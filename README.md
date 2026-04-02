@@ -1,7 +1,8 @@
-# Skill Distillation
-## Tối ưu hóa định nghĩa Skill cho Language Models nhỏ trong các tác vụ Agent
+# Skill Distillation for Small Large Language Models via Skill Definition Optimization
+## Chắt lọc Kỹ năng cho Mô hình Ngôn ngữ Lớn Nhỏ thông qua Tối ưu Định nghĩa Kỹ năng
 
-**Đề tài Đồ án Tốt nghiệp** • **2025**
+
+**Đề tài Đồ án Tốt nghiệp** • **2026**
 
 ---
 
