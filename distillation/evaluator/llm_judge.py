@@ -25,9 +25,9 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
-DEFAULT_MODEL    = "claude-haiku-4-5"
+DEFAULT_MODEL = "claude-haiku-4-5"
 DEFAULT_ENSEMBLE = 3
-MAX_CONTENT_CHARS = 3000   # truncate extracted content to protect context
+MAX_CONTENT_CHARS = 3000  # truncate extracted content to protect context
 
 JUDGE_SYSTEM = """You are an impartial evaluator assessing AI-generated task outputs.
 
@@ -101,15 +101,16 @@ class LLMJudge:
 
 # ── Content extractors (one per skill) ────────────────────────────────────────
 
+
 def _extract_content(output_dir: str, skill: str) -> str:
     """Extract human-readable content from output files for LLM Judge."""
     extractors = {
-        "docx":              _extract_docx,
-        "xlsx":              _extract_xlsx,
+        "docx": _extract_docx,
+        "xlsx": _extract_xlsx,
         "slack-gif-creator": _extract_gif_meta,
-        "webapp-testing":    _extract_script,
-        "frontend-design":   _extract_html,
-        "algorithmic-art":   _extract_script,
+        "webapp-testing": _extract_script,
+        "frontend-design": _extract_html,
+        "algorithmic-art": _extract_script,
     }
     fn = extractors.get(skill, _extract_any_text)
     return fn(Path(output_dir))
@@ -121,6 +122,7 @@ def _extract_docx(out: Path) -> str:
         return ""
     try:
         from docx import Document
+
         doc = Document(str(files[0]))
         lines = []
         for p in doc.paragraphs:
@@ -129,7 +131,9 @@ def _extract_docx(out: Path) -> str:
                 lines.append(f"[{style}] {p.text.strip()}")
         for table in doc.tables:
             for row in table.rows:
-                lines.append("| " + " | ".join(c.text.strip() for c in row.cells) + " |")
+                lines.append(
+                    "| " + " | ".join(c.text.strip() for c in row.cells) + " |"
+                )
         # Extract header/footer content so Judge can verify multi-zone layout
         for i, section in enumerate(doc.sections):
             for zone, label in [(section.header, "Header"), (section.footer, "Footer")]:
@@ -149,6 +153,7 @@ def _extract_xlsx(out: Path) -> str:
         return ""
     try:
         import openpyxl
+
         wb = openpyxl.load_workbook(str(files[0]), data_only=True)
         lines = []
         for sheet_name in wb.sheetnames:
@@ -171,6 +176,7 @@ def _extract_gif_meta(out: Path) -> str:
     for gif_path in files[:3]:
         try:
             from PIL import Image
+
             img = Image.open(str(gif_path))
             frames = getattr(img, "n_frames", 1)
             size_kb = gif_path.stat().st_size // 1024
@@ -218,6 +224,7 @@ def _truncate(text: str) -> str:
 
 # ── Claude call ───────────────────────────────────────────────────────────────
 
+
 def _build_judge_prompt(test_case: dict, content: str) -> str:
     checklist = _extract_checklist(test_case)
     checklist_text = "\n".join(f"  - {item}" for item in checklist)
@@ -247,7 +254,7 @@ Reply ONLY with JSON (include the checklist results)."""
 
 def _extract_checklist(test_case: dict) -> list[str]:
     """Extract specific requirements from prompt + expected_behavior as a checklist."""
-    prompt   = test_case.get("prompt", "")
+    prompt = test_case.get("prompt", "")
     expected = test_case.get("expected_behavior", "")
 
     checklist = [
@@ -294,14 +301,14 @@ def _parse_json_response(text: str) -> tuple[float, str]:
 
     try:
         data = json.loads(clean)
-        score     = float(data.get("score", -1))
+        score = float(data.get("score", -1))
         reasoning = str(data.get("reasoning", ""))
 
         # Optionally append checklist summary to reasoning
         checklist = data.get("checklist", {})
         if checklist:
             passed = sum(1 for v in checklist.values() if v)
-            total  = len(checklist)
+            total = len(checklist)
             reasoning = f"[{passed}/{total} checks] {reasoning}"
 
         if 0.0 <= score <= 1.0:

@@ -49,7 +49,9 @@ def execute_tool(
                 arguments.get("path", ""), arguments.get("content", ""), workspace
             )
         elif tool_name == "list_directory":
-            return _execute_list_directory(arguments.get("path", ""), workspace, skill_path)
+            return _execute_list_directory(
+                arguments.get("path", ""), workspace, skill_path
+            )
         elif tool_name == "str_replace":
             return _execute_str_replace(
                 arguments.get("path", ""),
@@ -140,7 +142,6 @@ def _execute_write_file(path: str, content: str, workspace: str) -> str:
     content = _normalize_workspace_refs(content, workspace)
     resolved = _resolve_path(path, workspace)
     ws = os.path.realpath(workspace)
-    rp = os.path.realpath(os.path.dirname(os.path.abspath(resolved)))
     # Ensure destination is inside workspace
     if not (os.path.realpath(resolved).startswith(ws)):
         return f"ERROR: Can only write files in workspace: {workspace}"
@@ -235,7 +236,10 @@ def _bash_error_hint(command: str, stdout: str, stderr: str) -> str:
         )
 
     # Python wrong args (usage message in stderr)
-    if any(kw in combined for kw in ("usage:", "error: the following", "unrecognized argument")):
+    if any(
+        kw in combined
+        for kw in ("usage:", "error: the following", "unrecognized argument")
+    ):
         m = re.search(r"python\s+(\S+\.py)", cmd)
         if m:
             return f"Wrong arguments. Run `python {m.group(1)} --help` to see correct usage."

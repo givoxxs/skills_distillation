@@ -37,15 +37,21 @@ def summarize(
     lines.append("")
 
     # ── Score summary ─────────────────────────────────────────────────────────
-    avg_score = sum(r.rule_score for r in eval_results) / len(eval_results) if eval_results else 0.0
+    avg_score = (
+        sum(r.rule_score for r in eval_results) / len(eval_results)
+        if eval_results
+        else 0.0
+    )
     pass_count = sum(1 for r in eval_results if r.rule_score >= 0.6)
-    lines.append(f"## Score Summary")
+    lines.append("## Score Summary")
     lines.append(f"- Test cases run: {len(eval_results)}")
     lines.append(f"- Pass (≥0.6): {pass_count}/{len(eval_results)}")
     lines.append(f"- Average rule score: {avg_score:.2f}")
 
     if prev_round_results:
-        prev_avg = sum(r.rule_score for r in prev_round_results) / len(prev_round_results)
+        prev_avg = sum(r.rule_score for r in prev_round_results) / len(
+            prev_round_results
+        )
         delta = avg_score - prev_avg
         sign = "+" if delta >= 0 else ""
         lines.append(f"- Delta from round {round_n - 1}: {sign}{delta:.2f}")
@@ -64,7 +70,9 @@ def summarize(
     if fail_counts:
         for check_name, count in sorted(fail_counts.items(), key=lambda x: -x[1]):
             pct = count / len(eval_results) * 100
-            lines.append(f"- `{check_name}`: failed {count}/{len(eval_results)} cases ({pct:.0f}%)")
+            lines.append(
+                f"- `{check_name}`: failed {count}/{len(eval_results)} cases ({pct:.0f}%)"
+            )
             reasons = fail_reasons.get(check_name, [])
             seen = set()
             for r in reasons[:3]:  # show up to 3 unique reasons
@@ -114,7 +122,11 @@ def _extract_patterns(log_paths: list[str]) -> list[str]:
             continue
 
         try:
-            events = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+            events = [
+                json.loads(line)
+                for line in path.read_text().splitlines()
+                if line.strip()
+            ]
         except Exception:
             continue
 
@@ -147,7 +159,9 @@ def _extract_patterns(log_paths: list[str]) -> list[str]:
         patterns.append(f"Average iterations per run: {avg:.1f}")
 
     if loop_detected_count:
-        patterns.append(f"Loop detected {loop_detected_count} time(s) — model repeated same failing command")
+        patterns.append(
+            f"Loop detected {loop_detected_count} time(s) — model repeated same failing command"
+        )
 
     for tool, count in sorted(tool_error_counts.items(), key=lambda x: -x[1]):
         patterns.append(f"Tool '{tool}' errored {count} time(s) across all runs")
@@ -188,11 +202,17 @@ def _generate_hints(
             "Heading 1/2/3 styles in the chosen library (docx-js or python-docx)"
         )
     if fail_counts.get("has_table", 0):
-        hints.append("Model omitted required table — add explicit table creation example to SKILL.md")
+        hints.append(
+            "Model omitted required table — add explicit table creation example to SKILL.md"
+        )
     if fail_counts.get("has_toc", 0):
-        hints.append("Model omitted table of contents — add step-by-step TOC creation instructions")
+        hints.append(
+            "Model omitted table of contents — add step-by-step TOC creation instructions"
+        )
     if fail_counts.get("heading_hierarchy", 0):
-        hints.append("Heading levels are out of order — add rule: 'Use H1→H2→H3 in order, never skip levels'")
+        hints.append(
+            "Heading levels are out of order — add rule: 'Use H1→H2→H3 in order, never skip levels'"
+        )
 
     any_loop = any("loop" in p.lower() for p in patterns)
     if any_loop:
@@ -209,6 +229,8 @@ def _generate_hints(
         )
 
     if not hints:
-        hints.append("No obvious issues — consider improving content quality or edge case handling")
+        hints.append(
+            "No obvious issues — consider improving content quality or edge case handling"
+        )
 
     return hints

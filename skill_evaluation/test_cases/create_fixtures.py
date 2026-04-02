@@ -12,17 +12,15 @@ import zipfile
 from pathlib import Path
 
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
-from docx.shared import Pt, RGBColor
-import openpyxl  # not used but ensure docx is importable
 
 OUT = Path(__file__).parent / "fixtures"
 OUT.mkdir(exist_ok=True)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _shade_row(row, hex_color: str = "BDD7EE"):
     """Apply background shading to every cell in a table row."""
@@ -37,6 +35,7 @@ def _shade_row(row, hex_color: str = "BDD7EE"):
 
 # ── fixture 1: simple_report.docx ─────────────────────────────────────────────
 # 3 headings (H1/H2/H3), 2 body paragraphs, 1 table 3×3, no images
+
 
 def make_simple_report():
     doc = Document()
@@ -59,8 +58,8 @@ def make_simple_report():
     headers = ["Department", "Budget (USD)", "Spent (USD)"]
     rows_data = [
         ["Engineering", "500,000", "487,000"],
-        ["Marketing",   "200,000", "198,500"],
-        ["Operations",  "150,000", "141,200"],
+        ["Marketing", "200,000", "198,500"],
+        ["Operations", "150,000", "141,200"],
     ]
     for i, h in enumerate(headers):
         table.rows[0].cells[i].text = h
@@ -75,6 +74,7 @@ def make_simple_report():
 
 # ── fixture 2: contract_draft.docx ────────────────────────────────────────────
 # sections: Parties, Scope, Payment, Termination; 'Company' x6, 'Party A' x4
+
 
 def make_contract_draft():
     doc = Document()
@@ -116,6 +116,7 @@ def make_contract_draft():
 # doc with 3 w:ins tracked insertions by author 'Jane'
 # python-docx doesn't support tracked changes, so inject via XML after saving
 
+
 def make_tracked_review():
     doc = Document()
     doc.add_heading("Project Review Notes", level=1)
@@ -140,18 +141,18 @@ def make_tracked_review():
         '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
         '<w:ins w:id="101" w:author="Jane" w:date="2025-03-01T00:00:00Z">'
         '<w:r><w:t xml:space="preserve"> [Jane: Please clarify this point.]</w:t></w:r>'
-        '</w:ins>'
-        '</w:p>'
+        "</w:ins>"
+        "</w:p>"
         '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
         '<w:ins w:id="102" w:author="Jane" w:date="2025-03-01T00:00:00Z">'
         '<w:r><w:t xml:space="preserve"> [Jane: Add cost breakdown here.]</w:t></w:r>'
-        '</w:ins>'
-        '</w:p>'
+        "</w:ins>"
+        "</w:p>"
         '<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
         '<w:ins w:id="103" w:author="Jane" w:date="2025-03-01T00:00:00Z">'
         '<w:r><w:t xml:space="preserve"> [Jane: Reference Appendix B.]</w:t></w:r>'
-        '</w:ins>'
-        '</w:p>'
+        "</w:ins>"
+        "</w:p>"
     )
     xml = xml.replace("</w:body>", ins_block + "</w:body>")
     doc_xml_path.write_text(xml, encoding="utf-8")
@@ -169,6 +170,7 @@ def make_tracked_review():
 
 # ── fixture 4: newsletter_raw.docx ────────────────────────────────────────────
 # plain single-column doc with 3 article blocks, no formatting
+
 
 def make_newsletter_raw():
     doc = Document()
@@ -210,6 +212,7 @@ def make_newsletter_raw():
 # ── fixture 5: data_table.docx ────────────────────────────────────────────────
 # single table 5×4 with numeric data, header row shaded
 
+
 def make_data_table():
     doc = Document()
     doc.add_heading("Quarterly Sales Data", level=1)
@@ -219,11 +222,11 @@ def make_data_table():
 
     headers = ["Product", "Q1 (USD)", "Q2 (USD)", "Q3 (USD)"]
     data = [
-        ["Widget A",  "45,000", "52,000", "61,000"],
-        ["Widget B",  "30,000", "28,000", "33,000"],
-        ["Widget C",  "18,000", "24,000", "27,500"],
-        ["Widget D",  "12,500", "15,000", "19,000"],
-        ["Widget E",   "9,000", "11,200", "14,800"],
+        ["Widget A", "45,000", "52,000", "61,000"],
+        ["Widget B", "30,000", "28,000", "33,000"],
+        ["Widget C", "18,000", "24,000", "27,500"],
+        ["Widget D", "12,500", "15,000", "19,000"],
+        ["Widget E", "9,000", "11,200", "14,800"],
     ]
 
     for i, h in enumerate(headers):

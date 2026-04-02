@@ -45,7 +45,12 @@ from evaluator.llm_judge import LLMJudge
 # Path to validate.py — resolved relative to this file's skill scripts location
 _VALIDATE_PY = (
     Path(__file__).parent.parent.parent
-    / "skill_runner" / "skills" / "docx" / "scripts" / "office" / "validate.py"
+    / "skill_runner"
+    / "skills"
+    / "docx"
+    / "scripts"
+    / "office"
+    / "validate.py"
 )
 
 
@@ -54,7 +59,9 @@ class DocxEvaluator:
 
     skill = "docx"
 
-    def __init__(self, judge_model: str = "claude-haiku-4-5", use_llm_judge: bool = True) -> None:
+    def __init__(
+        self, judge_model: str = "claude-haiku-4-5", use_llm_judge: bool = True
+    ) -> None:
         self.use_llm_judge = use_llm_judge
         self._judge = LLMJudge(model=judge_model) if use_llm_judge else None
 
@@ -74,8 +81,8 @@ class DocxEvaluator:
         )
 
         out = Path(output_dir)
-        sc  = test_case.get("structural_checks") or {}
-        ae  = test_case.get("auto_eval") or {}
+        sc = test_case.get("structural_checks") or {}
+        ae = test_case.get("auto_eval") or {}
 
         # Locate output file
         expected_filename = sc.get("expected_filename") or ae.get("expected_filename")
@@ -85,7 +92,7 @@ class DocxEvaluator:
                 docx_path = next(iter(out.rglob("*.docx")), None)
         else:
             docx_files = list(out.rglob("*.docx"))
-            docx_path  = docx_files[0] if docx_files else None
+            docx_path = docx_files[0] if docx_files else None
 
         doc = _try_load(docx_path)
 
@@ -111,62 +118,84 @@ class DocxEvaluator:
         if sc.get("has_list"):
             g2.append(self._check_has_list(doc))
         if sc.get("min_pages") or sc.get("max_pages"):
-            g2.append(self._check_page_count(doc, sc.get("min_pages"), sc.get("max_pages")))
+            g2.append(
+                self._check_page_count(doc, sc.get("min_pages"), sc.get("max_pages"))
+            )
 
         # auto_eval checks
         if ae:
             g2 += self._run_auto_eval(docx_path, ae)
 
-        result.checks     = g1 + g2
+        result.checks = g1 + g2
         result.rule_score = 0.50 * _avg(g1) + 0.50 * _avg(g2)
 
         # Tier 1-2 weights: rule 40% + llm 60% (thesis spec)
         result._rule_weight = 0.40
-        result._llm_weight  = 0.60
+        result._llm_weight = 0.60
 
         # ── LLM Judge (60% of hybrid score) ──────────────────────────────────
         if self._judge and result.rule_score > 0:
             llm_score, reasoning = self._judge.score(output_dir, test_case, self.skill)
-            result.llm_judge_score     = llm_score
+            result.llm_judge_score = llm_score
             result.llm_judge_reasoning = reasoning
 
         return result
 
     # ── Group 1 ───────────────────────────────────────────────────────────────
 
-    def _check_file_exists(self, path: Path | None, expected_filename: str | None) -> CheckResult:
-        ok  = path is not None and path.exists()
+    def _check_file_exists(
+        self, path: Path | None, expected_filename: str | None
+    ) -> CheckResult:
+        ok = path is not None and path.exists()
         msg = ""
         if not ok:
-            msg = f"Expected '{expected_filename}' not found" if expected_filename else "No .docx file found in output_dir"
+            msg = (
+                f"Expected '{expected_filename}' not found"
+                if expected_filename
+                else "No .docx file found in output_dir"
+            )
         return CheckResult("file_exists", ok, 1.0 if ok else 0.0, msg)
 
     def _check_file_parseable(self, path: Path | None, doc) -> CheckResult:
         if path is None or not path.exists():
             return CheckResult("file_parseable", False, 0.0, "No file to parse")
         ok = doc is not None
-        return CheckResult("file_parseable", ok, 1.0 if ok else 0.0,
-                           "" if ok else "python-docx raised an error — file may be corrupt")
+        return CheckResult(
+            "file_parseable",
+            ok,
+            1.0 if ok else 0.0,
+            "" if ok else "python-docx raised an error — file may be corrupt",
+        )
 
     def _check_file_not_empty(self, path: Path | None) -> CheckResult:
         if path is None or not path.exists():
             return CheckResult("file_not_empty", False, 0.0, "No file")
         size = path.stat().st_size
-        ok   = size > 1024
-        return CheckResult("file_not_empty", ok, 1.0 if ok else 0.0,
-                           "" if ok else f"File only {size} bytes — likely empty or invalid")
+        ok = size > 1024
+        return CheckResult(
+            "file_not_empty",
+            ok,
+            1.0 if ok else 0.0,
+            "" if ok else f"File only {size} bytes — likely empty or invalid",
+        )
 
     # ── Group 2: structural checks ────────────────────────────────────────────
 
     def _check_no_placeholders(self, doc) -> CheckResult:
         if doc is None:
             return CheckResult("no_placeholders", False, 0.0, "Could not load document")
-        text    = " ".join(p.text for p in doc.paragraphs)
-        pattern = re.compile(r"\[INSERT|\[YOUR |\[NAME\]|\[DATE\]|\{\{|TBD\b|TODO\b", re.I)
-        match   = pattern.search(text)
-        ok      = match is None
-        return CheckResult("no_placeholders", ok, 1.0 if ok else 0.0,
-                           "" if ok else f"Unfilled placeholder: '{match.group()}'")
+        text = " ".join(p.text for p in doc.paragraphs)
+        pattern = re.compile(
+            r"\[INSERT|\[YOUR |\[NAME\]|\[DATE\]|\{\{|TBD\b|TODO\b", re.I
+        )
+        match = pattern.search(text)
+        ok = match is None
+        return CheckResult(
+            "no_placeholders",
+            ok,
+            1.0 if ok else 0.0,
+            "" if ok else f"Unfilled placeholder: '{match.group()}'",
+        )
 
     def _check_has_heading_level(self, doc, level: int) -> CheckResult:
         name = f"has_h{level}"
@@ -176,15 +205,20 @@ class DocxEvaluator:
             p.style is not None and p.style.name == f"Heading {level}"
             for p in doc.paragraphs
         )
-        return CheckResult(name, ok, 1.0 if ok else 0.0,
-                           "" if ok else f"No 'Heading {level}' paragraph found")
+        return CheckResult(
+            name,
+            ok,
+            1.0 if ok else 0.0,
+            "" if ok else f"No 'Heading {level}' paragraph found",
+        )
 
     def _check_has_table(self, doc) -> CheckResult:
         if doc is None:
             return CheckResult("has_table", False, 0.0, "Could not load document")
         ok = len(doc.tables) > 0
-        return CheckResult("has_table", ok, 1.0 if ok else 0.0,
-                           "" if ok else "No tables found")
+        return CheckResult(
+            "has_table", ok, 1.0 if ok else 0.0, "" if ok else "No tables found"
+        )
 
     def _check_has_toc(self, doc) -> CheckResult:
         if doc is None:
@@ -194,42 +228,58 @@ class DocxEvaluator:
             p.style is not None and p.style.name.startswith("TOC")
             for p in doc.paragraphs
         )
-        return CheckResult("has_toc", ok, 1.0 if ok else 0.0,
-                           "" if ok else "No table of contents found")
+        return CheckResult(
+            "has_toc",
+            ok,
+            1.0 if ok else 0.0,
+            "" if ok else "No table of contents found",
+        )
 
     def _check_has_header_footer(self, doc) -> CheckResult:
         if doc is None:
-            return CheckResult("has_header_footer", False, 0.0, "Could not load document")
+            return CheckResult(
+                "has_header_footer", False, 0.0, "Could not load document"
+            )
         has = any(
-            (section.header and any(p.text.strip() for p in section.header.paragraphs)) or
-            (section.footer and any(p.text.strip() for p in section.footer.paragraphs))
+            (section.header and any(p.text.strip() for p in section.header.paragraphs))
+            or (
+                section.footer
+                and any(p.text.strip() for p in section.footer.paragraphs)
+            )
             for section in doc.sections
         )
-        return CheckResult("has_header_footer", has, 1.0 if has else 0.0,
-                           "" if has else "No header or footer with content found")
+        return CheckResult(
+            "has_header_footer",
+            has,
+            1.0 if has else 0.0,
+            "" if has else "No header or footer with content found",
+        )
 
     def _check_has_list(self, doc) -> CheckResult:
         if doc is None:
             return CheckResult("has_list", False, 0.0, "Could not load document")
         ok = any(
-            (p.style is not None and p.style.name.startswith("List")) or
-            (p._element.pPr is not None and p._element.pPr.numPr is not None)
+            (p.style is not None and p.style.name.startswith("List"))
+            or (p._element.pPr is not None and p._element.pPr.numPr is not None)
             for p in doc.paragraphs
         )
-        return CheckResult("has_list", ok, 1.0 if ok else 0.0,
-                           "" if ok else "No list items found")
+        return CheckResult(
+            "has_list", ok, 1.0 if ok else 0.0, "" if ok else "No list items found"
+        )
 
-    def _check_page_count(self, doc, min_pages: int | None, max_pages: int | None) -> CheckResult:
+    def _check_page_count(
+        self, doc, min_pages: int | None, max_pages: int | None
+    ) -> CheckResult:
         if doc is None:
             return CheckResult("page_count", False, 0.0, "Could not load document")
         count = doc.element.body.xml.count('w:type="page"') + 1
-        ok    = True
-        msg   = f"Estimated {count} page(s)"
+        ok = True
+        msg = f"Estimated {count} page(s)"
         if min_pages and count < min_pages:
-            ok  = False
+            ok = False
             msg = f"Estimated {count} page(s), expected >= {min_pages}"
         elif max_pages and count > max_pages:
-            ok  = False
+            ok = False
             msg = f"Estimated {count} page(s), expected <= {max_pages}"
         return CheckResult("page_count", ok, 1.0 if ok else 0.0, "" if ok else msg)
 
@@ -264,10 +314,16 @@ class DocxEvaluator:
                 doc_xml = _read_file(tmp_dir / xml_filename)
                 for needle in ae["xml_must_contain"]:
                     ok = needle in doc_xml
-                    checks.append(CheckResult(
-                        f"xml_has:{needle[:40]}", ok, 1.0 if ok else 0.0,
-                        "" if ok else f"XML missing in {xml_filename}: {needle[:60]}",
-                    ))
+                    checks.append(
+                        CheckResult(
+                            f"xml_has:{needle[:40]}",
+                            ok,
+                            1.0 if ok else 0.0,
+                            ""
+                            if ok
+                            else f"XML missing in {xml_filename}: {needle[:60]}",
+                        )
+                    )
 
             # xml_must_not_contain — checked against xml_file (default: document.xml)
             if ae.get("xml_must_not_contain"):
@@ -275,10 +331,16 @@ class DocxEvaluator:
                 doc_xml = _read_file(tmp_dir / xml_filename)
                 for needle in ae["xml_must_not_contain"]:
                     ok = needle not in doc_xml
-                    checks.append(CheckResult(
-                        f"xml_absent:{needle[:40]}", ok, 1.0 if ok else 0.0,
-                        "" if ok else f"XML must not contain in {xml_filename}: {needle[:60]}",
-                    ))
+                    checks.append(
+                        CheckResult(
+                            f"xml_absent:{needle[:40]}",
+                            ok,
+                            1.0 if ok else 0.0,
+                            ""
+                            if ok
+                            else f"XML must not contain in {xml_filename}: {needle[:60]}",
+                        )
+                    )
 
             # footer_xml_must_contain — checked against any word/footer*.xml
             if ae.get("footer_xml_must_contain") and tmp_dir:
@@ -287,10 +349,14 @@ class DocxEvaluator:
                     footer_xml += _read_file(fpath)
                 for needle in ae["footer_xml_must_contain"]:
                     ok = needle in footer_xml
-                    checks.append(CheckResult(
-                        f"footer_has:{needle[:40]}", ok, 1.0 if ok else 0.0,
-                        "" if ok else f"Footer XML missing: {needle[:60]}",
-                    ))
+                    checks.append(
+                        CheckResult(
+                            f"footer_has:{needle[:40]}",
+                            ok,
+                            1.0 if ok else 0.0,
+                            "" if ok else f"Footer XML missing: {needle[:60]}",
+                        )
+                    )
 
             # file_exists — paths inside the zip (e.g. "word/footnotes.xml")
             if ae.get("file_exists") and tmp_dir:
@@ -302,24 +368,34 @@ class DocxEvaluator:
                         ok = dir_path.is_dir() and any(dir_path.iterdir())
                     else:
                         ok = target.exists()
-                    checks.append(CheckResult(
-                        f"zip_has:{rel_path}", ok, 1.0 if ok else 0.0,
-                        "" if ok else f"Missing in docx zip: {rel_path}",
-                    ))
+                    checks.append(
+                        CheckResult(
+                            f"zip_has:{rel_path}",
+                            ok,
+                            1.0 if ok else 0.0,
+                            "" if ok else f"Missing in docx zip: {rel_path}",
+                        )
+                    )
 
             # keywords_in_text — extracted from doc paragraphs
             if ae.get("keywords_in_text") or ae.get("keywords_in_output"):
-                keywords = ae.get("keywords_in_text") or ae.get("keywords_in_output") or []
+                keywords = (
+                    ae.get("keywords_in_text") or ae.get("keywords_in_output") or []
+                )
                 doc = _try_load(docx_path)
                 text = ""
                 if doc:
                     text = " ".join(p.text for p in doc.paragraphs).lower()
                 for kw in keywords:
                     ok = kw.lower() in text
-                    checks.append(CheckResult(
-                        f"kw:{kw[:30]}", ok, 1.0 if ok else 0.0,
-                        "" if ok else f"Keyword not found in document text: '{kw}'",
-                    ))
+                    checks.append(
+                        CheckResult(
+                            f"kw:{kw[:30]}",
+                            ok,
+                            1.0 if ok else 0.0,
+                            "" if ok else f"Keyword not found in document text: '{kw}'",
+                        )
+                    )
 
             # validate_passes — run scripts/office/validate.py
             if ae.get("validate_passes") and _VALIDATE_PY.exists():
@@ -328,6 +404,7 @@ class DocxEvaluator:
         finally:
             if tmp_dir:
                 import shutil
+
                 shutil.rmtree(tmp_dir, ignore_errors=True)
 
         return checks
@@ -352,11 +429,13 @@ class DocxEvaluator:
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+
 def _try_load(path: Path | None):
     if path is None or not path.exists():
         return None
     try:
         from docx import Document
+
         return Document(str(path))
     except Exception:
         return None

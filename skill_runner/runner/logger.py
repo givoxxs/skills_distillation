@@ -24,28 +24,43 @@ class AgentLogger:
         self._fh.flush()
 
     def log_start(self, skill: str, model: str, prompt: str) -> None:
-        self._write({"event": "start", "skill": skill, "model": model, "prompt": prompt})
+        self._write(
+            {"event": "start", "skill": skill, "model": model, "prompt": prompt}
+        )
 
     def log_event(self, iteration: int, event: str, data: dict[str, Any]) -> None:
         self._write({"event": event, "iteration": iteration, **data})
 
     def log_tool_call(self, iteration: int, tool: str, args: dict[str, Any]) -> None:
-        self._write({"event": "tool_call", "iteration": iteration, "tool": tool, "args": args})
+        self._write(
+            {"event": "tool_call", "iteration": iteration, "tool": tool, "args": args}
+        )
 
     def log_tool_result(self, iteration: int, tool: str, result: str) -> None:
-        self._write({"event": "tool_result", "iteration": iteration, "tool": tool, "result": result[:500]})
+        self._write(
+            {
+                "event": "tool_result",
+                "iteration": iteration,
+                "tool": tool,
+                "result": result[:500],
+            }
+        )
 
     def log_error(self, iteration: int, error: str) -> None:
         self._write({"event": "api_error", "iteration": iteration, "error": error})
 
-    def log_end(self, iterations: int, stop_reason: str, duration: float, tokens: dict[str, int]) -> None:
-        self._write({
-            "event": "end",
-            "iterations": iterations,
-            "stop_reason": stop_reason,
-            "duration_seconds": round(duration, 2),
-            "tokens": tokens,
-        })
+    def log_end(
+        self, iterations: int, stop_reason: str, duration: float, tokens: dict[str, int]
+    ) -> None:
+        self._write(
+            {
+                "event": "end",
+                "iterations": iterations,
+                "stop_reason": stop_reason,
+                "duration_seconds": round(duration, 2),
+                "tokens": tokens,
+            }
+        )
         self._fh.close()
 
     @property

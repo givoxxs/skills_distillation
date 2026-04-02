@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Protocol
 
 
 @dataclass
 class CheckResult:
     name: str
-    passed: bool        # True/False
-    score: float        # 0.0 or 1.0 (binary for rule-based)
-    reason: str = ""    # short explanation, shown in summary/key_notes
+    passed: bool  # True/False
+    score: float  # 0.0 or 1.0 (binary for rule-based)
+    reason: str = ""  # short explanation, shown in summary/key_notes
 
 
 @dataclass
@@ -26,10 +25,10 @@ class EvalResult:
     checks: list[CheckResult] = field(default_factory=list)
 
     # Computed after all checks run
-    rule_score: float = 0.0        # weighted average of rule checks (0.0 – 1.0)
+    rule_score: float = 0.0  # weighted average of rule checks (0.0 – 1.0)
     llm_judge_score: float = -1.0  # -1 = not run yet
     llm_judge_reasoning: str = ""
-    human_eval_score: float = -1.0 # -1 = not run yet
+    human_eval_score: float = -1.0  # -1 = not run yet
 
     # Hybrid weights — override per evaluator:
     #   Tier 1-2 (docx, xlsx, slack-gif, webapp):  rule=0.50, llm=0.50, human=0.00
@@ -57,8 +56,8 @@ class EvalResult:
             if total == 0:
                 return self.rule_score
             r = self._rule_weight / total
-            l = self._llm_weight / total
-            return r * self.rule_score + l * llm
+            lw = self._llm_weight / total
+            return r * self.rule_score + lw * llm
 
     @property
     def failed_checks(self) -> list[CheckResult]:

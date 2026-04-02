@@ -25,12 +25,12 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "command": {
                         "type": "string",
-                        "description": "The bash command to execute"
+                        "description": "The bash command to execute",
                     }
                 },
-                "required": ["command"]
-            }
-        }
+                "required": ["command"],
+            },
+        },
     },
     {
         "type": "function",
@@ -46,12 +46,12 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Absolute path to the file to read"
+                        "description": "Absolute path to the file to read",
                     }
                 },
-                "required": ["path"]
-            }
-        }
+                "required": ["path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -69,16 +69,16 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Absolute path to write the file"
+                        "description": "Absolute path to write the file",
                     },
                     "content": {
                         "type": "string",
-                        "description": "Content to write to the file"
-                    }
+                        "description": "Content to write to the file",
+                    },
                 },
-                "required": ["path", "content"]
-            }
-        }
+                "required": ["path", "content"],
+            },
+        },
     },
     {
         "type": "function",
@@ -90,12 +90,12 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Absolute path to the directory to list"
+                        "description": "Absolute path to the directory to list",
                     }
                 },
-                "required": ["path"]
-            }
-        }
+                "required": ["path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -112,13 +112,13 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "summary": {
                         "type": "string",
-                        "description": "A brief summary of what was accomplished"
+                        "description": "A brief summary of what was accomplished",
                     }
                 },
-                "required": ["summary"]
-            }
-        }
-    }
+                "required": ["summary"],
+            },
+        },
+    },
 ]
 
 

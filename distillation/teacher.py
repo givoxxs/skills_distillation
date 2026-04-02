@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 DEFAULT_MODEL = "claude-haiku-4-5"
-MAX_TOKENS    = 8192
+MAX_TOKENS = 8192
 
 SYSTEM_PROMPT = """You are an expert technical writer specializing in optimizing \
 AI agent skill definitions.

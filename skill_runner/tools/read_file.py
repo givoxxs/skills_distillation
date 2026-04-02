@@ -36,7 +36,10 @@ def read_file(path: str, workspace: str, skill_path: str, max_chars: int = 4000)
     try:
         content = Path(path).read_text(encoding="utf-8")
         if len(content) > max_chars:
-            content = content[:max_chars] + f"\n... [TRUNCATED — {len(content):,} total chars]"
+            content = (
+                content[:max_chars]
+                + f"\n... [TRUNCATED — {len(content):,} total chars]"
+            )
         return content
     except UnicodeDecodeError:
         return f"ERROR: Cannot read binary file: {path}"

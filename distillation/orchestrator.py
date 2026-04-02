@@ -28,19 +28,19 @@ from pathlib import Path
 _SKILL_RUNNER = Path(__file__).parent.parent / "skill_runner"
 sys.path.insert(0, str(_SKILL_RUNNER))
 
-from config import RunConfig
-from runner.agent_loop import run_agent
+from config import RunConfig  # noqa: E402
+from runner.agent_loop import run_agent  # noqa: E402
 
-from evaluator.base import EvalResult
-from evaluator.docx_rules import DocxEvaluator
-import summarizer
-import teacher as teacher_module
+from evaluator.base import EvalResult  # noqa: E402
+from evaluator.docx_rules import DocxEvaluator  # noqa: E402
+import summarizer  # noqa: E402
+import teacher as teacher_module  # noqa: E402
 
 # ── Default stopping criteria (overridable via run_distillation args) ─────────
 _STOP_THRESHOLD = 0.80
 _CONVERGE_DELTA = 0.02
-_CONVERGE_K     = 3
-_MAX_ROUNDS     = 10
+_CONVERGE_K = 3
+_MAX_ROUNDS = 10
 
 
 def _build_evaluators(judge_model: str, use_llm_judge: bool) -> dict:
@@ -91,35 +91,39 @@ def run_distillation(
     Returns:
         Dict with keys: rounds, final_score, best_round, skill_md_versions.
     """
-    evaluators = _build_evaluators(judge_model=teacher_model, use_llm_judge=use_llm_judge)
+    evaluators = _build_evaluators(
+        judge_model=teacher_model, use_llm_judge=use_llm_judge
+    )
     if skill not in evaluators:
         raise ValueError(
             f"No evaluator registered for skill '{skill}'. "
             f"Available: {list(evaluators.keys())}"
         )
 
-    evaluator   = evaluators[skill]
+    evaluator = evaluators[skill]
     results_path = Path(results_dir) / skill
     results_path.mkdir(parents=True, exist_ok=True)
 
-    sr            = _SKILL_RUNNER
-    skills_dir    = skills_dir    or str(sr / "skills")
+    sr = _SKILL_RUNNER
+    skills_dir = skills_dir or str(sr / "skills")
     workspace_dir = workspace_dir or str(sr / "workspace")
-    log_dir       = log_dir       or str(sr / "logs")
+    log_dir = log_dir or str(sr / "logs")
 
     skill_md_path = Path(skills_dir) / skill / "SKILL.md"
     if not skill_md_path.exists():
         raise FileNotFoundError(f"SKILL.md not found at {skill_md_path}")
 
     # Effective batch size — 0 means "all at once"
-    eff_batch = batch_size if (batch_size and batch_size < len(test_cases)) else len(test_cases)
+    eff_batch = (
+        batch_size if (batch_size and batch_size < len(test_cases)) else len(test_cases)
+    )
     n_batches = math.ceil(len(test_cases) / eff_batch)
 
     run_log_path = results_path / "run.log"
     run_log_file = open(run_log_path, "a", buffering=1)
 
     def emit(msg: str) -> None:
-        ts   = datetime.now().strftime("%H:%M:%S")
+        ts = datetime.now().strftime("%H:%M:%S")
         line = f"[{ts}] {msg}"
         run_log_file.write(line + "\n")
         run_log_file.flush()
@@ -128,8 +132,12 @@ def run_distillation(
 
     emit("=" * 60)
     emit(f"START  skill={skill}  student={student_model}  teacher={teacher_model}")
-    emit(f"Test cases: {len(test_cases)}  |  batch_size={eff_batch}  |  batches/round={n_batches}")
-    emit(f"Max rounds: {max_rounds}  |  stop≥{stop_threshold}  |  converge Δ<{converge_delta} × {converge_k}")
+    emit(
+        f"Test cases: {len(test_cases)}  |  batch_size={eff_batch}  |  batches/round={n_batches}"
+    )
+    emit(
+        f"Max rounds: {max_rounds}  |  stop≥{stop_threshold}  |  converge Δ<{converge_delta} × {converge_k}"
+    )
     emit("=" * 60)
 
     _save_skill_version(skill_md_path, results_path, round_n=0)
@@ -141,13 +149,12 @@ def run_distillation(
     for round_n in range(1, max_rounds + 1):
         emit("")
         emit(f"--- Round {round_n}/{max_rounds} ---")
-        round_start      = time.time()
+        round_start = time.time()
         all_round_results: list[EvalResult] = []
 
         # Split test cases into batches
         batches = [
-            test_cases[i : i + eff_batch]
-            for i in range(0, len(test_cases), eff_batch)
+            test_cases[i : i + eff_batch] for i in range(0, len(test_cases), eff_batch)
         ]
 
         for batch_idx, batch in enumerate(batches, 1):
@@ -161,7 +168,9 @@ def run_distillation(
                 output_dir = str(
                     results_path / f"round_{round_n}" / f"batch_{batch_idx}" / tc["id"]
                 )
-                emit(f"    [{tc_idx}/{len(batch)}] tc={tc['id']}  '{tc.get('name', '')}' ...")
+                emit(
+                    f"    [{tc_idx}/{len(batch)}] tc={tc['id']}  '{tc.get('name', '')}' ..."
+                )
                 tc_start = time.time()
 
                 config = RunConfig(
@@ -190,11 +199,16 @@ def run_distillation(
                         emit("      output: (none)")
                 except Exception as e:
                     emit(f"      ERROR: {e}")
-                    batch_results.append(EvalResult(
-                        test_case_id=tc["id"], skill=skill,
-                        model=student_model, round_n=round_n,
-                        output_dir=output_dir, rule_score=0.0,
-                    ))
+                    batch_results.append(
+                        EvalResult(
+                            test_case_id=tc["id"],
+                            skill=skill,
+                            model=student_model,
+                            round_n=round_n,
+                            output_dir=output_dir,
+                            rule_score=0.0,
+                        )
+                    )
                     continue
 
                 log_path = _find_latest_log(log_dir, skill)
@@ -210,7 +224,8 @@ def run_distillation(
             # ── Batch summary ─────────────────────────────────────────────────
             batch_avg = (
                 sum(r.rule_score for r in batch_results) / len(batch_results)
-                if batch_results else 0.0
+                if batch_results
+                else 0.0
             )
             emit(f"  [{batch_label}] batch_avg={batch_avg:.3f}")
             _save_batch_scores(results_path, round_n, batch_idx, batch_results)
@@ -225,7 +240,10 @@ def run_distillation(
                 round_n=round_n,
             )
             key_notes_path = (
-                results_path / f"round_{round_n}" / f"batch_{batch_idx}" / "key_notes.md"
+                results_path
+                / f"round_{round_n}"
+                / f"batch_{batch_idx}"
+                / "key_notes.md"
             )
             key_notes_path.parent.mkdir(parents=True, exist_ok=True)
             key_notes_path.write_text(key_notes)
@@ -244,14 +262,17 @@ def run_distillation(
         # ── Round summary ─────────────────────────────────────────────────────
         avg_score = (
             sum(r.rule_score for r in all_round_results) / len(all_round_results)
-            if all_round_results else 0.0
+            if all_round_results
+            else 0.0
         )
-        history.append({
-            "round":        round_n,
-            "avg_score":    avg_score,
-            "n_batches":    len(batches),
-            "eval_results": [_serialize_result(r) for r in all_round_results],
-        })
+        history.append(
+            {
+                "round": round_n,
+                "avg_score": avg_score,
+                "n_batches": len(batches),
+                "eval_results": [_serialize_result(r) for r in all_round_results],
+            }
+        )
         _save_round_scores(results_path, round_n, history[-1])
         _save_skill_version(skill_md_path, results_path, round_n=round_n)
 
@@ -265,12 +286,16 @@ def run_distillation(
             break
 
         if prev_all_results:
-            prev_avg = sum(r.rule_score for r in prev_all_results) / len(prev_all_results)
+            prev_avg = sum(r.rule_score for r in prev_all_results) / len(
+                prev_all_results
+            )
             delta = avg_score - prev_avg
             recent_deltas.append(abs(delta))
             if len(recent_deltas) >= converge_k:
                 if all(d < converge_delta for d in recent_deltas[-converge_k:]):
-                    emit(f"  ✓ STOP: converged (Δ<{converge_delta} for {converge_k} rounds)")
+                    emit(
+                        f"  ✓ STOP: converged (Δ<{converge_delta} for {converge_k} rounds)"
+                    )
                     break
 
         if round_n == max_rounds:
@@ -282,16 +307,20 @@ def run_distillation(
     # ── Final summary ─────────────────────────────────────────────────────────
     best = max(history, key=lambda h: h["avg_score"])
     summary = {
-        "skill":         skill,
+        "skill": skill,
         "student_model": student_model,
         "teacher_model": teacher_model,
-        "batch_size":    eff_batch,
-        "rounds_run":    len(history),
-        "final_score":   history[-1]["avg_score"] if history else 0.0,
-        "best_round":    best["round"],
-        "best_score":    best["avg_score"],
+        "batch_size": eff_batch,
+        "rounds_run": len(history),
+        "final_score": history[-1]["avg_score"] if history else 0.0,
+        "best_round": best["round"],
+        "best_score": best["avg_score"],
         "score_history": [
-            {"round": h["round"], "avg_score": h["avg_score"], "n_batches": h["n_batches"]}
+            {
+                "round": h["round"],
+                "avg_score": h["avg_score"],
+                "n_batches": h["n_batches"],
+            }
             for h in history
         ],
     }
@@ -307,6 +336,7 @@ def run_distillation(
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _find_latest_log(log_dir: str, skill: str) -> str | None:
     log_path = Path(log_dir)
@@ -332,15 +362,19 @@ def _save_batch_scores(
 ) -> None:
     path = results_path / f"round_{round_n}" / f"batch_{batch_idx}" / "scores.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(
-        {
-            "round": round_n,
-            "batch": batch_idx,
-            "avg_score": sum(r.rule_score for r in results) / len(results) if results else 0.0,
-            "eval_results": [_serialize_result(r) for r in results],
-        },
-        indent=2,
-    ))
+    path.write_text(
+        json.dumps(
+            {
+                "round": round_n,
+                "batch": batch_idx,
+                "avg_score": sum(r.rule_score for r in results) / len(results)
+                if results
+                else 0.0,
+                "eval_results": [_serialize_result(r) for r in results],
+            },
+            indent=2,
+        )
+    )
 
 
 def _save_round_scores(results_path: Path, round_n: int, round_data: dict) -> None:
@@ -355,11 +389,11 @@ def _save_summary(results_path: Path, summary: dict) -> None:
 
 def _serialize_result(r: EvalResult) -> dict:
     return {
-        "test_case_id":  r.test_case_id,
-        "rule_score":    r.rule_score,
-        "llm_score":     r.llm_judge_score if r.llm_judge_score >= 0 else None,
+        "test_case_id": r.test_case_id,
+        "rule_score": r.rule_score,
+        "llm_score": r.llm_judge_score if r.llm_judge_score >= 0 else None,
         "llm_reasoning": r.llm_judge_reasoning or None,
-        "hybrid_score":  r.hybrid_score,
+        "hybrid_score": r.hybrid_score,
         "checks": [
             {"name": c.name, "passed": c.passed, "score": c.score, "reason": c.reason}
             for c in r.checks

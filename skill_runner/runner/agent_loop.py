@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-import openai
 from rich.console import Console
 from rich.panel import Panel
 
@@ -25,10 +24,24 @@ console = Console()
 
 # Directories/files kept across workspace cleans (npm cache, installed packages).
 # These are expensive to reinstall and safe to reuse between runs.
-_WORKSPACE_PERSISTENT = {"_skills", ".npm", "node_modules", "package.json", "package-lock.json", "Library"}
+_WORKSPACE_PERSISTENT = {
+    "_skills",
+    ".npm",
+    "node_modules",
+    "package.json",
+    "package-lock.json",
+    "Library",
+}
 
 # Same set excluded when copying outputs — they are build artifacts, not results.
-_OUTPUT_EXCLUDE = {"_skills", ".npm", "node_modules", "package.json", "package-lock.json", "Library"}
+_OUTPUT_EXCLUDE = {
+    "_skills",
+    ".npm",
+    "node_modules",
+    "package.json",
+    "package-lock.json",
+    "Library",
+}
 
 
 def _clean_workspace(workspace_dir: str, preserve: list[str] | None = None) -> None:
@@ -114,16 +127,21 @@ def run_agent(
                 skill_name, config.skills_dir, config.workspace_dir
             )
             skill_files = list_skill_files(skill_path)
-            system_prompt = build_system_prompt(
-                skill_content=skill_content,
-                skill_path=skill_path,
-                skill_files=skill_files,
-                workspace_path=workspace_abs,
-            ) + input_note
+            system_prompt = (
+                build_system_prompt(
+                    skill_content=skill_content,
+                    skill_path=skill_path,
+                    skill_files=skill_files,
+                    workspace_path=workspace_abs,
+                )
+                + input_note
+            )
         except FileNotFoundError as e:
             raise ValueError(f"Cannot load skill '{skill_name}': {e}") from e
     else:
-        system_prompt = build_system_prompt_no_skill(workspace_path=workspace_abs) + input_note
+        system_prompt = (
+            build_system_prompt_no_skill(workspace_path=workspace_abs) + input_note
+        )
 
     # 3. Init state
     messages: list[dict[str, Any]] = [{"role": "user", "content": user_prompt}]
@@ -148,14 +166,15 @@ def run_agent(
     MAX_CONSECUTIVE_ERRORS = 2  # Warn after 2 identical failures, not 3
 
     if config.verbose:
-        console.print(Panel(
-            f"[bold]Model:[/bold] {model}\n[bold]Skill:[/bold] {skill_name or 'none'}\n[bold]Prompt:[/bold] {user_prompt[:200]}",
-            title="Agent Run Started"
-        ))
+        console.print(
+            Panel(
+                f"[bold]Model:[/bold] {model}\n[bold]Skill:[/bold] {skill_name or 'none'}\n[bold]Prompt:[/bold] {user_prompt[:200]}",
+                title="Agent Run Started",
+            )
+        )
 
     # 4. Agentic loop
     for iteration in range(config.max_iterations):
-
         # === API call ===
         try:
             response = call_with_retry(
@@ -207,7 +226,9 @@ def run_agent(
         # === Stop condition: model finished naturally ===
         if choice.finish_reason not in ("tool_calls", "function_call"):
             if not assistant_msg.tool_calls:
-                logger.log_event(iteration, "natural_stop", {"finish_reason": choice.finish_reason})
+                logger.log_event(
+                    iteration, "natural_stop", {"finish_reason": choice.finish_reason}
+                )
                 stop_reason = "natural_stop"
                 break
 
@@ -234,20 +255,26 @@ def run_agent(
             try:
                 args = json.loads(tc.function.arguments)
             except json.JSONDecodeError as parse_err:
-                logger.log_event(iteration, "json_parse_error", {
-                    "tool": tc.function.name,
-                    "error": str(parse_err),
-                })
+                logger.log_event(
+                    iteration,
+                    "json_parse_error",
+                    {
+                        "tool": tc.function.name,
+                        "error": str(parse_err),
+                    },
+                )
                 # Return the parse error directly to the model so it can retry correctly
-                tool_results.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": (
-                        f"ERROR: Could not parse tool arguments as JSON: {parse_err}. "
-                        "If writing a large file, try writing it in chunks using bash with a heredoc, "
-                        "or break the content into smaller write_file calls."
-                    ),
-                })
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": (
+                            f"ERROR: Could not parse tool arguments as JSON: {parse_err}. "
+                            "If writing a large file, try writing it in chunks using bash with a heredoc, "
+                            "or break the content into smaller write_file calls."
+                        ),
+                    }
+                )
                 continue
 
             logger.log_tool_call(iteration, tc.function.name, args)
@@ -288,7 +315,11 @@ def run_agent(
                         "- bash script fails: read the error carefully, fix the script with write_file, then retry\n"
                         "If you cannot complete the task, call end_turn with an explanation."
                     )
-                    logger.log_event(iteration, "loop_detected", {"tool": tool_key, "count": consecutive_errors[tool_key]})
+                    logger.log_event(
+                        iteration,
+                        "loop_detected",
+                        {"tool": tool_key, "count": consecutive_errors[tool_key]},
+                    )
             else:
                 consecutive_errors[tool_key] = 0  # reset on success
 
@@ -298,11 +329,13 @@ def run_agent(
                 preview = result[:200].replace("\n", " ")
                 console.print(f"  [green]{tc.function.name}[/green] → {preview}")
 
-            tool_results.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "content": result,
-            })
+            tool_results.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result,
+                }
+            )
 
         # === Handle end_turn ===
         if has_end_turn:
@@ -318,13 +351,20 @@ def run_agent(
                 logger.log_event(iteration, "end_turn", {"summary": summary})
 
                 if config.verbose:
-                    console.print(Panel(f"[bold green]end_turn:[/bold green] {summary}", title="Agent Done"))
+                    console.print(
+                        Panel(
+                            f"[bold green]end_turn:[/bold green] {summary}",
+                            title="Agent Done",
+                        )
+                    )
 
-                tool_results.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": f"Turn ended. Summary: {summary}",
-                })
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": f"Turn ended. Summary: {summary}",
+                    }
+                )
 
             messages.extend(tool_results)
             stop_reason = "end_turn"
@@ -341,10 +381,14 @@ def run_agent(
     output_files: list[str] = []
     if config.output_dir:
         output_files = _collect_output_files(workspace_abs, config.output_dir)
-        logger.log_event(iteration, "output_collected", {
-            "output_dir": config.output_dir,
-            "files": output_files,
-        })
+        logger.log_event(
+            iteration,
+            "output_collected",
+            {
+                "output_dir": config.output_dir,
+                "files": output_files,
+            },
+        )
 
     logger.log_end(iteration + 1, stop_reason, duration, total_tokens)
 

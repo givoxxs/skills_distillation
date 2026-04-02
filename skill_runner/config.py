@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 @dataclass
 class RunConfig:
     # OpenRouter
@@ -39,4 +40,6 @@ class RunConfig:
 
     def validate(self) -> None:
         if not self.api_key:
-            raise ValueError("OPENROUTER_API_KEY not set. Copy .env.example to .env and fill in your key.")
+            raise ValueError(
+                "OPENROUTER_API_KEY not set. Copy .env.example to .env and fill in your key."
+            )

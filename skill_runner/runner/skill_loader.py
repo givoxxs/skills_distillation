@@ -113,7 +113,10 @@ def list_skill_files(skill_path: str) -> str:
     if scripts:
         parts.append("RUNNABLE SCRIPTS — use bash to execute:\n" + "\n".join(scripts))
     if templates:
-        parts.append("TEMPLATES — use read_file to read, then copy & modify:\n" + "\n".join(templates))
+        parts.append(
+            "TEMPLATES — use read_file to read, then copy & modify:\n"
+            + "\n".join(templates)
+        )
     if docs:
         parts.append("REFERENCE DOCS — use read_file to read:\n" + "\n".join(docs))
 

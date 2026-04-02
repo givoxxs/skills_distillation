@@ -20,13 +20,13 @@
             --tool-result: #58a6ff;
             --text-block: #ffa657;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-primary);
@@ -34,12 +34,12 @@
             height: 100vh;
             overflow: auto;
         }
-        
+
         .container {
             display: flex;
             height: 100vh;
         }
-        
+
         /* Sidebar - File Tree */
         .sidebar {
             width: 320px;
@@ -50,13 +50,13 @@
             flex-direction: column;
             overflow: hidden;
         }
-        
+
         .sidebar-header {
             padding: 16px;
             background: var(--bg-tertiary);
             border-bottom: 1px solid var(--border);
         }
-        
+
         .sidebar-header h2 {
             font-size: 14px;
             font-weight: 600;
@@ -64,12 +64,12 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        
+
         .sidebar-actions {
             padding: 12px 16px;
             border-bottom: 1px solid var(--border);
         }
-        
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -83,19 +83,19 @@
             cursor: pointer;
             transition: opacity 0.2s;
         }
-        
+
         .btn:hover { opacity: 0.9; }
-        
+
         .file-tree {
             flex: 1;
             overflow-y: auto;
             padding: 8px;
         }
-        
+
         .skill-group {
             margin-bottom: 8px;
         }
-        
+
         .skill-header {
             display: flex;
             align-items: center;
@@ -107,36 +107,36 @@
             user-select: none;
             transition: background 0.2s;
         }
-        
+
         .skill-header:hover {
             background: var(--border);
         }
-        
+
         .skill-icon {
             transition: transform 0.2s;
             font-size: 10px;
         }
-        
+
         .skill-icon.expanded {
             transform: rotate(90deg);
         }
-        
+
         .skill-name {
             flex: 1;
             font-weight: 500;
             font-size: 13px;
         }
-        
+
         .skill-stats {
             font-size: 11px;
             color: var(--text-secondary);
         }
-        
+
         .skill-tests {
             margin-left: 20px;
             margin-top: 4px;
         }
-        
+
         .test-item {
             display: flex;
             align-items: center;
@@ -147,25 +147,25 @@
             font-size: 12px;
             transition: background 0.2s;
         }
-        
+
         .test-item:hover {
             background: rgba(255,255,255,0.05);
         }
-        
+
         .test-item.active {
             background: rgba(88, 166, 255, 0.15);
             border-left: 2px solid var(--accent);
         }
-        
+
         .test-status {
             font-size: 14px;
         }
-        
+
         .test-id {
             color: var(--text-secondary);
             flex: 1;
         }
-        
+
         /* Main Content */
         /* Main Content */
         .main {
@@ -175,7 +175,7 @@
             overflow: auto;
             height: 100vh;
         }
-        
+
         #mainContent {
             flex: 1;
             display: flex;
@@ -183,7 +183,7 @@
             overflow: auto;
             min-height: 0;
         }
-        
+
         .main-header {
             padding: 16px 24px;
             background: var(--bg-secondary);
@@ -192,48 +192,48 @@
             align-items: center;
             justify-content: space-between;
         }
-        
+
         .header-info {
             display: flex;
             align-items: center;
             gap: 24px;
         }
-        
+
         .header-info h1 {
             font-size: 18px;
             font-weight: 600;
         }
-        
+
         .header-meta {
             display: flex;
             gap: 16px;
             font-size: 13px;
             color: var(--text-secondary);
         }
-        
+
         .meta-item {
             display: flex;
             align-items: center;
             gap: 6px;
         }
-        
+
         .status-badge {
             padding: 4px 12px;
             border-radius: 12px;
             font-size: 12px;
             font-weight: 500;
         }
-        
+
         .status-success {
             background: rgba(63, 185, 80, 0.15);
             color: var(--success);
         }
-        
+
         .status-error {
             background: rgba(248, 81, 73, 0.15);
             color: var(--error);
         }
-        
+
         .log-content {
             flex: 1;
             overflow-y: auto;
@@ -241,7 +241,7 @@
             background: var(--bg-primary);
             min-height: 0;
         }
-        
+
         /* Log Blocks */
         .log-block {
             margin-bottom: 16px;
@@ -249,42 +249,42 @@
             overflow: hidden;
             border: 1px solid var(--border);
         }
-        
+
         .block-system {
             background: rgba(139, 148, 158, 0.1);
             border-left: 3px solid var(--text-secondary);
         }
-        
+
         .block-thinking {
             background: rgba(163, 113, 247, 0.1);
             border-left: 3px solid var(--thinking);
         }
-        
+
         .block-tool-use {
             background: rgba(57, 211, 83, 0.1);
             border-left: 3px solid var(--tool);
         }
-        
+
         .block-tool-result {
             background: rgba(88, 166, 255, 0.1);
             border-left: 3px solid var(--tool-result);
         }
-        
+
         .block-text {
             background: rgba(255, 166, 87, 0.08);
             border-left: 3px solid var(--text-block);
         }
-        
+
         .block-result {
             background: rgba(63, 185, 80, 0.1);
             border-left: 3px solid var(--success);
         }
-        
+
         .block-result-error {
             background: rgba(248, 81, 73, 0.1);
             border-left: 3px solid var(--error);
         }
-        
+
         .block-header {
             display: flex;
             align-items: center;
@@ -294,18 +294,18 @@
             cursor: pointer;
             font-size: 12px;
         }
-        
+
         .block-header:hover {
             background: rgba(0,0,0,0.4);
         }
-        
+
         .block-type {
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        
+
         .block-system .block-type { color: var(--text-secondary); }
         .block-thinking .block-type { color: var(--thinking); }
         .block-tool-use .block-type { color: var(--tool); }
@@ -313,7 +313,7 @@
         .block-text .block-type { color: var(--text-block); }
         .block-result .block-type { color: var(--success); }
         .block-result-error .block-type { color: var(--error); }
-        
+
         .block-content {
             padding: 12px;
             font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
@@ -324,17 +324,17 @@
             max-height: 500px;
             overflow-y: auto;
         }
-        
+
         .block-content.collapsed {
             display: none;
         }
-        
+
         /* JSON Syntax */
         .json-key { color: #79c0ff; }
         .json-string { color: #a5d6ff; }
         .json-number { color: #7ee787; }
         .json-boolean { color: #ff7b72; }
-        
+
         /* Empty State */
         .empty-state {
             display: flex;
@@ -346,38 +346,38 @@
             text-align: center;
             padding: 40px;
         }
-        
+
         .empty-state-icon {
             font-size: 64px;
             margin-bottom: 16px;
             opacity: 0.5;
         }
-        
+
         .empty-state h3 {
             font-size: 18px;
             margin-bottom: 8px;
             color: var(--text-primary);
         }
-        
+
         /* Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
-        
+
         ::-webkit-scrollbar-track {
             background: var(--bg-primary);
         }
-        
+
         ::-webkit-scrollbar-thumb {
             background: var(--bg-tertiary);
             border-radius: 4px;
         }
-        
+
         ::-webkit-scrollbar-thumb:hover {
             background: var(--border);
         }
-        
+
         /* Summary Panel */
         .summary-panel {
             background: var(--bg-secondary);
@@ -386,30 +386,30 @@
             padding: 16px;
             margin-bottom: 24px;
         }
-        
+
         .summary-row {
             display: flex;
             gap: 24px;
             margin-bottom: 12px;
         }
-        
+
         .summary-item {
             display: flex;
             flex-direction: column;
             gap: 4px;
         }
-        
+
         .summary-label {
             font-size: 11px;
             color: var(--text-secondary);
             text-transform: uppercase;
         }
-        
+
         .summary-value {
             font-size: 14px;
             font-weight: 500;
         }
-        
+
         .summary-prompt {
             margin-top: 12px;
             padding: 12px;
@@ -418,7 +418,7 @@
             font-size: 13px;
             color: var(--text-secondary);
         }
-        
+
         /* Stats */
         .stats-bar {
             display: flex;
@@ -428,7 +428,7 @@
             border-radius: 6px;
             margin-top: 12px;
         }
-        
+
         /* Output Files Panel */
         .output-panel {
             background: var(--bg-secondary);
@@ -437,7 +437,7 @@
             margin-bottom: 24px;
             overflow: hidden;
         }
-        
+
         .output-header {
             padding: 12px 16px;
             background: rgba(0,0,0,0.3);
@@ -445,13 +445,13 @@
             font-weight: 600;
             border-bottom: 1px solid var(--border);
         }
-        
+
         .output-files {
             padding: 8px;
             max-height: 200px;
             overflow-y: auto;
         }
-        
+
         .output-file {
             display: flex;
             align-items: center;
@@ -461,30 +461,30 @@
             cursor: pointer;
             transition: background 0.2s;
         }
-        
+
         .output-file:hover {
             background: rgba(88, 166, 255, 0.1);
         }
-        
+
         .output-icon {
             font-size: 16px;
         }
-        
+
         .output-name {
             font-weight: 500;
             font-size: 13px;
         }
-        
+
         .output-ext {
             font-size: 11px;
             color: var(--text-secondary);
         }
-        
+
         .stat-item {
             font-size: 12px;
             color: var(--text-secondary);
         }
-        
+
         .stat-item span {
             color: var(--text-primary);
             font-weight: 500;
@@ -498,14 +498,14 @@
             <div class="sidebar-header">
                 <h2>📁 Log Files</h2>
             </div>
-            
+
             <div class="sidebar-actions">
                 <button class="btn" onclick="document.getElementById('fileInput').click()">
                     📂 Open Logs Folder
                 </button>
                 <input type="file" id="fileInput" webkitdirectory directory multiple style="display:none" onchange="handleFiles(this.files)">
             </div>
-            
+
             <div class="file-tree" id="fileTree">
                 <div class="empty-state" style="padding: 20px;">
                     <p>No logs loaded</p>
@@ -513,7 +513,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Main Content -->
         <div class="main">
             <div id="mainContent">
@@ -525,67 +525,67 @@
             </div>
         </div>
     </div>
-    
+
     <script>
         // Global state
         let files = {};
         let currentLog = null;
         let expandedSkills = [];
-        
+
         function handleFiles(fileList) {
             files = {};
-            
+
             // Find index.json or build from files
             let indexFile = null;
             let logFiles = [];
             let fileMap = {}; // Map path -> File object
-            
+
             for (let file of fileList) {
                 const path = file.webkitRelativePath || file.name;
                 fileMap[path] = file;
-                
+
                 if (path.includes('index.json')) {
                     indexFile = file;
                 } else if (path.endsWith('.jsonl')) {
                     logFiles.push(path);
                 }
             }
-            
+
             if (indexFile) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
                         const data = JSON.parse(e.target.result);
-                        
+
                         // Load all jsonl files into memory
                         let loadedCount = 0;
                         let totalTests = 0;
-                        
+
                         // First count total tests
                         for (let eval of data.evaluations || []) {
                             totalTests += eval.test_logs.length;
                         }
-                        
+
                         // Handle case with no tests
                         if (totalTests === 0) {
                             renderTree();
                             return;
                         }
-                        
+
                         // Then load each file
                         for (let eval of data.evaluations || []) {
                             const skill = eval.skill;
                             files[skill] = [];
-                            
+
                             for (let t of eval.test_logs) {
                                 // t.file is like "algorithmic-art/tc_01.jsonl"
                                 // webkitRelativePath might be "logs/algorithmic-art/tc_01.jsonl" or just "algorithmic-art/tc_01.jsonl"
                                 const fileName = t.file.split('/').pop();
                                 const fullPath = 'logs/' + t.file;
-                                let fileObj = fileMap['logs/' + t.file] || 
-                                              fileMap[t.file] || 
+                                let fileObj = fileMap['logs/' + t.file] ||
+                                              fileMap[t.file] ||
                                               fileMap[Object.keys(fileMap).find(k => k.endsWith(fileName))];
-                                
+
                                 if (fileObj) {
                                     // Read file into memory - use IIFE to capture correct values
                                     (function(testInfo, fileP) {
@@ -599,7 +599,7 @@
                                                 content: content
                                             });
                                             loadedCount++;
-                                            
+
                                             // When all loaded, render tree
                                             if (loadedCount === totalTests) {
                                                 renderTree();
@@ -635,7 +635,7 @@
                     const parts = path.split('/');
                     const skill = parts[parts.length - 2] || 'unknown';
                     const testId = parts[parts.length - 1].replace('.jsonl', '');
-                    
+
                     if (!files[skill]) files[skill] = [];
                     files[skill].push({
                         test_id: testId,
@@ -647,7 +647,7 @@
                 renderTree();
             }
         }
-        
+
         function buildTreeFromIndex(data) {
             files = {};
             for (let eval of data.evaluations || []) {
@@ -659,30 +659,30 @@
                     timestamp: t.timestamp
                 }));
             }
-            
+
             // Auto expand first skill
             const skillNames = Object.keys(files);
             if (skillNames.length > 0) {
                 expandedSkills = [skillNames[0]];
             }
-            
+
             renderTree();
         }
-        
+
         function renderTree() {
             const tree = document.getElementById('fileTree');
-            
+
             if (Object.keys(files).length === 0) {
                 tree.innerHTML = '<div class="empty-state" style="padding: 20px;"><p>No logs found</p></div>';
                 return;
             }
-            
+
             let html = '';
             for (let skill in files) {
                 const tests = files[skill];
                 const passed = tests.filter(t => t.exit_code === 0).length;
                 const isExpanded = expandedSkills.includes(skill);
-                
+
                 html += `
                     <div class="skill-group">
                         <div class="skill-header" onclick="toggleSkill('${skill}')">
@@ -691,7 +691,7 @@
                             <span class="skill-stats">${passed}/${tests.length} ✅</span>
                         </div>
                 `;
-                
+
                 if (isExpanded) {
                     html += '<div class="skill-tests">';
                     for (let test of tests) {
@@ -705,13 +705,13 @@
                     }
                     html += '</div>';
                 }
-                
+
                 html += '</div>';
             }
-            
+
             tree.innerHTML = html;
         }
-        
+
         function toggleSkill(skill) {
             if (expandedSkills.includes(skill)) {
                 expandedSkills = expandedSkills.filter(s => s !== skill);
@@ -720,7 +720,7 @@
             }
             renderTree();
         }
-        
+
         async function loadLog(skill, testId) {
             // Find the file
             const tests = files[skill];
@@ -759,7 +759,7 @@
                 }
             }
         }
-        
+
         function parseAndRenderLog(text, skill, testId) {
             const lines = text.trim().split('\n');
             const entries = lines.map(line => {
@@ -769,28 +769,28 @@
                     return null;
                 }
             }).filter(e => e !== null);
-            
+
             if (entries.length === 0) {
                 showEmpty('Log file is empty');
                 return;
             }
-            
+
             // First entry is metadata
             const metadata = entries[0];
-            
+
             // Parse entries - also extract output files
             const blocks = [];
             const outputFiles = [];
-            
+
             for (let i = 1; i < entries.length; i++) {
                 const entry = entries[i];
                 const type = entry.type;
-                
+
                 // Extract output files from Write tool
                 if (type === 'assistant') {
                     const message = entry.message || {};
                     const content = message.content || [];
-                    
+
                     for (let item of content) {
                         if (item.type === 'tool_use' && item.name === 'Write') {
                             const input = item.input || {};
@@ -808,7 +808,7 @@
                                 else if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) icon = '🖼️';
                                 else if (['pptx', 'ppt'].includes(ext)) icon = '📊';
                                 else if (['xlsx', 'xls', 'csv'].includes(ext)) icon = '📈';
-                                
+
                                 outputFiles.push({
                                     path: input.file_path,
                                     name: fileName,
@@ -819,12 +819,12 @@
                         }
                     }
                 }
-                
+
                 if (type === 'system') {
                     const model = entry.model || 'N/A';
                     const sessionId = (entry.session_id || '').substring(0, 8);
                     const tools = (entry.tools || []).slice(0, 5).join(', ');
-                    
+
                     blocks.push({
                         type: 'system',
                         class: 'block-system',
@@ -833,20 +833,20 @@
                         collapsed: false
                     });
                 }
-                
+
                 else if (type === 'assistant') {
                     const message = entry.message || {};
                     const content = message.content || [];
-                    
+
                     for (let item of content) {
                         const itemType = item.type;
-                        
+
                         if (itemType === 'thinking') {
                             let thinking = item.thinking || '';
                             if (thinking.length > 1500) {
                                 thinking = thinking.substring(0, 1500) + `\n\n... [${thinking.length - 1500} more characters]`;
                             }
-                            
+
                             blocks.push({
                                 type: 'thinking',
                                 class: 'block-thinking',
@@ -855,7 +855,7 @@
                                 collapsed: false
                             });
                         }
-                        
+
                         else if (itemType === 'text') {
                             blocks.push({
                                 type: 'text',
@@ -865,11 +865,11 @@
                                 collapsed: false
                             });
                         }
-                        
+
                         else if (itemType === 'tool_use') {
                             const toolName = item.name || 'unknown';
                             const toolInput = JSON.stringify(item.input || {}, null, 2);
-                            
+
                             blocks.push({
                                 type: 'tool_use',
                                 class: 'block-tool-use',
@@ -880,17 +880,17 @@
                         }
                     }
                 }
-                
+
                 else if (type === 'user') {
                     const message = entry.message || {};
                     const content = message.content || [];
-                    
+
                     for (let item of content) {
                         let resultContent = item.content || '';
                         if (typeof resultContent === 'string' && resultContent.length > 1500) {
                             resultContent = resultContent.substring(0, 1500) + `\n\n... [${resultContent.length - 1500} more characters]`;
                         }
-                        
+
                         blocks.push({
                             type: 'tool_result',
                             class: 'block-tool-result',
@@ -900,7 +900,7 @@
                         });
                     }
                 }
-                
+
                 else if (type === 'rate_limit_event') {
                     const info = entry.rate_limit_info || {};
                     blocks.push({
@@ -911,22 +911,22 @@
                         collapsed: true
                     });
                 }
-                
+
                 else if (type === 'result') {
                     const subtype = entry.subtype;
                     const isError = entry.is_error;
                     const duration = entry.duration_ms || 0;
                     const cost = entry.total_cost_usd || 0;
                     const resultText = entry.result || '';
-                    
+
                     const resultClass = isError ? 'block-result-error' : 'block-result';
                     const title = isError ? '❌ Result - Error' : '✅ Result - Success';
-                    
+
                     let content = `Duration: ${duration}ms\nCost: $${cost.toFixed(6)}\nError: ${isError}`;
                     if (resultText) {
                         content += `\n\nResult:\n${resultText.substring(0, 1000)}`;
                     }
-                    
+
                     blocks.push({
                         type: 'result',
                         class: resultClass,
@@ -936,7 +936,7 @@
                     });
                 }
             }
-            
+
             // Count stats
             const stats = {
                 thinking: 0,
@@ -944,14 +944,14 @@
                 toolResult: 0,
                 text: 0
             };
-            
+
             for (let block of blocks) {
                 if (block.type === 'thinking') stats.thinking++;
                 else if (block.type === 'tool_use') stats.toolUse++;
                 else if (block.type === 'tool_result') stats.toolResult++;
                 else if (block.type === 'text') stats.text++;
             }
-            
+
             // Render
             renderLogContent(metadata, blocks, stats, skill, testId, outputFiles);
         }
@@ -962,7 +962,7 @@
             const timestamp = metadata.timestamp || 'N/A';
             const model = metadata.model || 'N/A';
             const prompt = metadata.prompt || '';
-            
+
             let html = `
                 <div class="main-header">
                     <div class="header-info">
@@ -986,7 +986,7 @@
                         ${exitCode === 0 ? '✅ Success' : `❌ Failed (${exitCode})`}
                     </span>
                 </div>
-                
+
                 <div class="log-content">
                     <!-- Summary -->
                     <div class="summary-panel">
@@ -1019,7 +1019,7 @@
                             <div class="stat-item">📝 <span>${blocks.length}</span> total entries</div>
                         </div>
                     </div>
-                    
+
                     <!-- Output Files -->
                     ${outputFiles.length > 0 ? `
                     <div class="output-panel">
@@ -1038,7 +1038,7 @@
 
                     <!-- Log Blocks -->
             `;
-            
+
             for (let block of blocks) {
                 const escapedContent = escapeHtml(block.content);
                 html += `
@@ -1051,18 +1051,18 @@
                     </div>
                 `;
             }
-            
+
             html += '</div>';
-            
+
             document.getElementById('mainContent').innerHTML = html;
         }
-        
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-        
+
         function formatJson(text) {
             // Try to parse and format as JSON
             try {
@@ -1072,18 +1072,18 @@
                 return escapeHtml(text);
             }
         }
-        
+
         function showOutputFileContent(path) {
             // Simple: prepend output/ to the file name
             const fileName = path.split('/').pop();
             const fullPath = '/Users/soc_036/study_dir/skill_distillation/skill_evaluation/output/' + fileName;
-            
+
             console.log('Opening:', 'file://' + fullPath);
-            
+
             // Open directly in browser
             window.open('file://' + fullPath, '_blank');
         }
-        
+
         function showEmpty(message) {
             document.getElementById('mainContent').innerHTML = `
                 <div class="empty-state">
@@ -1092,7 +1092,7 @@
                 </div>
             `;
         }
-        
+
         // Try to load index.json from default location
         fetch('logs/index.json')
             .then(r => r.json())

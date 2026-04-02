@@ -41,17 +41,47 @@ def cli() -> None:
 
 
 @cli.command()
-@click.option("--skill", "-s", default=None, help="Skill name (folder in ./skills/). Omit for bare tools.")
-@click.option("--model", "-m", default="qwen/qwen3-8b", show_default=True, help="OpenRouter model ID.")
+@click.option(
+    "--skill",
+    "-s",
+    default=None,
+    help="Skill name (folder in ./skills/). Omit for bare tools.",
+)
+@click.option(
+    "--model",
+    "-m",
+    default="qwen/qwen3-8b",
+    show_default=True,
+    help="OpenRouter model ID.",
+)
 @click.option("--prompt", "-p", required=True, help="Task prompt for the model.")
-@click.option("--input", "-i", "input_files", multiple=True, help="Input file(s) to copy into workspace before run. Can be repeated.")
-@click.option("--max-iterations", default=20, show_default=True, help="Maximum agent loop iterations.")
-@click.option("--timeout", default=60, show_default=True, help="Bash tool timeout (seconds).")
-@click.option("--verbose", "-v", is_flag=True, default=False, help="Show tool calls in real-time.")
+@click.option(
+    "--input",
+    "-i",
+    "input_files",
+    multiple=True,
+    help="Input file(s) to copy into workspace before run. Can be repeated.",
+)
+@click.option(
+    "--max-iterations",
+    default=20,
+    show_default=True,
+    help="Maximum agent loop iterations.",
+)
+@click.option(
+    "--timeout", default=60, show_default=True, help="Bash tool timeout (seconds)."
+)
+@click.option(
+    "--verbose", "-v", is_flag=True, default=False, help="Show tool calls in real-time."
+)
 @click.option("--skills-dir", default="./skills", show_default=True)
 @click.option("--workspace-dir", default="./workspace", show_default=True)
 @click.option("--log-dir", default="./logs", show_default=True)
-@click.option("--output-dir", default=None, help="Copy output files here after run (for evaluation). E.g. ./outputs/docx/tc_01/round_1")
+@click.option(
+    "--output-dir",
+    default=None,
+    help="Copy output files here after run (for evaluation). E.g. ./outputs/docx/tc_01/round_1",
+)
 def run(
     skill: str | None,
     model: str,
@@ -132,7 +162,13 @@ def run(
 @cli.command()
 @click.option("--skill", "-s", required=True, help="Skill name to evaluate.")
 @click.option("--models", "-m", required=True, help="Comma-separated model IDs.")
-@click.option("--test-cases", "-t", required=True, type=click.Path(exists=True), help="JSON file with test cases.")
+@click.option(
+    "--test-cases",
+    "-t",
+    required=True,
+    type=click.Path(exists=True),
+    help="JSON file with test cases.",
+)
 @click.option("--verbose", "-v", is_flag=True, default=False)
 def eval(skill: str, models: str, test_cases: str, verbose: bool) -> None:
     """Batch evaluation: run multiple models on a skill's test cases."""
@@ -147,7 +183,9 @@ def eval(skill: str, models: str, test_cases: str, verbose: bool) -> None:
 
     for model in model_list:
         for i, case in enumerate(cases):
-            console.print(f"[bold]Model:[/bold] {model} | [bold]Case {i + 1}/{len(cases)}:[/bold] {case['prompt'][:80]}")
+            console.print(
+                f"[bold]Model:[/bold] {model} | [bold]Case {i + 1}/{len(cases)}:[/bold] {case['prompt'][:80]}"
+            )
             config = RunConfig(
                 api_key=os.getenv("OPENROUTER_API_KEY", ""),
                 model=model,
@@ -162,7 +200,9 @@ def eval(skill: str, models: str, test_cases: str, verbose: bool) -> None:
                 )
                 result["test_case"] = case
                 all_results.append(result)
-                console.print(f"  → {result['stop_reason']} in {result['iterations']} iterations")
+                console.print(
+                    f"  → {result['stop_reason']} in {result['iterations']} iterations"
+                )
             except Exception as e:
                 console.print(f"  [red]FAILED:[/red] {e}")
 
@@ -173,7 +213,12 @@ def eval(skill: str, models: str, test_cases: str, verbose: bool) -> None:
     table.add_column("Iterations")
     table.add_column("Duration(s)")
     for r in all_results:
-        table.add_row(r["model"], r["stop_reason"], str(r["iterations"]), str(r["duration_seconds"]))
+        table.add_row(
+            r["model"],
+            r["stop_reason"],
+            str(r["iterations"]),
+            str(r["duration_seconds"]),
+        )
     console.print(table)
 
 
@@ -216,7 +261,9 @@ def logs(skill: str | None, log_dir: str, last: int) -> None:
         console.print("[red]No logs directory found.[/red]")
         return
 
-    all_logs = sorted(log_path.glob("*.jsonl"), key=lambda f: f.stat().st_mtime, reverse=True)
+    all_logs = sorted(
+        log_path.glob("*.jsonl"), key=lambda f: f.stat().st_mtime, reverse=True
+    )
     if skill:
         all_logs = [f for f in all_logs if f.name.startswith(skill + "_")]
 
@@ -227,11 +274,17 @@ def logs(skill: str | None, log_dir: str, last: int) -> None:
                 record = json.loads(line)
                 event = record.get("event", "")
                 if event == "start":
-                    console.print(f"  [green]START[/green] model={record.get('model')} skill={record.get('skill')}")
+                    console.print(
+                        f"  [green]START[/green] model={record.get('model')} skill={record.get('skill')}"
+                    )
                 elif event == "end":
-                    console.print(f"  [blue]END[/blue] stop_reason={record.get('stop_reason')} iterations={record.get('iterations')} duration={record.get('duration_seconds')}s")
+                    console.print(
+                        f"  [blue]END[/blue] stop_reason={record.get('stop_reason')} iterations={record.get('iterations')} duration={record.get('duration_seconds')}s"
+                    )
                 elif event == "tool_call":
-                    console.print(f"  [yellow]TOOL[/yellow] [{record.get('iteration')}] {record.get('tool')}")
+                    console.print(
+                        f"  [yellow]TOOL[/yellow] [{record.get('iteration')}] {record.get('tool')}"
+                    )
                 elif event == "api_error":
                     console.print(f"  [red]ERROR[/red] {record.get('error')}")
 
