@@ -1,0 +1,65 @@
+{
+  "skill": "pdf",
+  "test_cases": [
+    {
+      "id": "tc_01",
+      "name": "Đọc và trích xuất text từ PDF",
+      "prompt": "Đọc file PDF và trích xuất toàn bộ text content",
+      "expected_behavior": "Trích xuất đầy đủ text từ PDF"
+    },
+    {
+      "id": "tc_02",
+      "name": "Tạo PDF mới",
+      "prompt": "Tạo file PDF mới với nội dung: tiêu đề 'Báo cáo', nội dung 'Đây là trang đầu tiên'",
+      "expected_behavior": "File PDF được tạo, mở được bằng PDF reader"
+    },
+    {
+      "id": "tc_03",
+      "name": "Gộp nhiều PDF",
+      "prompt": "Gộp 3 file PDF thành 1 file duy nhất",
+      "expected_behavior": "File PDF gộp chứa tất cả trang từ 3 file gốc"
+    },
+    {
+      "id": "tc_04",
+      "name": "Tách PDF",
+      "prompt": "Tách file PDF 10 trang thành 2 file: trang 1-5 và trang 6-10",
+      "expected_behavior": "2 file PDF mới chứa đúng các trang yêu cầu"
+    },
+    {
+      "id": "tc_05",
+      "name": "Thêm watermark",
+      "prompt": "Thêm watermark 'CONFIDENTIAL' vào tất cả các trang của file PDF",
+      "expected_behavior": "Watermark xuất hiện trên tất cả các trang"
+    },
+    {
+      "id": "tc_06",
+      "name": "Xoay trang PDF",
+      "prompt": "Xoay trang 1 của PDF 90 độ",
+      "expected_behavior": "Trang 1 được xoay đúng góc"
+    },
+    {
+      "id": "tc_07",
+      "name": "Trích xuất bảng từ PDF",
+      "prompt": "Trích xuất bảng từ file PDF có chứa bảng",
+      "expected_behavior": "Dữ liệu bảng được trích xuất đúng"
+    },
+    {
+      "id": "tc_08",
+      "name": "Mã hóa PDF",
+      "prompt": "Mã hóa file PDF với password 'secret123'",
+      "expected_behavior": "PDF yêu cầu password khi mở"
+    },
+    {
+      "id": "tc_09",
+      "name": "Điền form PDF",
+      "prompt": "Điền vào file PDF form: field 'name' = 'John Doe', field 'date' = '2024-01-01'",
+      "expected_behavior": "Form được điền đúng giá trị"
+    },
+    {
+      "id": "tc_10",
+      "name": "Thêm page numbers",
+      "prompt": "Thêm số trang vào góc dưới mỗi trang của PDF",
+      "expected_behavior": "Số trang xuất hiện ở vị trí nhất quán"
+    }
+  ]
+}

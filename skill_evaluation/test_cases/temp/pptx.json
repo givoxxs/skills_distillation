@@ -1,0 +1,65 @@
+{
+  "skill": "pptx",
+  "test_cases": [
+    {
+      "id": "tc_01",
+      "name": "Tạo presentation cơ bản",
+      "prompt": "Tạo PowerPoint presentation 5 slides: Title slide, Agenda, Content 1, Content 2, Thank you",
+      "expected_behavior": "File PPTX có 5 slides, mở được bằng PowerPoint"
+    },
+    {
+      "id": "tc_02",
+      "name": "Thêm hình ảnh vào slide",
+      "prompt": "Tạo presentation với 1 slide chứa hình ảnh và text",
+      "expected_behavior": "Hình ảnh hiển thị đúng vị trí"
+    },
+    {
+      "id": "tc_03",
+      "name": "Tạo bullet points",
+      "prompt": "Tạo slide với bullet points: - Item 1, - Item 2, - Item 3",
+      "expected_behavior": "Bullet points hiển thị đúng format"
+    },
+    {
+      "id": "tc_04",
+      "name": "Thêm speaker notes",
+      "prompt": "Tạo presentation 3 slides, mỗi slide có speaker notes",
+      "expected_behavior": "Speaker notes được lưu trong file"
+    },
+    {
+      "id": "tc_05",
+      "name": "Tạo bảng trong slide",
+      "prompt": "Tạo slide với bảng: 3 cột, 4 hàng dữ liệu",
+      "expected_behavior": "Bảng hiển thị đúng"
+    },
+    {
+      "id": "tc_06",
+      "name": "Thêm chart",
+      "prompt": "Tạo slide với bar chart hiển thị doanh số: Q1=100, Q2=150, Q3=120, Q4=180",
+      "expected_behavior": "Chart được tạo và hiển thị dữ liệu đúng"
+    },
+    {
+      "id": "tc_07",
+      "name": "Áp dụng template",
+      "prompt": "Tạo presentation sử dụng template có sẵn",
+      "expected_behavior": "Template được áp dụng đúng"
+    },
+    {
+      "id": "tc_08",
+      "name": "Tạo slide layout",
+      "prompt": "Tạo presentation với 2 cột layout: text bên trái, hình bên phải",
+      "expected_behavior": "Layout hiển thị đúng"
+    },
+    {
+      "id": "tc_09",
+      "name": "Đọc và trích xuất nội dung PPTX",
+      "prompt": "Đọc file PPTX và trích xuất toàn bộ text content",
+      "expected_behavior": "Trích xuất đầy đủ text từ tất cả slides"
+    },
+    {
+      "id": "tc_10",
+      "name": "Tạo animation",
+      "prompt": "Tạo presentation với hiệu ứng animation cho text",
+      "expected_behavior": "Animation được áp dụng"
+    }
+  ]
+}

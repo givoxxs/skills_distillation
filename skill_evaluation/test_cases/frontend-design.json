@@ -1,0 +1,125 @@
+{
+  "skill": "frontend-design",
+  "test_cases": [
+    {
+      "id": "tc_01",
+      "name": "Landing page luxury watch - Brutalist",
+      "prompt": "Thiết kế một Landing Page bán đồng hồ xa xỉ, phong cách Brutalist (thô mộc). Sử dụng HTML/CSS/JS hoặc React. Tránh dùng layout giữa màn hình, font Inter, nền trắng chữ xám.",
+      "expected_behavior": "Trang web có thiết kế bold, phá cách, không giống template Bootstrap phổ thông"
+    },
+    {
+      "id": "tc_02",
+      "name": "Dashboard minimalist",
+      "prompt": "Thiết kế một dashboard quản lý tài chính, phong cách minimalist (tối giản). Sử dụng dark mode, accent colors mạnh.",
+      "expected_behavior": "Dashboard có thiết kế tinh tế, không generic"
+    },
+    {
+      "id": "tc_03",
+      "name": "Portfolio retro-futuristic",
+      "prompt": "Thiết kế một portfolio cá nhân, phong cách retro-futuristic (retro-futuristic). Kết hợp yếu tố cổ điển và tương lai.",
+      "expected_behavior": "Thiết kế độc đáo, không trùng lặp với xu hướng phổ biến"
+    },
+    {
+      "id": "tc_04",
+      "name": "E-commerce toy-store playful",
+      "prompt": "Thiết đồ chơi trẻ em, phong cách playful (vui nhộn), màu sắc tươi sáng, font interesting",
+      "expected_behavior": "Giao diện vui nhộn, phù hợp đối tượng trẻ em"
+    },
+    {
+      "id": "tc_05",
+      "name": "Tech blog editorial",
+      "prompt": "Thiết kế một tech blog, phong cách editorial/magazine (tạp chí). Typography nổi bật, bố cục đọc thoải mái.",
+      "expected_behavior": "Giao diện đọc thoải mái, typography chuyên nghiệp"
+    },
+    {
+      "id": "tc_06",
+      "name": "Restaurant website industrial",
+      "prompt": "Thiết kế website nhà hàng, phong cách industrial (công nghiệp). Tông màu xám, đen, đỏ gạch.",
+      "expected_behavior": "Thiết kế industrial đúng phong cách"
+    },
+    {
+      "id": "tc_07",
+      "name": "Mobile app login screen",
+      "prompt": "Thiết kế màn hình login cho mobile app, tránh design generic. Phong cách tùy chọn nhưng phải memorable.",
+      "expected_behavior": "Login screen độc đáo, memorable"
+    },
+    {
+      "id": "tc_08",
+      "name": "SaaS pricing page",
+      "prompt": "Thiết kế pricing page cho SaaS product, tránh 3-card layout generic. Phong cách tùy chọn bold.",
+      "expected_behavior": "Pricing page có thiết kế sáng tạo"
+    },
+    {
+      "id": "tc_09",
+      "name": "Contact form creative",
+      "prompt": "Thiết kế contact form với UX tốt, tránh form generic. Animation mượt, micro-interactions.",
+      "expected_behavior": "Form có micro-interactions, UX tốt"
+    },
+    {
+      "id": "tc_10",
+      "name": "Navigation menu unique",
+      "prompt": "Thiết kế navigation menu sáng tạo cho website, không dùng hamburger menu phổ thông",
+      "expected_behavior": "Navigation có thiết kế độc đáo"
+    },
+    {
+      "id": "tc_11",
+      "name": "Neo-brutalism SaaS landing page",
+      "prompt": "Design a SaaS product landing page in Neo-Brutalism style. Use: raw black borders (3-4px solid), offset box shadows (6px 6px 0px #000), high-contrast color blocks (electric yellow #FFE500 and hot coral #FF4D4D against white), bold grotesque typography (font-family: 'Space Grotesk' or similar), deliberately imperfect asymmetric grid. The page should have: hero section with a punchy headline, 3 feature blocks, a CTA button with hover state that shifts the offset shadow. Absolutely no rounded corners, no gradients, no drop shadows.",
+      "expected_behavior": "Design unmistakably neo-brutalist: raw borders, offset shadows, flat colors, asymmetric layout — clearly distinct from polished SaaS templates"
+    },
+    {
+      "id": "tc_12",
+      "name": "Swiss International Style portfolio",
+      "prompt": "Design a designer portfolio in the Swiss/International Typographic Style. Strict requirements: grid-based layout using CSS Grid with visible grid lines as design element, typeface exclusively Helvetica Neue or Arial, strong typographic hierarchy using only size and weight (no decorative fonts), limited color palette (black, white, and one accent: red #E63946), flush-left ragged-right text alignment, ruled lines as structural elements. Content: name, discipline, 6 project thumbnails, contact. No photography backgrounds, no shadows, no rounded elements.",
+      "expected_behavior": "Design reflects Swiss school principles: rigid grid, typography-first, extreme restraint — visually distinct from trendy portfolio templates"
+    },
+    {
+      "id": "tc_13",
+      "name": "Maximalism e-commerce fashion brand",
+      "prompt": "Design a maximalist fashion e-commerce homepage. Embrace visual excess: layer multiple textures and patterns, use 5+ colors simultaneously (jewel tones: emerald, sapphire, ruby, gold, violet), large overlapping typography at multiple scales, collage-style image placeholders, busy background patterns (damask or baroque motif via CSS). Include: full-width hero with layered text, a product grid where each card has a different background color, a marquee/ticker element. The design should feel luxuriously overwhelming, not cluttered.",
+      "expected_behavior": "Design is visually rich and layered — multiple colors, patterns, overlapping elements — clearly maximalist rather than minimal or neutral"
+    },
+    {
+      "id": "tc_14",
+      "name": "Neumorphism dashboard for productivity app",
+      "prompt": "Design a productivity app dashboard using Neumorphism (soft UI). Requirements: light gray base color (#E0E5EC), all UI elements use double box-shadow technique (light shadow top-left: rgba(255,255,255,0.8), dark shadow bottom-right: rgba(163,177,198,0.6)), no hard borders, convex buttons that appear to press inward on hover/active states. Include: sidebar navigation, a stats section with 4 KPI cards, a task list, and a progress ring widget. Background must stay the same gray — no color fills on containers.",
+      "expected_behavior": "Design achieves the neumorphic soft-UI look with proper double-shadow technique, convex/concave elements, monochromatic gray palette — distinct from flat or material design"
+    },
+    {
+      "id": "tc_15",
+      "name": "Glassmorphism SaaS hero section",
+      "prompt": "Design a SaaS landing page hero section using Glassmorphism. Technical requirements: frosted glass cards using backdrop-filter: blur(10px) and semi-transparent backgrounds (rgba(255,255,255,0.1)), subtle white border (1px solid rgba(255,255,255,0.2)), vivid gradient background behind the glass (purple to blue to pink: #6C63FF → #3B82F6 → #EC4899). Include: a glass hero card with headline and CTA, 3 floating glass feature pills, a mock browser/app screenshot placeholder. Ensure sufficient contrast for text readability despite transparency.",
+      "expected_behavior": "Glassmorphism effect clearly visible with backdrop blur, semi-transparent layers, vivid colorful background showing through — not just flat transparency"
+    },
+    {
+      "id": "tc_16",
+      "name": "Bauhaus design school landing page",
+      "prompt": "Design a design school landing page inspired by Bauhaus principles. Rules: strict geometric forms only (circles, rectangles, triangles as decorative elements), primary colors exclusively (red #CC0000, blue #0000CC, yellow #FFCC00) plus black and white, geometric sans-serif type (font that evokes Universal or Block), asymmetric but structured compositions, form follows function — every visual element must serve a purpose. Include: header with bold geometric logo, course listings in a grid, instructor profiles. No photography, illustrations as geometric shape compositions only.",
+      "expected_behavior": "Design reflects Bauhaus theory: primary colors, geometric shapes, functional layout — visually evokes early 20th century constructivism rather than modern web trends"
+    },
+    {
+      "id": "tc_17",
+      "name": "Vaporwave music streaming landing page",
+      "prompt": "Design a music streaming service landing page in Vaporwave aesthetic. Required elements: gradient backgrounds using pink-to-purple-to-cyan (#FF71CE → #B967FF → #01CDFE), retro 3D grid perspective (CSS transform on a grid element), glitch text effect on the hero headline (CSS animation shifting text layers in red/cyan), Roman bust or classical sculpture SVG placeholder, pixel font mixed with serif, chrome/holographic text effect using CSS gradient on text. Include: hero, featured playlists grid, subscribe CTA. Make it feel like 1984 imagined 2026.",
+      "expected_behavior": "Design unmistakably vaporwave: gradient palette, grid perspective, glitch effects, retro-future aesthetic — not mistakable for mainstream streaming UI"
+    },
+    {
+      "id": "tc_18",
+      "name": "Cyberpunk developer portfolio",
+      "prompt": "Design a developer/hacker portfolio in Cyberpunk style. Requirements: dark background (#0D0D0D or #05001F), neon accent colors (electric green #00FF41 like terminal text, hot pink #FF0080, cyan #00FFFF), scanline overlay effect (repeating CSS gradient creating horizontal lines), glowing text using text-shadow with neon colors, monospace font throughout, terminal/command-line aesthetic UI elements. Include: hero with animated cursor, skills section styled as CLI output, project cards as terminal windows, contact as a form styled like a command prompt. No soft colors, no rounded cards, no whitespace comfort.",
+      "expected_behavior": "Design is dark and neon — terminal aesthetic, scanlines, glowing elements — clearly cyberpunk rather than a dark-mode Bootstrap site"
+    },
+    {
+      "id": "tc_19",
+      "name": "Art Deco luxury hotel website",
+      "prompt": "Design a luxury hotel website homepage in Art Deco style. Mandatory elements: geometric ornamental borders (fan shapes, chevrons, stepped patterns using CSS or SVG), gold color (#C9A84C or #D4AF37) and deep navy (#1B2A4A) or black as primary palette, symmetrical layout with strong central axis, ornate typography (serif with high contrast like Didot or similar via Google Fonts), stylized sunburst or fan motifs as section dividers, zigzag or Greek key patterns as borders. Include: full-width hero with hotel name in Art Deco title treatment, room showcase, amenities, booking CTA. No modern flat design elements.",
+      "expected_behavior": "Design evokes 1920s-1930s Art Deco: geometric ornament, gold palette, symmetrical luxury — clearly period-inspired rather than generic luxury web template"
+    },
+    {
+      "id": "tc_20",
+      "name": "Memphis Design blog for creative agency",
+      "prompt": "Design a creative agency blog using Memphis Design (1980s postmodern). Requirements: squiggly lines as design elements (SVG or CSS), geometric shapes scattered as background decoration (triangles, circles, diamonds in multiple colors), clashing color combinations (#FF6B9D hot pink, #FFD700 yellow, #00B4D8 cyan, #9B5DE5 purple, #F77F00 orange — use all 5), mix of serif and sans-serif fonts at large scales, playful asymmetric grid that breaks rules. Blog layout: hero post large, secondary posts in irregular grid, sidebar with author bio in a geometric frame. Should feel energetic and anti-minimalist.",
+      "expected_behavior": "Design captures Memphis movement: scattered geometric shapes, clashing colors, squiggly elements, deliberate anti-minimalism — recognizably postmodern rather than contemporary"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "skill": "brand-guidelines",
+  "test_cases": [
+    {
+      "id": "tc_01",
+      "name": "Áp dụng Anthropic brand colors vào banner HTML",
+      "prompt": "Tạo một file HTML banner 1200x400px cho Anthropic với brand colors chính xác: background Dark #141413, text Light #faf9f5, accent Orange #d97757. Banner cần có: tiêu đề 'Building AI for the long-term benefit of humanity', subtitle 'Anthropic — AI Safety Company', và một CTA button màu cam. Xuất ra file banner.html hoàn chỉnh có thể mở trên browser.",
+      "expected_behavior": "File HTML dùng đúng hex colors: #141413, #faf9f5, #d97757. Banner render được trên browser với layout đẹp"
+    },
+    {
+      "id": "tc_02",
+      "name": "Tạo typography scale theo brand",
+      "prompt": "Tạo một HTML page demo typography system của Anthropic brand: heading font là serif (Freight Display hoặc fallback Georgia), body font là sans-serif (Inter hoặc fallback system-ui). Cần có đầy đủ scale: H1 (48px), H2 (36px), H3 (24px), Body (16px), Caption (12px). Dùng màu text #141413 trên nền #faf9f5. Xuất ra file typography-demo.html.",
+      "expected_behavior": "File HTML có đủ các text styles, fonts và sizes đúng hierarchy, màu brand chính xác"
+    },
+    {
+      "id": "tc_03",
+      "name": "Tạo UI component library với brand colors",
+      "prompt": "Tạo file HTML chứa component library mini gồm: (1) Primary button: background #d97757, text trắng, hover state tối hơn 10%; (2) Secondary button: border #d97757, text #d97757, background transparent; (3) Input field: border #141413, focus state màu #d97757; (4) Alert/badge với 3 variants: success dùng green #788c5d, warning dùng orange #d97757, info dùng blue #6a9bcc. Tất cả trên nền #faf9f5. Xuất ra components.html.",
+      "expected_behavior": "File HTML có đủ 4 components, đúng brand colors, hover states hoạt động, visual hierarchy rõ ràng"
+    },
+    {
+      "id": "tc_04",
+      "name": "Tạo dark mode CSS với brand colors",
+      "prompt": "Tạo CSS stylesheet và HTML demo page cho dark mode của Anthropic brand. Light mode: background #faf9f5, text #141413. Dark mode: background #141413, text #faf9f5, accent vẫn #d97757. Implement bằng CSS custom properties và prefers-color-scheme media query, có toggle button bằng JavaScript để switch giữa 2 mode. Xuất ra dark-mode-demo.html với CSS inline.",
+      "expected_behavior": "File HTML có cả light và dark mode, toggle button hoạt động, màu switch đúng brand colors"
+    },
+    {
+      "id": "tc_05",
+      "name": "Tạo navigation header với brand",
+      "prompt": "Tạo HTML navigation header theo Anthropic brand: background màu #141413, logo text 'Anthropic' màu #faf9f5 (serif font, 24px), nav links màu #faf9f5 với hover màu #d97757. Nav items: Products, Research, Company, Careers, và CTA button 'Try Claude' màu #d97757. Header phải responsive: trên mobile (<768px) collapse thành hamburger menu. Xuất ra header.html.",
+      "expected_behavior": "Header đúng brand colors, hover states đúng, responsive với hamburger menu trên mobile"
+    },
+    {
+      "id": "tc_06",
+      "name": "Tạo data visualization với accent colors",
+      "prompt": "Tạo một HTML page chứa bar chart dùng Chart.js (CDN) hiển thị dữ liệu quarterly revenue: Q1: $2.3M, Q2: $3.1M, Q3: $4.2M, Q4: $5.8M. Dùng đúng Anthropic accent colors: bars màu #d97757 (orange), với secondary series màu #6a9bcc (blue). Background chart area màu #faf9f5, grid lines màu nhạt. Title 'Revenue Growth 2025' màu #141413. Xuất ra chart.html.",
+      "expected_behavior": "Chart render được, dùng đúng accent colors brand, data hiển thị đúng, có legend"
+    },
+    {
+      "id": "tc_07",
+      "name": "Audit brand consistency trong HTML",
+      "prompt": "Đây là một HTML file cần audit brand consistency. Tạo script Python để scan file HTML/CSS và báo cáo: (1) Tất cả color values được dùng, (2) Màu nào không thuộc Anthropic brand palette (#141413, #faf9f5, #d97757, #6a9bcc, #788c5d, #8b6f5e), (3) Số lần mỗi brand color được dùng. Tạo file audit_brand.py và test nó với một sample HTML file có cả brand colors và non-brand colors.",
+      "expected_behavior": "Script Python chạy được, detect đúng colors, báo cáo rõ ràng brand vs non-brand colors"
+    },
+    {
+      "id": "tc_08",
+      "name": "Tạo social media template với brand",
+      "prompt": "Tạo HTML template cho LinkedIn post của Anthropic, kích thước 1200x627px (dùng fixed width/height trong CSS). Design: background gradient từ #141413 đến #1e1e1c, tiêu đề bài post màu #faf9f5 (serif, 40px bold), quote box với left border màu #d97757, footer với logo và tagline. Thêm sample content: 'We believe AI can be both safe and transformative.' Xuất ra linkedin-template.html.",
+      "expected_behavior": "Template đúng dimensions, brand colors, typography hierarchy, có thể dùng làm screenshot để post"
+    },
+    {
+      "id": "tc_09",
+      "name": "Tạo email template HTML với brand",
+      "prompt": "Tạo email HTML template theo brand Anthropic dành cho newsletter. Phải dùng table-based layout (compatible với email clients). Cấu trúc: header với background #141413 và logo text, body trên nền #faf9f5 với text #141413, một featured section với accent border #d97757, footer màu #141413. Subject line mẫu: 'Anthropic Monthly: March 2026 Updates'. Đảm bảo inline CSS, không dùng external stylesheet. Xuất ra email-template.html.",
+      "expected_behavior": "Email template dùng table layout, inline CSS, đúng brand colors, render được trong email preview"
+    },
+    {
+      "id": "tc_10",
+      "name": "Tạo brand guidelines reference card",
+      "prompt": "Tạo HTML page brand guidelines reference card cho Anthropic với các sections: (1) Color Palette: swatches cho mỗi màu brand với hex code và usage notes; (2) Typography: font specimens với size scale; (3) Spacing: spacing scale 4px base; (4) Do's and Don'ts: ví dụ đúng và sai khi dùng brand. Dùng chính brand colors trong trang này. Xuất ra brand-reference.html, phải có print CSS để in ra đẹp.",
+      "expected_behavior": "Reference card đầy đủ 4 sections, visual swatches, examples rõ ràng, print CSS hoạt động"
+    }
+  ]
+}

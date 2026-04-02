@@ -1,0 +1,65 @@
+{
+  "skill": "web-artifacts-builder",
+  "test_cases": [
+    {
+      "id": "tc_01",
+      "name": "Tạo React artifact cơ bản",
+      "prompt": "Tạo một React component đơn giản: Button với 3 variants (primary, secondary, danger)",
+      "expected_behavior": "Component React hoạt động, có 3 variants"
+    },
+    {
+      "id": "tc_02",
+      "name": "Tạo artifact với state management",
+      "prompt": "Tạo một React app với counter sử dụng useState",
+      "expected_behavior": "Counter tăng/giảm được"
+    },
+    {
+      "id": "tc_03",
+      "name": "Tạo artifact với Tailwind",
+      "prompt": "Tạo component sử dụng Tailwind CSS",
+      "expected_behavior": "Tailwind classes được apply"
+    },
+    {
+      "id": "tc_04",
+      "name": "Tạo artifact với shadcn/ui",
+      "prompt": "Tạo component sử dụng shadcn/ui Button",
+      "expected_behavior": "shadcn/ui component hoạt động"
+    },
+    {
+      "id": "tc_05",
+      "name": "Bundle artifact thành HTML",
+      "prompt": "Bundle React artifact thành single HTML file",
+      "expected_behavior": "HTML file chạy được standalone"
+    },
+    {
+      "id": "tc_06",
+      "name": "Tạo artifact với routing",
+      "prompt": "Tạo React app với 2 routes: /home và /about",
+      "expected_behavior": "Navigation giữa routes hoạt động"
+    },
+    {
+      "id": "tc_07",
+      "name": "Tạo form với validation",
+      "prompt": "Tạo form với validation (required, email format)",
+      "expected_behavior": "Validation hoạt động"
+    },
+    {
+      "id": "tc_08",
+      "name": "Tạo artifact với API call",
+      "prompt": "Tạo component fetch data từ API và hiển thị",
+      "expected_behavior": "Data được fetch và hiển thị"
+    },
+    {
+      "id": "tc_09",
+      "name": "Tạo artifact với TypeScript",
+      "prompt": "Tạo React component sử dụng TypeScript",
+      "expected_behavior": "TypeScript compile không lỗi"
+    },
+    {
+      "id": "tc_10",
+      "name": "Tạo artifact phức tạp",
+      "prompt": "Tạo một dashboard app với charts, tables, forms",
+      "expected_behavior": "Dashboard hoàn chỉnh, bundle được"
+    }
+  ]
+}

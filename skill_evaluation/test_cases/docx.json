@@ -1,0 +1,472 @@
+{
+  "skill": "docx",
+  "version": "2.0",
+  "design_notes": "Test cases designed around SKILL.md's 3 distinct workflows: (A) Create-new via docx-js, (B) Read/analyze via pandoc/unpack, (C) Edit-existing via unpack→XML→pack. Each test targets specific technical gotchas documented in SKILL.md.",
+  "fixtures_required": [
+    "fixtures/simple_report.docx        — 3 headings (H1/H2/H3), 2 paragraphs, 1 table 3x3, no images",
+    "fixtures/contract_draft.docx       — sections: Parties, Scope, Payment, Termination; text contains 'Company' x6, 'Party A' x4",
+    "fixtures/tracked_review.docx       — doc with 3 existing w:ins tracked insertions by author 'Jane'",
+    "fixtures/newsletter_raw.docx       — plain single-column doc with 3 article blocks, no formatting",
+    "fixtures/data_table.docx           — single table 5x4 with numeric data, header row shaded"
+  ],
+
+  "test_cases": [
+
+    {
+      "_comment": "=== WORKFLOW A: CREATE NEW (docx-js) ===",
+      "_comment_detail": "Tests verify correct use of docx-js API including critical gotchas from SKILL.md"
+    },
+
+    {
+      "id": "tc_a01",
+      "workflow": "create",
+      "name": "List — bullet must use LevelFormat not unicode",
+      "skill_gotcha": "SKILL.md CRITICAL: never use unicode bullets (• or \\u2022), must use LevelFormat.BULLET with numbering config",
+      "prompt": "Create a Word document with a bulleted list of 5 items: 'Design', 'Develop', 'Test', 'Deploy', 'Monitor'. Use proper Word list formatting.",
+      "expected_behavior": "File uses native Word numbering (w:numPr), NOT unicode bullet characters inserted as text",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain": ["<w:numFmt", "<w:numId"],
+        "xml_must_not_contain": ["\u2022", "&#x2022;", "&#8226;"],
+        "keywords_in_text": ["Design", "Develop", "Test", "Deploy", "Monitor"]
+      },
+      "structural_checks": { "has_list": true }
+    },
+
+    {
+      "id": "tc_a02",
+      "workflow": "create",
+      "name": "Table — dual widths + DXA + ShadingType.CLEAR",
+      "skill_gotcha": "SKILL.md CRITICAL: tables need (1) columnWidths array, (2) width on each cell, both in DXA. ShadingType.CLEAR not SOLID. WidthType.PERCENTAGE breaks Google Docs.",
+      "prompt": "Create a Word document with a 3-column table (Name, Department, Salary) with 4 data rows. Add a blue-grey shaded header row. Use US Letter page size.",
+      "expected_behavior": "Table has columnWidths in DXA, each cell has explicit DXA width, shading uses CLEAR type, no PERCENTAGE widths",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain": ["w:type=\"dxa\"", "w:type=\"clear\""],
+        "xml_must_not_contain": ["w:type=\"pct\"", "w:type=\"solid\""],
+        "keywords_in_text": ["Name", "Department", "Salary"]
+      },
+      "structural_checks": { "has_table": true }
+    },
+
+    {
+      "id": "tc_a03",
+      "workflow": "create",
+      "name": "Heading styles — outlineLevel required for ToC",
+      "skill_gotcha": "SKILL.md: custom heading styles must include outlineLevel (0 for H1, 1 for H2) otherwise ToC won't pick them up",
+      "prompt": "Create a Word document with 3 sections using Heading 1 for section titles and Heading 2 for subsections. Add a Table of Contents on the first page. Sections: Introduction (2 subs), Methodology (3 subs), Results (2 subs).",
+      "expected_behavior": "ToC generated from headings; if custom styles used, outlineLevel is present in paragraphStyles. ToC uses HeadingLevel enum not custom style names.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain": ["<w:instrText", "TOC"],
+        "keywords_in_text": ["Introduction", "Methodology", "Results"]
+      },
+      "structural_checks": { "has_toc": true, "heading_levels": [1, 2] }
+    },
+
+    {
+      "id": "tc_a04",
+      "workflow": "create",
+      "name": "Page break — must be inside Paragraph",
+      "skill_gotcha": "SKILL.md CRITICAL: PageBreak must be inside a Paragraph element. Standalone PageBreak creates invalid XML.",
+      "prompt": "Create a 3-page Word document where each page has a distinct section title and body text. Force page breaks between sections.",
+      "expected_behavior": "Page breaks are valid — each PageBreak is a child of a Paragraph element, not standalone. File passes validate.py.",
+      "auto_eval": {
+        "validate_passes": true,
+        "xml_must_not_contain": ["<w:br w:type=\"page\"/></w:body>"]
+      },
+      "structural_checks": { "min_pages": 3 }
+    },
+
+    {
+      "id": "tc_a05",
+      "workflow": "create",
+      "name": "No \\n in paragraphs — separate Paragraph objects",
+      "skill_gotcha": "SKILL.md: never use \\n inside TextRun. Each line break must be a new Paragraph element.",
+      "prompt": "Create a memo Word document with To, From, Date, Subject fields on separate lines, followed by 3 body paragraphs.",
+      "expected_behavior": "Each field and each paragraph is a separate Paragraph element. No \\n characters inside TextRun content.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_not_contain": ["\\n", "&#xA;"]
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_a06",
+      "workflow": "create",
+      "name": "Footer with tab stops — not table",
+      "skill_gotcha": "SKILL.md: never use tables in headers/footers (cells have minimum height, render as empty boxes). Use tab stops for multi-zone footers.",
+      "prompt": "Create a Word document with a footer containing: company name on the left, document title centered, page number on the right.",
+      "expected_behavior": "Footer uses tab stops (TabStopType.CENTER and TabStopType.RIGHT) not a Table. No table elements inside footer XML.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_not_contain": ["<w:tbl>"],
+        "xml_path": "word/document.xml",
+        "footer_xml_must_contain": ["<w:tab/>", "PAGE"]
+      },
+      "structural_checks": { "has_header_footer": true }
+    },
+
+    {
+      "id": "tc_a07",
+      "workflow": "create",
+      "name": "ImageRun — type parameter required",
+      "skill_gotcha": "SKILL.md CRITICAL: ImageRun requires `type` field (png/jpg/etc). Missing type causes silent failure or corrupt output.",
+      "prompt": "Create a Word document with a placeholder company logo image (generate a simple 100x50px colored rectangle as PNG) and a title 'Annual Report 2026'. Image should appear at the top.",
+      "expected_behavior": "ImageRun has explicit type field. Image appears in document. File is valid.",
+      "auto_eval": {
+        "validate_passes": true,
+        "file_exists": ["word/media/"]
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_a08",
+      "workflow": "create",
+      "name": "Multi-column layout via section properties",
+      "skill_gotcha": "SKILL.md: multi-column uses section properties with column.count, not tables. Full-width header/footer require separate sections.",
+      "prompt": "Create a newsletter Word document with a full-width title 'Tech Weekly — Issue 42', then a 2-column body with 3 news articles, then a full-width footer with contact info.",
+      "expected_behavior": "Document uses section breaks: single-column section for title, 2-column section for body, single-column section for footer. Column layout defined in section properties, not via table.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain": ["<w:cols ", "w:num=\"2\""]
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_a09",
+      "workflow": "create",
+      "name": "Footnotes — proper docx-js API",
+      "skill_gotcha": "SKILL.md: footnotes defined at Document level in `footnotes` object, referenced via FootnoteReferenceRun(id)",
+      "prompt": "Create a research summary Word document with 3 paragraphs. Add footnotes: paragraph 1 cites 'Smith et al. 2024', paragraph 2 cites 'See appendix A', paragraph 3 cites 'Data from WHO 2025'.",
+      "expected_behavior": "Document has footnotes section in XML (word/footnotes.xml). FootnoteReferenceRun used correctly. Footnotes appear at page bottom.",
+      "auto_eval": {
+        "file_exists": ["word/footnotes.xml"],
+        "keywords_in_text": ["Smith et al.", "appendix A", "WHO 2025"]
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_a10",
+      "workflow": "create",
+      "name": "US Letter page size explicit — not A4 default",
+      "skill_gotcha": "SKILL.md CRITICAL: docx-js defaults to A4. US documents must explicitly set 12240x15840 DXA.",
+      "prompt": "Create a US Letter format business letter (8.5\" x 11\") with 1-inch margins. Include a letterhead, date, recipient address, 2-paragraph body, and signature block.",
+      "expected_behavior": "Page size in XML is exactly 12240 width x 15840 height DXA. Margins are 1440 DXA (1 inch) on all sides.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain": ["<w:pgSz w:w=\"12240\"", "<w:pgSz"]
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_a11",
+      "workflow": "create",
+      "name": "Numbered list — independent vs continuing references",
+      "skill_gotcha": "SKILL.md: same numbering reference = continues counting (1,2,3 then 4,5,6). Different reference = restarts (1,2,3 then 1,2,3). Must be intentional.",
+      "prompt": "Create a Word document with two separate numbered lists. List 1: Steps to install (3 items). List 2: Steps to configure (4 items). Each list must start numbering from 1 independently.",
+      "expected_behavior": "Two distinct numbering references used so each list restarts at 1. No shared reference that would cause list 2 to start at 4.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "numbering_references_count": 2
+      },
+      "structural_checks": { "has_list": true }
+    },
+
+    {
+      "id": "tc_a12",
+      "workflow": "create",
+      "name": "Validate after creation — file integrity",
+      "skill_gotcha": "SKILL.md: always run validate.py after creation. Tests that model includes validation step.",
+      "prompt": "Create a complex Word document with: cover page, ToC, 5 sections with H1/H2 headings, 2 tables, a numbered list, header with company name, footer with page number. Save as project_report.docx.",
+      "expected_behavior": "Document passes validate.py with no errors. All elements present. Filename matches.",
+      "auto_eval": {
+        "validate_passes": true,
+        "expected_filename": "project_report.docx"
+      },
+      "structural_checks": {
+        "has_table": true, "has_toc": true, "has_header_footer": true,
+        "has_list": true, "heading_levels": [1, 2], "expected_filename": "project_report.docx"
+      }
+    },
+
+    {
+      "_comment": "=== WORKFLOW B: READ / ANALYZE (pandoc / unpack) ===",
+      "_comment_detail": "All tests in this group REQUIRE a fixture file as input. Tests verify model uses correct read approach."
+    },
+
+    {
+      "id": "tc_b01",
+      "workflow": "read",
+      "fixture_file": "fixtures/simple_report.docx",
+      "name": "Extract all text with structure preserved",
+      "skill_gotcha": "SKILL.md: use `pandoc --track-changes=all document.docx -o output.md` for text extraction. NOT python-docx or manual XML parsing.",
+      "prompt": "Read the attached Word document and extract all its text content. Preserve the heading hierarchy in your output.",
+      "expected_behavior": "Model uses pandoc for extraction. Output shows heading levels (# ## ###) matching the fixture. All paragraph text present.",
+      "auto_eval": {
+        "tool_used": "pandoc",
+        "keywords_in_output": ["Introduction", "Conclusion"]
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_b02",
+      "workflow": "read",
+      "fixture_file": "fixtures/simple_report.docx",
+      "name": "Extract table data as structured output",
+      "skill_gotcha": "SKILL.md: unpack gives raw XML — use this when pandoc output is insufficient for table structure.",
+      "prompt": "Read the attached Word document and extract the table data as a JSON array of objects, using the header row as keys.",
+      "expected_behavior": "JSON output with correct keys from header row. All data rows present. Values match fixture table content.",
+      "auto_eval": {
+        "output_is_valid_json": true,
+        "json_has_keys_from_fixture": true
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_b03",
+      "workflow": "read",
+      "fixture_file": "fixtures/simple_report.docx",
+      "name": "Summarize document — read then write",
+      "skill_gotcha": "Combination: read with pandoc, then create new summary doc with docx-js. Two-step pipeline.",
+      "prompt": "Read the attached Word document and create a new 1-page executive summary Word document based on its content.",
+      "expected_behavior": "Model reads source with pandoc first, then creates new .docx. Summary contains key points from fixture. Output is valid .docx.",
+      "auto_eval": {
+        "validate_passes": true,
+        "output_is_new_file": true
+      },
+      "structural_checks": { "max_pages": 1 }
+    },
+
+    {
+      "id": "tc_b04",
+      "workflow": "read",
+      "fixture_file": "fixtures/data_table.docx",
+      "name": "Read and compute statistics from table",
+      "skill_gotcha": "Read path: unpack or pandoc to get numeric data, then compute. No hallucination of values.",
+      "prompt": "Read the attached Word document, extract the numeric data from the table, and report: sum of each column, average of each column, and which row has the highest total.",
+      "expected_behavior": "Computed values match actual numbers in fixture table. No invented values.",
+      "auto_eval": {
+        "values_match_fixture": true
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "_comment": "=== WORKFLOW C: EDIT EXISTING (unpack → XML → pack) ===",
+      "_comment_detail": "All tests require fixture files. Tests verify the 3-step workflow: unpack.py → edit XML → pack.py --original"
+    },
+
+    {
+      "id": "tc_c01",
+      "workflow": "edit",
+      "fixture_file": "fixtures/contract_draft.docx",
+      "name": "Find and replace — unpack→edit→pack workflow",
+      "skill_gotcha": "SKILL.md: edit existing docs via unpack→XML edit→pack. Use Edit tool directly, NOT a Python script. Must use --original flag in pack.py.",
+      "prompt": "Open the attached Word document and replace all occurrences of 'Company' with 'Acme Corp'. Preserve all formatting.",
+      "expected_behavior": "Model unpacks with unpack.py, uses str_replace on document.xml directly, repacks with pack.py --original. All 6 instances replaced. No formatting lost.",
+      "auto_eval": {
+        "workflow_steps": ["unpack.py", "str_replace", "pack.py --original"],
+        "keywords_in_output": ["Acme Corp"],
+        "keywords_absent_in_output": ["Company"],
+        "validate_passes": true
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_c02",
+      "workflow": "edit",
+      "fixture_file": "fixtures/contract_draft.docx",
+      "name": "Add tracked changes (w:ins / w:del)",
+      "skill_gotcha": "SKILL.md: tracked changes require replacing entire <w:r> with <w:del>+<w:ins> siblings. Preserve <w:rPr> from original run. Use 'Claude' as author.",
+      "prompt": "Open the attached contract Word document and use tracked changes to: (1) change '30 days' to '60 days' in the Payment Terms section, (2) delete the sentence containing 'Party A reserves the right'.",
+      "expected_behavior": "Output has <w:ins> and <w:del> elements. Author is 'Claude'. Original <w:rPr> preserved in tracked change runs. File validates.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain": ["w:author=\"Claude\"", "<w:ins ", "<w:del "],
+        "validate_passes": true
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_c03",
+      "workflow": "edit",
+      "fixture_file": "fixtures/tracked_review.docx",
+      "name": "Accept existing tracked changes",
+      "skill_gotcha": "SKILL.md: accepting tracked changes uses scripts/accept_changes.py, not manual XML editing.",
+      "prompt": "Open the attached Word document which has tracked changes from a reviewer. Accept all tracked changes and produce a clean document.",
+      "expected_behavior": "Model uses accept_changes.py script. Output has no <w:ins> or <w:del> elements. Content reflects accepted insertions/deletions.",
+      "auto_eval": {
+        "tool_used": "accept_changes.py",
+        "unpack_and_check": true,
+        "xml_must_not_contain": ["<w:ins ", "<w:del "]
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_c04",
+      "workflow": "edit",
+      "fixture_file": "fixtures/tracked_review.docx",
+      "name": "Reject another author's insertions",
+      "skill_gotcha": "SKILL.md: to reject someone else's insertion, nest <w:del> inside their <w:ins> block. Do NOT delete the <w:ins> element itself.",
+      "prompt": "Open the attached Word document with tracked changes from 'Jane'. Reject all of Jane's insertions (mark them as deleted by Claude).",
+      "expected_behavior": "Output has <w:del w:author='Claude'> nested inside existing <w:ins w:author='Jane'> blocks. Jane's original <w:ins> wrapper preserved.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain": ["<w:ins w:author=\"Jane\"", "w:author=\"Claude\""]
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_c05",
+      "workflow": "edit",
+      "fixture_file": "fixtures/contract_draft.docx",
+      "name": "Add comments via comment.py",
+      "skill_gotcha": "SKILL.md: adding comments requires comment.py script + manually adding markers to document.xml. Two-step process. commentRangeStart/End are siblings of <w:r>, never inside it.",
+      "prompt": "Open the attached contract document and add 2 review comments: (1) on the Payment Terms section heading: 'Needs legal review', (2) on the Termination clause text: 'Verify 30-day notice period is standard'.",
+      "expected_behavior": "comment.py called twice. document.xml has <w:commentRangeStart> and <w:commentRangeEnd> as direct children of <w:p>, never inside <w:r>. word/comments.xml created.",
+      "auto_eval": {
+        "tool_used": "comment.py",
+        "file_exists": ["word/comments.xml"],
+        "xml_must_not_contain_in_pattern": "<w:r>.*<w:commentRangeStart",
+        "keywords_in_comments_xml": ["legal review", "notice period"]
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_c06",
+      "workflow": "edit",
+      "fixture_file": "fixtures/newsletter_raw.docx",
+      "name": "Add formatting to existing plain document",
+      "skill_gotcha": "Edit workflow: unpack → add <w:pStyle> to paragraphs in XML → pack. Must preserve existing content exactly.",
+      "prompt": "Open the attached plain Word document and apply formatting: make the first line of each article bold as a heading (Heading 2 style), and add 1.5x line spacing to body paragraphs.",
+      "expected_behavior": "Heading paragraphs gain <w:pStyle w:val=\"Heading2\">. Body paragraphs have <w:spacing w:line=\"360\">. All original text preserved.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain": ["w:val=\"Heading2\"", "w:line=\"360\""],
+        "original_text_preserved": true
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "id": "tc_c07",
+      "workflow": "edit",
+      "fixture_file": "fixtures/simple_report.docx",
+      "name": "Delete entire paragraph with tracked change",
+      "skill_gotcha": "SKILL.md: deleting an entire paragraph requires <w:del/> inside <w:pPr><w:rPr> to mark the paragraph mark as deleted. Without it, accepting changes leaves empty paragraph.",
+      "prompt": "Open the attached report document and use tracked changes to delete the second body paragraph entirely.",
+      "expected_behavior": "Deleted paragraph has <w:del/> inside <w:pPr><w:rPr> (paragraph mark deletion) AND <w:del> wrapping the run content. Both present.",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain_pattern": "<w:pPr>.*<w:rPr>.*<w:del "
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "_comment": "=== LEGACY CONVERSION ===",
+      "_comment_detail": "doc→docx conversion requires LibreOffice via soffice.py"
+    },
+
+    {
+      "id": "tc_d01",
+      "workflow": "convert",
+      "fixture_file": "fixtures/legacy_document.doc",
+      "name": "Convert .doc to .docx via soffice.py",
+      "skill_gotcha": "SKILL.md: legacy .doc files must use `python scripts/office/soffice.py --headless --convert-to docx`. Cannot use docx-js for this.",
+      "prompt": "Convert the attached .doc file to .docx format.",
+      "expected_behavior": "Model uses soffice.py with --headless --convert-to docx flags. Output is valid .docx. Content preserved from original.",
+      "auto_eval": {
+        "tool_used": "soffice.py",
+        "validate_passes": true,
+        "output_extension": ".docx"
+      },
+      "structural_checks": {}
+    },
+
+    {
+      "_comment": "=== AMBIGUOUS / REGRESSION (kept from v1, revised) ===",
+      "_comment_detail": "These test prompt interpretation and handling of vague requests."
+    },
+
+    {
+      "id": "tc_e01",
+      "workflow": "create",
+      "name": "Ambiguous: 'make it look nice' — interpret and create",
+      "prompt": "Summarize the following into a Word document and make it look nice: 'Our company was founded in 2010. We have 3 products: Alpha, Beta, Gamma. We serve 500+ clients in 20 countries. Revenue grew 15% last year. CEO is John Smith.'",
+      "expected_behavior": "Model creates structured document with headings, possibly a table for products/metrics. Not plain text paste. File validates.",
+      "auto_eval": {
+        "validate_passes": true,
+        "keywords_in_text": ["Alpha", "Beta", "Gamma", "John Smith"]
+      },
+      "structural_checks": { "heading_levels": [1] }
+    },
+
+    {
+      "id": "tc_e02",
+      "workflow": "create",
+      "name": "Ambiguous: email thread → formal document",
+      "prompt": "Turn this email thread into a proper Word document: 'From: manager — discuss product launch, finalize Q3 date, assign marketing. Reply: I'll handle marketing, budget ~$50K. Reply: July 15th works.'",
+      "expected_behavior": "Model interprets as meeting summary or action items document, not plain copy-paste. Has headings, possibly action items table. File validates.",
+      "auto_eval": {
+        "validate_passes": true,
+        "keywords_in_text": ["product launch", "July 15", "marketing"]
+      },
+      "structural_checks": { "heading_levels": [1] }
+    },
+
+    {
+      "id": "tc_e03",
+      "workflow": "create",
+      "name": "Edge case: unicode and special characters",
+      "prompt": "Create a Word document with: heading 'Analysis & Results: Q1/Q2 <Preliminary>', a table containing em-dash (—), ellipsis (…), copyright (©), Vietnamese characters (sản phẩm phân tích), and the expression x² + y² = r².",
+      "expected_behavior": "All special characters preserved. File opens without errors. No substitution or encoding artifacts.",
+      "auto_eval": {
+        "validate_passes": true,
+        "keywords_in_text": ["sản phẩm phân tích", "Analysis & Results"]
+      },
+      "structural_checks": { "has_table": true }
+    },
+
+    {
+      "id": "tc_e04",
+      "workflow": "create",
+      "name": "Edge case: graceful handling of missing image path",
+      "prompt": "Create a Word document that includes a company logo from path '/nonexistent/path/logo.png'. If the image is not available, use a placeholder text '[Image not available]'. Also include a title, 2 paragraphs, and a table.",
+      "expected_behavior": "Document completes successfully despite missing image. Placeholder text present. File validates.",
+      "auto_eval": {
+        "validate_passes": true,
+        "keywords_in_text": ["Image not available"]
+      },
+      "structural_checks": { "has_table": true }
+    },
+
+    {
+      "id": "tc_e05",
+      "workflow": "create",
+      "name": "Landscape orientation — pass portrait dims to docx-js",
+      "skill_gotcha": "SKILL.md: landscape requires passing SHORT edge as width, LONG edge as height, then set orientation: PageOrientation.LANDSCAPE. docx-js swaps internally.",
+      "prompt": "Create a landscape-orientation Word document (11\" wide x 8.5\" tall) with a wide data table spanning the full page width: 6 columns (Quarter, Revenue, Costs, Profit, Growth%, Region) with 4 data rows.",
+      "expected_behavior": "Page XML has w:w=12240, w:h=15840 with landscape orientation attribute. Table spans ~13400 DXA (landscape content width).",
+      "auto_eval": {
+        "unpack_and_check": true,
+        "xml_must_contain": ["w:orient=\"landscape\"", "w:w=\"12240\""]
+      },
+      "structural_checks": { "has_table": true }
+    }
+
+  ]
+}

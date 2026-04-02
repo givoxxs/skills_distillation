@@ -1,0 +1,24 @@
+# Skill Distillation Pipeline — Default Configuration
+# CLI flags override these values when provided.
+
+distillation:
+  # ── Models ──────────────────────────────────────────────────────────────────
+  student_model: "qwen/qwen3-8b"
+  teacher_model: "claude-haiku-4-5"
+
+  # ── Loop control ────────────────────────────────────────────────────────────
+  max_rounds: 10          # hard cap on distillation rounds
+  batch_size: 5           # test cases per Teacher feedback cycle (within a round)
+                          #   batch_size=0 or batch_size>=len(test_cases) → no batching
+                          #   (teacher called once per round, after all test cases)
+
+  # ── Stopping criteria ───────────────────────────────────────────────────────
+  stop_threshold: 0.7    # avg hybrid score — stop when reached
+  converge_delta: 0.02    # stop if improvement < this for K consecutive rounds
+  converge_k: 3           # number of consecutive rounds with tiny delta
+
+  # ── Output ──────────────────────────────────────────────────────────────────
+  results_dir: "./results"
+
+  # ── Evaluation ──────────────────────────────────────────────────────────────
+  use_llm_judge: true     # set to false for faster/cheaper debug runs

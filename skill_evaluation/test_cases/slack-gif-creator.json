@@ -1,0 +1,185 @@
+{
+  "skill": "slack-gif-creator",
+  "test_cases": [
+    {
+      "id": "tc_01",
+      "name": "Tạo loading spinner nhiều layers",
+      "prompt": "Tạo GIF loading spinner 128x128px cho Slack emoji. Yêu cầu kỹ thuật: 30 frames, 30 FPS, transparent background (RGBA mode), dung lượng < 200KB. Design: 3 vòng tròn đồng tâm (outer radius 55px, middle 40px, inner 25px), mỗi vòng xoay với tốc độ khác nhau (outer: 1 vòng/30frames, middle: 1.5x, inner: 2x), màu gradient từ #d97757 đến #6a9bcc. Sử dụng PIL/Pillow, anti-aliasing, tối ưu palette để file nhỏ. Lưu ra loading_spinner.gif và verify kích thước + dung lượng.",
+      "expected_behavior": "GIF 128x128, transparent bg, 30 frames, < 200KB, 3 rings xoay với tốc độ khác nhau, màu đẹp"
+    },
+    {
+      "id": "tc_02",
+      "name": "Tạo animated thumbs up với easing",
+      "prompt": "Tạo GIF thumbs up animation 128x128px cho Slack. Animation phải có easing (không linear): (1) Thumb bounce lên nhanh trong 8 frames đầu; (2) Overshoot 10% rồi settle về position cuối trong 4 frames; (3) Hold 10 frames; (4) Fade out 8 frames. Design: thumb geometry rõ ràng với outline màu #141413, fill màu #f5c842, subtle shadow. Tổng: 30 frames, 24 FPS, background transparent. Implement easing bằng công thức toán học (cubic ease-out). Lưu ra thumbs_up.gif, verify animation timeline đúng.",
+      "expected_behavior": "GIF có easing animation rõ ràng, không linear, design thumb đẹp, timing đúng 30 frames"
+    },
+    {
+      "id": "tc_03",
+      "name": "Tạo particle explosion message GIF",
+      "prompt": "Tạo GIF 480x480px dùng làm message GIF trong Slack (bình luận 'Amazing work!'). Animation: 40 particles bắt đầu từ center (240,240), mỗi particle có: random direction (0-360°), random velocity (3-8px/frame), random màu từ palette ['#d97757','#6a9bcc','#788c5d','#f5c842','#e87e8a'], size giảm dần từ 8px đến 0px theo trajectory. Background #141413. Text 'Amazing! 🎉' hiện ra ở frame 20 với fade-in, font size 48px, màu #faf9f5. Tổng 50 frames, 20 FPS. Lưu ra celebration.gif, kiểm tra dung lượng < 2MB.",
+      "expected_behavior": "GIF 480x480, particle explosion animation, text fade-in đúng timing, màu đa dạng, < 2MB"
+    },
+    {
+      "id": "tc_04",
+      "name": "Tối ưu GIF từ nhiều frames xuống nhỏ nhất",
+      "prompt": "Tạo một GIF animation phức tạp (color wheel quay 360°, 128x128px, 60 frames, 30 FPS), sau đó tối ưu xuống dưới 500KB bằng nhiều kỹ thuật: (1) Giảm màu palette từ 256 xuống tối ưu (thử 128, 64, 32); (2) Dùng frame disposal optimization (chỉ update pixels thay đổi); (3) Thử giảm FPS xuống 15 FPS nếu cần; (4) So sánh kích thước file sau mỗi bước tối ưu. Báo cáo: kích thước original vs final, % reduction, và quality assessment. Lưu ra color_wheel_optimized.gif.",
+      "expected_behavior": "GIF color wheel đẹp, report rõ các bước tối ưu với số liệu cụ thể, file cuối < 500KB"
+    },
+    {
+      "id": "tc_05",
+      "name": "Tạo GIF generator class tái sử dụng",
+      "prompt": "Viết Python class SlackGifCreator với các methods: (1) create_spinner(size, colors, fps, frames) → tạo loading spinner; (2) create_progress_bar(width, height, duration_s, color) → progress bar animation; (3) create_text_animation(text, font_size, bg_color, text_color) → text typewriter effect; (4) optimize(input_path, max_kb) → tối ưu GIF xuống max_kb. Class phải: handle errors gracefully, return metadata dict (size, frames, fps, file_size_kb), có docstrings. Viết test script demo cả 4 methods và lưu ra 4 file GIF khác nhau.",
+      "expected_behavior": "Class có đủ 4 methods, code clean với docstrings, test script tạo được 4 GIFs khác nhau, metadata đúng"
+    },
+    {
+      "id": "tc_06",
+      "name": "Tạo GIF đúng thông số kỹ thuật khắt khe",
+      "prompt": "Tạo GIF với các thông số kỹ thuật nghiêm ngặt: 128x128px chính xác (verify bằng code), 20 frames chính xác (không hơn không kém), 15 FPS (delay = 1000/15 = 66.67ms → round to 67ms), dung lượng < 100KB (không phải 1MB). Animation: morphing shape từ hình vuông → hình tròn → hình tam giác trong 20 frames, màu #d97757 với outline #141413. Sau khi tạo: verify bằng PIL rằng tất cả thông số đúng và in ra verification report. Nếu thông số sai, tự động điều chỉnh.",
+      "expected_behavior": "GIF đáp ứng chính xác tất cả thông số, verification report confirm, morphing animation rõ ràng, < 100KB"
+    },
+    {
+      "id": "tc_07",
+      "name": "Tạo GIF transparent với drop shadow",
+      "prompt": "Tạo loading icon GIF 128x128px với transparent background và drop shadow effect. Animation: spinning arc (như loading indicator iOS style), màu #d97757, stroke width 6px, góc 270° của vòng tròn. Drop shadow phải được render vào từng frame (không dùng CSS). Shadow: offset (3,3), blur radius 4px, màu rgba(0,0,0,0.4). Background: transparent (RGBA). Thách thức: GIF format không support alpha channel tốt → implement bằng checkerboard transparency hoặc single-color transparency. Lưu ra spinning_arc.gif, test visual output.",
+      "expected_behavior": "GIF có spinning arc đẹp, drop shadow visible, transparency xử lý đúng theo GIF format limitations"
+    },
+    {
+      "id": "tc_08",
+      "name": "Tạo pulse animation với Bezier easing",
+      "prompt": "Tạo GIF pulse animation 128x128px với easing curves phức tạp. Animation: circle to pulse ra rồi fade. Parameters: base radius 30px, max radius 55px, center (64,64). Easing: dùng cubic Bezier curve (0.25, 0.1, 0.25, 1.0) cho expand phase (0-15 frames) và ease-in cubic cho fade phase (15-30 frames). Màu: fill #d97757 opacity giảm từ 0.8 đến 0, stroke #141413 opacity 1 trong suốt. Implement Bezier calculation từ đầu (không dùng library). 30 frames, 24 FPS, transparent bg. Lưu ra pulse.gif.",
+      "expected_behavior": "Pulse animation có easing rõ ràng (không linear), Bezier implementation đúng, transparency đẹp"
+    },
+    {
+      "id": "tc_09",
+      "name": "Tạo brand GIF set 3 variants",
+      "prompt": "Tạo một brand GIF set gồm 3 variants của loading indicator dùng màu brand #d97757: (1) spinner_sm.gif: 32x32px, 12 frames, 15 FPS - simple dot rotation; (2) spinner_md.gif: 64x64px, 20 frames, 20 FPS - arc spinner; (3) spinner_lg.gif: 128x128px, 30 frames, 30 FPS - elaborate triple ring. Tất cả phải visual consistent (cùng màu #d97757, transparent bg). Tạo script create_brand_set.py, sau khi tạo verify cả 3 files và xuất ra brand_gif_report.txt liệt kê: tên file, kích thước pixels, dung lượng KB, số frames, FPS thực tế.",
+      "expected_behavior": "3 GIFs tạo thành công, visual consistent, report file đầy đủ thông tin verify, sizes đúng yêu cầu"
+    },
+    {
+      "id": "tc_10",
+      "name": "Tạo multi-frame GIF với storyboard",
+      "prompt": "Tạo GIF narrative 10 frames (480x480px) kể một 'mini story' trong Slack context: Frame 1-2: Empty chat bubble xuất hiện. Frame 3-4: Typing dots animation (3 dots bounce). Frame 5-6: Message text 'Hello!' fade in. Frame 7-8: Thumbs up reaction pop-up từ bottom-right. Frame 9-10: Confetti particles. Mỗi scene transition mượt mà. Màu: Slack-inspired dark mode (#1a1d21 background, #e8e8e8 text, #007a5a accent green). 15 FPS, tổng duration 0.67 giây (fast-paced). Lưu ra chat_story.gif, verify đủ 10 frames và duration.",
+      "expected_behavior": "GIF có đủ 10 scenes rõ ràng, transitions mượt, Slack-style design, duration ~0.67s, narrative dễ hiểu"
+    },
+    {
+      "id": "tc_11",
+      "name": "Simple: static color block animation",
+      "prompt": "Create a simple Slack emoji GIF: 128x128px, 10 frames at 10 FPS, cycling through 5 solid colors (#FF6B6B, #FFE66D, #4ECDC4, #45B7D1, #96CEB4) with 2 frames per color. No transparency required. Save as color_cycle.gif and verify: 128x128 dimensions, 10 frames, file size < 50KB.",
+      "expected_behavior": "GIF with 5 color blocks cycling, exactly 128x128, 10 frames, under 50KB — straightforward color animation"
+    },
+    {
+      "id": "tc_12",
+      "name": "Simple: blinking dot indicator",
+      "prompt": "Create a minimal Slack status indicator GIF: 32x32px, 20 frames at 10 FPS. Animation: a single circle of radius 10px at center (16,16), alternates between fully visible (frames 1-10) and hidden (frames 11-20), creating a blink effect. Color: #36C5F0 (Slack blue). White background. Save as blink_dot.gif.",
+      "expected_behavior": "GIF 32x32, 20 frames, dot visible for 1 second then invisible for 1 second, Slack blue color, white background, < 20KB"
+    },
+    {
+      "id": "tc_13",
+      "name": "Simple: horizontal progress bar",
+      "prompt": "Create a progress bar GIF: 200x40px, 20 frames at 15 FPS. A bar fills from left to right over 20 frames (0% to 100%). Bar color: #2EB67D (Slack green), background: #1D1C1D (Slack dark). Bar height: 16px, centered vertically, with 4px horizontal margin. Rounded corners (4px radius). Save as progress.gif, verify dimensions and frame count.",
+      "expected_behavior": "Progress bar fills smoothly left to right, correct dimensions, green on dark background, rounded ends, < 100KB"
+    },
+    {
+      "id": "tc_14",
+      "name": "Ambiguous: make something fun for Slack",
+      "prompt": "Make something fun for Slack. No specific size or frame count requirements.",
+      "expected_behavior": "Model produces a valid GIF appropriate for Slack (emoji size 128x128 or message size 480x480), makes reasonable choices for frames/FPS, animation is visually interesting — demonstrates ability to fill in missing specs with sensible defaults"
+    },
+    {
+      "id": "tc_15",
+      "name": "Ambiguous: create a team celebration GIF",
+      "prompt": "Create a team celebration GIF for our Slack workspace. Make it feel positive and energetic.",
+      "expected_behavior": "Model creates a celebratory animation (confetti, fireworks, stars, or similar), chooses appropriate size/FPS/color palette autonomously, output is a working GIF file"
+    },
+    {
+      "id": "tc_16",
+      "name": "Ambiguous: loading animation for our app",
+      "prompt": "We need a loading animation GIF for our Slack bot responses. Keep it branded.",
+      "expected_behavior": "Model creates a loading indicator GIF, makes decisions about size (likely 128x128), frame count, FPS, and a reasonable color choice — produces a working file without crashing on missing brand specs"
+    },
+    {
+      "id": "tc_17",
+      "name": "Negative edge case: impossible file size constraint",
+      "prompt": "Create a GIF: 480x480px, 1000 frames at 60 FPS, full-color animation with particle effects, file size must be under 50KB. Attempt to create this GIF and report what constraints are achievable.",
+      "expected_behavior": "Model recognizes the impossibility (1000 frames at 480x480 cannot fit in 50KB), reports the constraint conflict, and produces the best achievable GIF within a reasonable file size OR reduces specs to meet the 50KB limit — does not crash silently"
+    },
+    {
+      "id": "tc_18",
+      "name": "Negative edge case: zero-frame GIF request",
+      "prompt": "Create a GIF with 0 frames, 128x128px, 24 FPS. Save as empty.gif.",
+      "expected_behavior": "Model handles the invalid 0-frame request gracefully — either raises a clear error explaining minimum 1 frame required, or defaults to 1 frame, rather than producing a corrupt file"
+    },
+    {
+      "id": "tc_19",
+      "name": "Negative edge case: conflicting size requirements",
+      "prompt": "Create a Slack emoji GIF. Requirements: exactly 128x128px for emoji compliance. Also: exactly 512x512px for high-res display. Both requirements must be met in a single file.",
+      "expected_behavior": "Model identifies the conflicting size requirements (a single GIF cannot be both 128x128 and 512x512), explains the conflict, and asks for clarification OR produces both files with clear naming"
+    },
+    {
+      "id": "tc_20",
+      "name": "Negative edge case: negative FPS value",
+      "prompt": "Create a spinning arrow GIF: 64x64px, 24 frames, FPS = -10. Arrow pointing right, rotating clockwise. Save as spinning_arrow.gif.",
+      "expected_behavior": "Model catches the negative FPS value, raises a clear error or defaults to a positive FPS, does not produce a corrupt or invalid GIF"
+    },
+    {
+      "id": "tc_21",
+      "name": "Sequential chain: raw frames then effects then optimize then verify",
+      "prompt": "Complete this GIF creation pipeline step by step: (1) Generate 30 raw frames (128x128, RGBA) of a rotating square, no effects yet — just white square on dark background. (2) Apply a glow effect to each frame: the square edges should emit a soft orange glow (#d97757) using gaussian blur on a separate glow layer. (3) Optimize: reduce to 64-color palette, apply inter-frame delta compression. (4) Verify the final GIF: confirm 128x128, 30 frames, file < 150KB, glow visible. (5) Save as glowing_square.gif.",
+      "expected_behavior": "All 4 pipeline stages visible in output: raw frames → glow applied → optimized → verified. Final GIF has glow effect and meets size constraint"
+    },
+    {
+      "id": "tc_22",
+      "name": "Sequential chain: design concept then prototype then refine",
+      "prompt": "Build a Slack reaction GIF through an iterative process: (1) Create a basic v1: simple star burst shape, 128x128, 20 frames, 15 FPS — minimal styling. (2) Refine to v2: add 5-pointed star geometry instead of circles, apply yellow-to-orange gradient fill (#FFE66D to #FF6B35). (3) Add bounce easing: star scales from 0 to 1.1 then settles to 1.0. (4) Final optimization: confirm < 200KB. Save v1 as star_v1.gif and final as star_final.gif.",
+      "expected_behavior": "Two files produced (v1 and final), each showing progression — v1 simple, final with star geometry, gradient, and bounce easing"
+    },
+    {
+      "id": "tc_23",
+      "name": "Sequential chain: create then verify then fix then re-verify",
+      "prompt": "Create a GIF with intentional spec violations to test the verification-fix cycle: (1) Attempt to create a 130x130px GIF (spec requires 128x128). (2) Verify dimensions with PIL — catch the mismatch. (3) Resize to exactly 128x128 using LANCZOS resampling. (4) Re-verify all specs: 128x128, 24 frames, 20 FPS, < 100KB. (5) Save as verified_spinner.gif with a final verification report printed to stdout.",
+      "expected_behavior": "Verification step catches the 130x130 mismatch, resize is applied, re-verification passes, final report shows correct specs"
+    },
+    {
+      "id": "tc_24",
+      "name": "Sequential chain: script → batch generate → report",
+      "prompt": "Build a batch GIF generation system: (1) Write a Python script that reads a JSON config file defining 3 GIFs: [{name: 'spinner', size: 64, frames: 15, fps: 15}, {name: 'pulse', size: 128, frames: 30, fps: 24}, {name: 'wave', size: 256, frames: 45, fps: 20}]. (2) For each config entry, generate the corresponding GIF animation (spinner=rotating arc, pulse=expanding circle, wave=sine wave). (3) After generation, produce a batch_report.json with actual file sizes, frame counts, and pass/fail against config specs. (4) All 3 GIFs must be < 500KB each.",
+      "expected_behavior": "3 GIFs generated with correct names and approximate specs, batch_report.json present with actual measurements, all files < 500KB"
+    },
+    {
+      "id": "tc_25",
+      "name": "Negative edge case: invalid color hex codes",
+      "prompt": "Create a Slack emoji GIF 128x128px, 20 frames, 15 FPS. Use these colors for the animation: #GGGGGG (invalid), #12345 (too short), #XYZ (invalid). Handle invalid color codes gracefully.",
+      "expected_behavior": "Model detects invalid hex codes, falls back to sensible defaults or reports which colors are invalid, produces a working GIF without crashing"
+    },
+    {
+      "id": "tc_26",
+      "name": "Simple: countdown timer GIF",
+      "prompt": "Create a countdown timer GIF: 200x200px, 30 frames at 1 FPS (30 seconds total). Each frame shows a large number counting down from 30 to 1, then 'GO!' on the final frame. Black background, white numbers, font size 80px. Numbers should be centered. Save as countdown.gif, verify 30 frames.",
+      "expected_behavior": "GIF with 30 frames each showing a countdown number (30 to 1, then GO!), correct sizing, numbers centered, < 500KB"
+    },
+    {
+      "id": "tc_27",
+      "name": "Simple: wave text animation",
+      "prompt": "Create a text wave animation GIF: 300x80px, 24 frames, 24 FPS. Text 'HELLO' where each letter oscillates up and down like a wave, with each letter offset by 72° (360/5 letters). Amplitude: 10px. Background: #1D1C1D, text color: #ECB22E (Slack yellow). Letter spacing: 40px. Save as wave_text.gif.",
+      "expected_behavior": "GIF 300x80, each letter of HELLO moves in wave pattern with phase offset, Slack color scheme, < 200KB"
+    },
+    {
+      "id": "tc_28",
+      "name": "Negative edge case: single pixel GIF",
+      "prompt": "Create an animated GIF that is exactly 1x1 pixel, 5 frames, cycling through colors red, green, blue, white, black at 5 FPS. Save as pixel.gif. This tests the minimum viable GIF size.",
+      "expected_behavior": "Valid 1x1 GIF produced with 5 color frames, file is technically valid (can be opened), extremely small file size"
+    },
+    {
+      "id": "tc_29",
+      "name": "Ambiguous: something for the Monday standup channel",
+      "prompt": "Create a GIF for our team's Monday standup Slack channel. We're a software engineering team.",
+      "expected_behavior": "Model creates a contextually appropriate GIF (coffee, morning energy, coding theme, or similar), makes autonomous choices about size/animation type, produces a working GIF file — handles high-level context with no technical specs"
+    },
+    {
+      "id": "tc_30",
+      "name": "Sequential chain: template system",
+      "prompt": "Build a reusable GIF template system: (1) Create a base template function that draws a rounded rectangle frame on a transparent 128x128 background. (2) Create 3 specializations: status_online (green dot inside), status_away (yellow dot), status_busy (red dot). (3) Animate each: dot pulses (scale 0.8 to 1.0) over 20 frames at 15 FPS. (4) Save as status_online.gif, status_away.gif, status_busy.gif. (5) Generate a comparison report showing all 3 file sizes and confirming consistent frame counts.",
+      "expected_behavior": "3 status GIFs with shared frame/rounded-rect base, correct color dots, pulse animation, comparison report showing consistent specs"
+    }
+  ]
+}

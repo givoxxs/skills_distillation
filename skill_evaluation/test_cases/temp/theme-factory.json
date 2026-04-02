@@ -1,0 +1,65 @@
+{
+  "skill": "theme-factory",
+  "test_cases": [
+    {
+      "id": "tc_01",
+      "name": "Áp dụng theme Corporate cho HTML presentation",
+      "prompt": "Tạo một HTML presentation 5 slides với theme 'Corporate'. Theme Corporate có: primary color #1a3a6e (navy blue), secondary #c8a84b (gold), background trắng #ffffff, font heading 'Georgia' serif, font body 'Arial' sans-serif. Nội dung slides: (1) Title: 'Q1 2026 Business Review'; (2) Revenue Overview với bullet points; (3) Team Performance; (4) Challenges & Solutions; (5) Next Quarter Goals. Mỗi slide có header với màu navy, content area, page number. Xuất ra corporate-presentation.html.",
+      "expected_behavior": "File HTML có 5 slides với Corporate theme đúng colors và fonts, navigation giữa slides"
+    },
+    {
+      "id": "tc_02",
+      "name": "Tạo theme showcase và apply theme Modern",
+      "prompt": "Tạo một theme showcase webpage hiển thị 4 preset themes: (1) Modern: background #f8f9fa, accent #0066cc, clean sans-serif; (2) Corporate: navy/gold như đã mô tả; (3) Creative: background #1a1a2e, accent #e94560, bold typography; (4) Minimal: toàn trắng, accent #333333, lots of whitespace. Mỗi theme có preview card showing colors, fonts, và sample text. Khi click 'Apply', áp dụng theme đó lên sample content bên phải. Implement bằng HTML + CSS + JavaScript. Xuất ra theme-showcase.html.",
+      "expected_behavior": "Showcase có 4 themes với preview đẹp, clicking apply thay đổi theme của sample content ngay lập tức"
+    },
+    {
+      "id": "tc_03",
+      "name": "Áp dụng theme cho landing page HTML",
+      "prompt": "Đây là landing page HTML cần apply theme. Tạo file landing.html với nội dung placeholder (hero, features, pricing sections) rồi tạo script apply-theme.js có thể inject theme vào. Theme 'Startup': primary #6c63ff (purple), secondary #ff6584 (pink), background #ffffff, font Inter. Script phải: (1) thay đổi tất cả CSS variables, (2) cập nhật font imports từ Google Fonts, (3) áp dụng accent colors lên buttons/links. Xuất cả 2 files: landing.html và apply-theme.js.",
+      "expected_behavior": "landing.html render đúng với theme, apply-theme.js hoạt động khi include trong HTML"
+    },
+    {
+      "id": "tc_04",
+      "name": "Tạo custom theme từ brand colors",
+      "prompt": "Tạo custom theme từ brand colors của công ty Nexus Corp: primary #2d4a8a, secondary #e8732a, background #f5f5f0, success #4a7c5e, error #c44a2a. Tạo: (1) theme-config.json chứa tất cả tokens (colors, spacing, typography, border-radius, shadows); (2) theme.css file với CSS custom properties; (3) demo.html apply theme này với các elements: navigation, hero section, cards, buttons, form, footer. Chứng minh theme hoạt động trên toàn trang.",
+      "expected_behavior": "3 files được tạo đúng, theme nhất quán trên tất cả components trong demo.html"
+    },
+    {
+      "id": "tc_05",
+      "name": "Theme với dark/light mode toggle",
+      "prompt": "Tạo document viewer HTML với 2 themes: Light theme (background #ffffff, text #1a1a1a, sidebar #f0f0f0, accent #0070f3) và Dark theme (background #0d1117, text #c9d1d9, sidebar #161b22, accent #58a6ff). Implement: (1) CSS custom properties cho cả 2 themes; (2) Toggle button top-right corner; (3) Lưu preference vào localStorage; (4) Respect prefers-color-scheme ban đầu. Content: sample markdown-rendered documentation page. Xuất ra document-viewer.html.",
+      "expected_behavior": "Toggle hoạt động smooth, preference được lưu, prefers-color-scheme được respect, cả 2 themes đẹp"
+    },
+    {
+      "id": "tc_06",
+      "name": "Đảm bảo theme consistency trên multi-page site",
+      "prompt": "Tạo một mini website 3 trang với shared theme. Theme 'Ocean': primary #006994, secondary #00b4d8, background #f0f8ff, text #1a2b3c, accent #ff9e00. Tạo: (1) index.html (homepage với hero + features); (2) about.html (team page với cards); (3) contact.html (contact form). Tất cả phải share file theme.css. Tạo thêm navigation bar nhất quán với active state cho trang hiện tại. Verify consistency bằng cách list tất cả elements dùng theme colors trong mỗi file.",
+      "expected_behavior": "3 pages có cùng theme, navigation nhất quán, active state đúng, không có colors ngoài theme"
+    },
+    {
+      "id": "tc_07",
+      "name": "Font pairing và typography system",
+      "prompt": "Tạo typography system cho theme 'Editorial' sử dụng Google Fonts. Heading font: 'Playfair Display' (serif, elegant). Body font: 'Lato' (sans-serif, readable). Code font: 'JetBrains Mono'. Scale: Display 64px, H1 48px, H2 36px, H3 28px, H4 22px, Body 16px/1.6 line-height, Small 14px, Caption 12px. Tạo: (1) typography.css với classes và CSS variables; (2) type-scale.html demo tất cả styles với sample Latin và Vietnamese text; (3) Đảm bảo legibility trên mobile (min 16px body). Xuất ra cả 2 files.",
+      "expected_behavior": "CSS có đủ scale, fonts load từ Google Fonts, Vietnamese text hiển thị đúng, mobile readable"
+    },
+    {
+      "id": "tc_08",
+      "name": "Theme với accent colors cho interactive elements",
+      "prompt": "Tạo một UI kit HTML với theme 'Vibrant' (primary #7c3aed, accent #f59e0b, success #10b981, danger #ef4444, background #fafafa). Kit phải có: Primary button (purple), Secondary button (outlined), Danger button (red), Disabled state. Input fields: default, focus (purple border), error (red), success (green). Checkboxes và radio buttons với custom styling. Toggle switches. Progress bars. Badges/tags. Tất cả có hover states và transitions 0.2s. Xuất ra ui-kit.html.",
+      "expected_behavior": "Tất cả interactive elements có đúng theme colors, hover/focus/active states hoạt động, transitions mượt"
+    },
+    {
+      "id": "tc_09",
+      "name": "Export presentation theo theme",
+      "prompt": "Tạo script Python để convert một HTML presentation file thành PDF sử dụng pdfkit hoặc weasyprint. Input: HTML file có nhiều sections (đóng vai là slides). Script phải: (1) apply 'print' CSS cho layout đẹp khi print; (2) đảm bảo mỗi section bắt đầu trang mới; (3) giữ nguyên theme colors trong PDF; (4) thêm page numbers. Tạo sample HTML presentation 3 slides + script export_pdf.py + requirements.txt. Chạy thử và xuất ra presentation.pdf nếu có thể.",
+      "expected_behavior": "Script Python có thể chạy, HTML có print CSS đúng, PDF output có page breaks và page numbers"
+    },
+    {
+      "id": "tc_10",
+      "name": "Generate color palette từ base color",
+      "prompt": "Tạo Python script tên generate_palette.py nhận một màu hex làm input và generate ra full design system color palette: (1) 5 shades lighter (tints) và 5 shades darker (shades) của màu đó; (2) Complementary color và split-complementary; (3) Analogous colors (30° và 60° trên color wheel); (4) Semantic colors: success (green), warning (yellow), error (red) harmonized với input color. Output ra: (a) palette.json với tất cả hex codes và tên; (b) palette-preview.html hiển thị swatches visual. Test với input color #6c63ff.",
+      "expected_behavior": "Script chạy được với input #6c63ff, generate đủ palette, JSON có structure đúng, HTML preview hiển thị swatches"
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "skill": "algorithmic-art",
+  "test_cases": [
+    {
+      "id": "tc_01",
+      "name": "Quantum fluctuations theme",
+      "prompt": "Tạo một tác phẩm nghệ thuật thuật toán (algorithmic art) với chủ đề 'quantum fluctuations' sử dụng p5.js",
+      "expected_behavior": "Artwork thể hiện được chủ đề quantum, có animation, không phải ảnh tĩnh"
+    },
+    {
+      "id": "tc_02",
+      "name": "Flow field art",
+      "prompt": "Tạo flow field art sử dụng Perlin noise trong p5.js",
+      "expected_behavior": "Có flow field, sử dụng noise function, artwork đẹp"
+    },
+    {
+      "id": "tc_03",
+      "name": "Particle system",
+      "prompt": "Tạo particle system với hàng ngàn particles tương tác với nhau",
+      "expected_behavior": "Particle system hoạt động, có tương tác"
+    },
+    {
+      "id": "tc_04",
+      "name": "Generative typography",
+      "prompt": "Tạo generative typography art, chữ 'CHAOS' với hiệu ứng animation",
+      "expected_behavior": "Typography có animation, không static"
+    },
+    {
+      "id": "tc_05",
+      "name": "Recursive fractal",
+      "prompt": "Tạo fractal art sử dụng thuật toán recursive (ví dụ: Mandelbrot, Sierpinski)",
+      "expected_behavior": "Fractal render đúng, có chiều sâu"
+    },
+    {
+      "id": "tc_06",
+      "name": "Organic shapes",
+      "prompt": "Tạo organic shapes sử dụng noise và smooth curves",
+      "expected_behavior": "Hình dạng organic, mượt mà"
+    },
+    {
+      "id": "tc_07",
+      "name": "Color field art",
+      "prompt": "Tạo color field art với gradients và layered colors",
+      "expected_behavior": "Sử dụng color gradients, layered effects"
+    },
+    {
+      "id": "tc_08",
+      "name": "Geometric patterns",
+      "prompt": "Tạo geometric patterns phức tạp với repetition và variation",
+      "expected_behavior": "Pattern có tính lặp lại nhưng có biến thể"
+    },
+    {
+      "id": "tc_09",
+      "name": "Interactive art",
+      "prompt": "Tạo interactive art tương tác với mouse position",
+      "expected_behavior": "Artwork phản hồi với mouse input"
+    },
+    {
+      "id": "tc_10",
+      "name": "Seeded randomness",
+      "prompt": "Tạo artwork sử dụng seeded randomness để reproducibility",
+      "expected_behavior": "Artwork có thể reproduce với cùng seed"
+    },
+    {
+      "id": "tc_11",
+      "name": "L-system botanical growth",
+      "prompt": "Create an algorithmic artwork using L-Systems to simulate botanical growth. Implement a Lindenmayer system with: axiom 'F', rules 'F -> FF+[+F-F-F]-[-F+F+F]', 4 iterations, angle=22.5 degrees. Render the resulting branching structure as a tree growing upward from the bottom center of a 800x800 canvas. Use color progression from dark brown at the trunk to light green at the tips. Animate the drawing process — branches should appear stroke by stroke. The result should resemble an organic plant or coral structure.",
+      "expected_behavior": "L-system correctly implemented with given axiom and rules, 4 iterations rendered, branching tree structure visible, color gradient from root to tips, animated drawing"
+    },
+    {
+      "id": "tc_12",
+      "name": "Conway's Game of Life cellular automata",
+      "prompt": "Create an artistic visualization of Conway's Game of Life cellular automata. Requirements: 800x800 canvas, cells 8x8px (100x100 grid), random initial state with 30% density. Aesthetic choices: cells should not be simple white squares — dying cells should fade through a color trail (alive=bright cyan #00FFCC, recently dead=dim teal, long dead=dark background), creating ghost trails. Add a control: click to pause/resume. Speed: ~10 generations per second. The visual goal is to make the mathematical patterns feel alive and ethereal, not computational.",
+      "expected_behavior": "Game of Life rules correctly implemented (birth=3 neighbors, survival=2-3), fade-trail effect on dying cells, click pause/resume works, ethereal visual quality"
+    },
+    {
+      "id": "tc_13",
+      "name": "Lorenz strange attractor",
+      "prompt": "Create a visualization of the Lorenz Strange Attractor — the butterfly-shaped chaotic system. Parameters: sigma=10, rho=28, beta=8/3, dt=0.005, initial conditions (0.1, 0, 0). Plot 50,000 trajectory points in 3D projected to 2D using isometric projection. Color each point based on its Z-velocity: slow Z-movement = deep blue, fast = bright orange, creating a heat map of dynamical activity. The trajectory should be drawn progressively (not all at once). Canvas: 900x900, dark background. The final image should reveal the famous butterfly double-lobe structure.",
+      "expected_behavior": "Lorenz equations correctly integrated, butterfly attractor shape visible, heat-map coloring based on velocity, progressive drawing animation, isometric 3D projection"
+    },
+    {
+      "id": "tc_14",
+      "name": "Reaction-diffusion Turing patterns",
+      "prompt": "Implement a Reaction-Diffusion simulation (Gray-Scott model) to generate Turing-style patterns. Parameters: feed rate F=0.055, kill rate k=0.062, diffusion rates Du=1.0, Dv=0.5. Canvas: 400x400 with each pixel as a simulation cell. Initialize with a small central square of V chemical (all other cells start with U=1, V=0). Run for 5000 iterations then display the result. Color mapping: high V concentration = dark purple, low = cream/white, mid-range = rust orange — evoking natural animal skin patterns. The output should look like leopard spots or coral textures.",
+      "expected_behavior": "Gray-Scott reaction-diffusion correctly implemented, Turing pattern (spots or stripes) visible in final output, color palette suggests biological origin, computation completes without timeout"
+    },
+    {
+      "id": "tc_15",
+      "name": "Voronoi diagram generative landscape",
+      "prompt": "Create a generative landscape using Voronoi diagrams. Generate 80 random seed points on an 800x600 canvas. Compute Voronoi regions using Fortune's algorithm or a distance-based approach. Color each region based on a simulated elevation derived from layered Perlin noise at the seed point location: low elevation = deep ocean blue, mid = sandy beach, higher = green forest, high = gray mountain, peak = white snow. Add subtle point-noise texture within each region. Animate by slowly moving seed points (particles) to create a living topographic map.",
+      "expected_behavior": "Voronoi cells correctly partitioned, elevation-based color palette (ocean to snow), terrain-like appearance, gentle animation of shifting cells"
+    },
+    {
+      "id": "tc_16",
+      "name": "Wave interference and moiré patterns",
+      "prompt": "Create a mathematical visualization of wave interference and moiré patterns. Implement: (1) Two sets of concentric circular waves emanating from two foci, separated by 200px on an 800x800 canvas. (2) Each wave is a sine wave: brightness = sin(distance * frequency + phase). (3) Superimpose both wave systems by adding their values. (4) Animate by slowly shifting the phase of both wave sources at slightly different rates, creating a slowly evolving moiré interference pattern. Color: use a perceptually uniform colormap (e.g., viridis-inspired: dark purple → blue → green → yellow). The result should feel hypnotic and mathematical.",
+      "expected_behavior": "Two interference wave sources visible, constructive/destructive interference patterns form, moiré effect present, animation shows time evolution, colormap applied correctly"
+    },
+    {
+      "id": "tc_17",
+      "name": "Boids agent-based flocking simulation",
+      "prompt": "Create an artistic agent-based simulation of flocking behavior (Boids algorithm). Implement all three rules: alignment (match neighbors' velocity), cohesion (move toward center of neighbors), separation (avoid crowding). Parameters: 200 agents, perception radius=60px, canvas 800x800 with edge wrapping. Aesthetic treatment: each boid rendered as a small elongated triangle pointing in travel direction. Color agents by their current speed (slow=deep blue, fast=bright red-orange). Add a subtle motion trail (draw semi-transparent lines behind each boid). The artwork should feel like watching a murmuration of starlings.",
+      "expected_behavior": "All three boid rules implemented, flocking behavior visible (agents cluster and align), speed-based coloring works, motion trails add depth, edge wrapping functional"
+    },
+    {
+      "id": "tc_18",
+      "name": "Lissajous curves explorer",
+      "prompt": "Create an interactive Lissajous curve artwork. A Lissajous figure traces x=A*sin(a*t+delta), y=B*sin(b*t). Generate a grid of 6x6 Lissajous figures on a 900x900 canvas, where the grid position determines parameters a (columns: 1-6) and b (rows: 1-6). Phase delta=PI/2. Each figure drawn in a unique color from a harmonious palette. Use a thick stroke (3px) on dark background. Animate by slowly rotating delta from 0 to 2*PI over 5 seconds, causing all figures to morph simultaneously. The effect should feel like watching a mathematical symphony.",
+      "expected_behavior": "6x6 grid of Lissajous figures, each with correct a/b frequency ratios from their grid position, simultaneous phase animation, harmonious color palette, dark background"
+    },
+    {
+      "id": "tc_19",
+      "name": "Spirograph hypotrochoid generator",
+      "prompt": "Create a generative spirograph artwork using hypotrochoid equations: x = (R-r)*cos(t) + d*cos((R-r)/r * t), y = (R-r)*sin(t) - d*sin((R-r)/r * t). Generate 12 overlapping spirographs on an 800x800 canvas, each with different R, r, d values drawn from a mathematically interesting series (use values that produce complex patterns: R=100-200, r=prime numbers 7,11,13,17,19,23, d=r*1.5). Draw each spirograph in a different color with low opacity (0.3-0.5) so overlaps create new color blends. Animate drawing progressively — the pen traces each curve over time.",
+      "expected_behavior": "12 hypotrochoid curves with correct parametric equations, overlapping with transparent colors creating blended zones, progressive animation, complex petal-like patterns visible"
+    },
+    {
+      "id": "tc_20",
+      "name": "Generative mountain landscape with fractal terrain",
+      "prompt": "Create a generative landscape artwork using the Diamond-Square fractal terrain algorithm. Generate a 513x513 heightmap (2^n+1 grid) using diamond-square with roughness=0.6. Render as a side-on mountain silhouette: take vertical slices of the heightmap as ridge profiles and stack 5 mountain layers at different depths using painter's algorithm (back to front). Color by depth: furthest layer = lightest misty purple (#C9B8D3), closest = deep forest green (#2D5A27). Atmosphere: add subtle horizontal fog gradient overlay between layers. Canvas 900x500. The result should evoke a tranquil Japanese ink painting of layered mountains.",
+      "expected_behavior": "Diamond-square algorithm correctly implemented producing fractal terrain, multiple mountain layers with depth-based coloring, atmospheric perspective/fog effect, landscape composition is horizontally oriented and painterly"
+    }
+  ]
+}

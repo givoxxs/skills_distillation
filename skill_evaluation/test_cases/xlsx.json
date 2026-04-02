@@ -1,0 +1,185 @@
+{
+  "skill": "xlsx",
+  "test_cases": [
+    {
+      "id": "tc_01",
+      "name": "Tạo financial model cơ bản",
+      "prompt": "Tạo một file Excel financial model với: income statement, balance sheet, cash flow statement. Dữ liệu mẫu: revenue=100000, COGS=60000, opex=20000",
+      "expected_behavior": "File Excel có 3 sheets, công thức đúng, không có lỗi #REF!, #DIV/0!, etc."
+    },
+    {
+      "id": "tc_02",
+      "name": "Kiểm tra mã màu",
+      "prompt": "Tạo Excel với: ô A1 chứa giá trị input 100 (màu xanh), ô A2 chứa công thức =A1*2 (màu đen)",
+      "expected_behavior": "Màu text đúng: xanh cho input, đen cho công thức"
+    },
+    {
+      "id": "tc_03",
+      "name": "Tạo bảng tính không lỗi công thức",
+      "prompt": "Tạo file Excel với các công thức: =A1/B1, =SUM(A1:A10), =IF(A1>0,A1,0). Đảm bảo không có lỗi #DIV/0!",
+      "expected_behavior": "Tất cả công thức tính đúng, không có lỗi"
+    },
+    {
+      "id": "tc_04",
+      "name": "Đọc và xử lý CSV",
+      "prompt": "Đọc file CSV với dữ liệu: name,age,city\nJohn,25,NYC\nJane,30,LA\nTạo Excel từ dữ liệu này",
+      "expected_behavior": "File Excel chứa đúng dữ liệu từ CSV"
+    },
+    {
+      "id": "tc_05",
+      "name": "Tạo pivot table",
+      "prompt": "Tạo Excel với dữ liệu bán hàng: product,quantity,price\nA,10,100\nB,5,200\nA,8,100. Tạo pivot table tính tổng doanh thu theo product",
+      "expected_behavior": "Có pivot table hoặc summary table tính đúng doanh thu"
+    },
+    {
+      "id": "tc_06",
+      "name": "Tạo chart",
+      "prompt": "Tạo Excel với dữ liệu: month,revenue\nJan,1000\nFeb,1500\nMar,1200. Thêm chart line graph",
+      "expected_behavior": "Chart được tạo và hiển thị đúng dữ liệu"
+    },
+    {
+      "id": "tc_07",
+      "name": "Xử lý text thành columns",
+      "prompt": "Tạo Excel từ dữ liệu: FullName\nJohn Doe\nJane Smith. Tách thành 2 cột FirstName, LastName",
+      "expected_behavior": "Dữ liệu được tách đúng thành 2 cột riêng biệt"
+    },
+    {
+      "id": "tc_08",
+      "name": "Tạo conditional formatting",
+      "prompt": "Tạo Excel với dữ liệu điểm số: 85, 92, 78, 55, 90. Áp dụng conditional formatting: >80=màu xanh, <60=màu đỏ",
+      "expected_behavior": "Conditional formatting được áp dụng đúng"
+    },
+    {
+      "id": "tc_09",
+      "name": "Tạo file Excel mới hoàn toàn",
+      "prompt": "Tạo file Excel mới với 2 sheets: 'Data' và 'Summary'. Sheet Data chứa bảng dữ liệu, Summary tính tổng",
+      "expected_behavior": "File Excel có 2 sheets, công thức link giữa các sheets hoạt động"
+    },
+    {
+      "id": "tc_10",
+      "name": "Validation và protection",
+      "prompt": "Tạo Excel với data validation: ô A1 chỉ cho phép nhập số từ 1-100. Thêm comment giải thích",
+      "expected_behavior": "Data validation hoạt động, comment hiển thị"
+    },
+    {
+      "id": "tc_11",
+      "name": "Simple budget tracker",
+      "prompt": "Create a simple personal monthly budget Excel file with columns: Category, Budget, Actual, Variance. Add 5 categories: Rent=1500, Food=400, Transport=200, Entertainment=150, Savings=300. Variance column should auto-calculate Budget minus Actual.",
+      "expected_behavior": "Excel file with a clean table, Variance formula =B2-C2 applied correctly for all rows, totals row at bottom using SUM"
+    },
+    {
+      "id": "tc_12",
+      "name": "Simple multiplication table",
+      "prompt": "Create an Excel file with a 10x10 multiplication table. Row 1 and Column A should contain numbers 1-10. Each inner cell should contain a formula that multiplies the corresponding row and column headers.",
+      "expected_behavior": "10x10 grid with correct multiplication formulas, headers in row 1 and column A, no hardcoded values in inner cells"
+    },
+    {
+      "id": "tc_13",
+      "name": "Employee salary sheet with basic stats",
+      "prompt": "Create an Excel file for employee salaries with columns: EmployeeID, Name, Department, BaseSalary, Bonus, TotalComp. Add 8 sample employees across 3 departments. TotalComp = BaseSalary + Bonus. Add a summary section with average, max, and min salary per department.",
+      "expected_behavior": "Table with correct TotalComp formula, summary section using AVERAGEIF/MAXIF/MINIF or equivalent, no formula errors"
+    },
+    {
+      "id": "tc_14",
+      "name": "Ambiguous: make it look professional",
+      "prompt": "Create an Excel sales report that looks professional. Data: Q1=45000, Q2=52000, Q3=48000, Q4=61000. Make it look professional.",
+      "expected_behavior": "Model interprets 'professional' by applying consistent formatting (bold headers, currency format, borders, totals row, a chart), output is visually clean even without explicit instructions"
+    },
+    {
+      "id": "tc_15",
+      "name": "Ambiguous: add some charts",
+      "prompt": "I have this sales data: Jan 12000, Feb 9500, Mar 14000, Apr 11000, May 16000, Jun 13500. Create an Excel file and add some charts to make it easier to understand.",
+      "expected_behavior": "Model decides appropriate chart type(s) (bar, line, or both), creates them with correct data binding, labels axes, and adds chart titles without crashing on ambiguous 'some charts' phrasing"
+    },
+    {
+      "id": "tc_16",
+      "name": "Ambiguous: make it useful for management",
+      "prompt": "Create an Excel dashboard for a small retail store. Make it useful for management. Include whatever you think is most important.",
+      "expected_behavior": "Model produces a multi-section workbook with KPI summary, at least one chart, and labeled sections — demonstrates reasonable interpretation of open-ended requirement"
+    },
+    {
+      "id": "tc_17",
+      "name": "Edge case: division by zero guard",
+      "prompt": "Create an Excel file with a profit margin calculator. Columns: Revenue, Cost, Profit, MarginPct. Add rows where Revenue is 0 for the last entry (to test division by zero). Ensure the MarginPct column never shows #DIV/0! error.",
+      "expected_behavior": "MarginPct uses IFERROR or IF(Revenue=0,...) to avoid #DIV/0! error, all rows display clean output"
+    },
+    {
+      "id": "tc_18",
+      "name": "Edge case: empty data range in SUM",
+      "prompt": "Create an Excel file with a summary sheet that uses SUM, AVERAGE, COUNT over a data range that is initially empty (no rows of data). Formulas should return 0 or N/A gracefully, not errors.",
+      "expected_behavior": "SUM returns 0, AVERAGE returns error-handled value (e.g., via IFERROR), COUNT returns 0 — no unhandled formula errors on empty range"
+    },
+    {
+      "id": "tc_19",
+      "name": "Edge case: large dataset simulation",
+      "prompt": "Create an Excel file simulating a large dataset of 500 rows. Each row has: RowID (1-500), RandomScore (use formula like =ROW()*17 MOD 100 to simulate), Category (cycle through A, B, C using MOD). Add a summary sheet with count and average per category.",
+      "expected_behavior": "500 rows generated using formulas (not hardcoded), summary sheet uses COUNTIF/AVERAGEIF correctly, file opens without errors"
+    },
+    {
+      "id": "tc_20",
+      "name": "Edge case: special characters in cell values",
+      "prompt": "Create an Excel file with cells containing special characters: ampersands (&), quotes (\"), angle brackets (<>), forward slashes (/), and unicode characters (é, ü, 中文). Ensure the file saves and reopens correctly.",
+      "expected_behavior": "All special characters preserved correctly in the .xlsx file, no encoding errors, file is valid"
+    },
+    {
+      "id": "tc_21",
+      "name": "Edge case: circular reference prevention",
+      "prompt": "Create an Excel file for a loan amortization schedule. Columns: Period, Principal, InterestRate, Payment, Balance. Ensure no circular references exist in the formulas. Period 1-12, Principal=10000, InterestRate=0.05/12.",
+      "expected_behavior": "Amortization schedule with correct non-circular formulas, Balance decreases each period, no circular reference warnings"
+    },
+    {
+      "id": "tc_22",
+      "name": "Sequential: create data then add formulas",
+      "prompt": "Step 1: Create an Excel file with raw sales data: ProductID, Units Sold, Unit Price (10 rows of data, no formulas yet). Step 2: Add a Revenue column with formula Units*Price. Step 3: Add a Discount column (10% if Units>50, else 5%) using IF formula. Step 4: Add Net Revenue = Revenue * (1 - Discount). Verify all formula chains are correct.",
+      "expected_behavior": "All 4 steps completed: raw data, Revenue formula, Discount IF formula, Net Revenue formula — entire chain calculates correctly"
+    },
+    {
+      "id": "tc_23",
+      "name": "Sequential: create data then chart then format",
+      "prompt": "Create an Excel workbook in sequence: (1) Create a 'Data' sheet with monthly website traffic: Jan=12000, Feb=14500, Mar=11000, Apr=16000, May=18000, Jun=15500. (2) Add a line chart on a separate 'Chart' sheet showing the traffic trend. (3) Apply professional formatting to the Data sheet: freeze header row, auto-fit columns, bold headers, add currency/number formatting. (4) Add a total row.",
+      "expected_behavior": "Data sheet, Chart sheet with linked line chart, formatting applied, total row present — all steps complete"
+    },
+    {
+      "id": "tc_24",
+      "name": "Sequential: build then protect sheet",
+      "prompt": "Build an Excel financial calculator in steps: (1) Create input section with labeled cells for Principal, Rate, Years. (2) Add calculation section that references the inputs (don't hardcode values). (3) Lock the calculation cells so users cannot edit formulas. (4) Leave input cells unlocked. (5) Protect the sheet with password '1234'. Verify protection is applied.",
+      "expected_behavior": "Input cells editable, formula cells locked, sheet protected with password — cell protection correctly separates input from formula areas"
+    },
+    {
+      "id": "tc_25",
+      "name": "Sequential: import CSV then enrich then export summary",
+      "prompt": "Complete this workflow: (1) Create a CSV dataset in memory: employee_id,name,salary,department for 15 employees across Sales, Engineering, HR. (2) Load it into an Excel 'Raw Data' sheet. (3) Add a computed column 'SalaryBand' using IF: <50000=Low, 50000-80000=Mid, >80000=High. (4) Create a 'Summary' sheet with headcount and avg salary per department. (5) Save as employees_report.xlsx.",
+      "expected_behavior": "Raw Data sheet with SalaryBand formula, Summary sheet with correct aggregation by department, saved as .xlsx"
+    },
+    {
+      "id": "tc_26",
+      "name": "Sequential: full financial model chain",
+      "prompt": "Build a complete 3-statement financial model step by step: (1) Create 'Assumptions' sheet with key inputs (revenue_growth=10%, gross_margin=40%, tax_rate=25%). (2) Create 'Income Statement' sheet that references Assumptions — Revenue, COGS, Gross Profit, EBITDA, Net Income. (3) Create 'Balance Sheet' that links to Income Statement for retained earnings. (4) Create 'Cash Flow' that derives from Income Statement. (5) Add a 'Dashboard' sheet with key ratios referencing all 3 statements.",
+      "expected_behavior": "5 linked sheets, all formulas reference Assumptions or other sheets (no hardcoded values), changing Assumptions updates all statements"
+    },
+    {
+      "id": "tc_27",
+      "name": "Negative: formulas referencing deleted sheet",
+      "prompt": "Create an Excel file with 2 sheets: 'Source' and 'Report'. Report has formulas referencing Source (e.g., =Source!A1). Then delete the Source sheet. Observe the #REF! errors. Now create a recovery script that detects all #REF! errors in the workbook and replaces them with the value 0.",
+      "expected_behavior": "Model correctly identifies and handles #REF! errors after sheet deletion, replacement produces a clean workbook with 0s instead of error cells"
+    },
+    {
+      "id": "tc_28",
+      "name": "Simple: inventory management table",
+      "prompt": "Create a simple inventory management Excel file with columns: ItemName, SKU, Category, QuantityOnHand, ReorderPoint, NeedsReorder. NeedsReorder should be YES/NO based on whether QuantityOnHand <= ReorderPoint. Add 12 sample items. Add a count at the bottom showing how many items need reordering.",
+      "expected_behavior": "Table with IF formula for NeedsReorder, COUNTIF at bottom for reorder count, 12 rows of valid data"
+    },
+    {
+      "id": "tc_29",
+      "name": "Simple: grade book with letter grades",
+      "prompt": "Create a gradebook Excel file for a class of 10 students. Columns: StudentName, Quiz1, Quiz2, Midterm, Final, WeightedAverage, LetterGrade. Weights: Quiz1=10%, Quiz2=10%, Midterm=35%, Final=45%. LetterGrade: A>=90, B>=80, C>=70, D>=60, F<60. Use nested IF for letter grades.",
+      "expected_behavior": "WeightedAverage formula uses correct weights, LetterGrade uses nested IF with correct thresholds, all 10 students present"
+    },
+    {
+      "id": "tc_30",
+      "name": "Ambiguous: make it interactive",
+      "prompt": "Create an Excel sales tracker and make it interactive. Data: 6 months of sales for 3 products. The user wants to be able to 'slice and dice' the data.",
+      "expected_behavior": "Model interprets 'interactive' and 'slice and dice' by adding dropdown filters, named ranges, or a structured table with filter controls — produces a functional file even without exact specification"
+    }
+  ]
+}
