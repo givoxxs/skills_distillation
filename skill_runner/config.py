@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 
 @dataclass

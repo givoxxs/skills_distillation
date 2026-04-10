@@ -27,10 +27,10 @@ from pathlib import Path
 import click
 from dotenv import load_dotenv
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
-load_dotenv()
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 console = Console()
 
