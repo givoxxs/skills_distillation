@@ -1,0 +1,141 @@
+{
+  "_schema_version": "3.0",
+  "_description": "TEMPLATE — copy and fill in to create a new docx test case. REQUIRED fields must be present. Optional fields are hints — include only when needed.",
+  "_scoring_guide": "Step 1: Prerequisite gate (must_have_docx). Fail → rule_score=0. Step 2: rule_checks (xml.contains/absent/style/page) → each field = 1 vote. Step 3: content_checks (keywords/output_format/json_keys) → rules-based in docx_rules.py. Step 4: _extract_docx → paragraphs + tables (text) + images (metadata). Step 5: LLM Judge (20%) checks off-topic + fixture for ALL test cases. Step 6: hybrid = 0.80 × rule_score + 0.20 × llm_judge_score.",
+
+  "id": "tc_XXX",
+  "workflow": "create | read | edit | convert",
+  "name": "Short description of what this test verifies",
+  "prompt": "Exact instruction the student model receives — be precise, include all required elements",
+  "expected_behavior": "What correct execution looks like — describe expected output in detail",
+  "skill_gotcha": "SKILL.md CRITICAL: ... — only if this test targets a specific gotcha",
+  "fixture_file": "fixtures/filename.docx — REQUIRED for workflow=read|edit|convert",
+  "must_have_docx": true,
+
+
+  "rule_checks": {
+    "_note": "Machine-verified format/structure checks. Each field = 1 or more votes (score 0 or 1). rule_score = avg(all votes). Omit entirely if no machine-checkable rules apply. All checks are XML-based — no python-docx style detection needed.",
+
+    "_xml_checks": {
+      "_desc": "Unzip .docx → inspect XML. xml.file sets target (default: word/document.xml). Each string in the array = 1 vote (found=1, absent=0). Use xml.contains for required elements, xml.absent for forbidden elements."
+    },
+
+    "xml.contains": [
+      "<w:numFmt",
+      "Example: model must use native Word numbering (w:numPr), NOT unicode bullets"
+    ],
+
+    "xml.absent": [
+      "•",
+      "&#x2022;",
+      "Example: unicode bullet chars inserted as plain text — forbidden"
+    ],
+
+    "xml.absent_pattern": [
+      "<w:r>.*<w:commentRangeStart",
+      "Example: comment markers must be siblings of <w:r>, NEVER nested inside it"
+    ],
+
+    "xml.file": "word/document.xml",
+
+    "xml.footer_contains": [
+      "PAGE",
+      "<w:tab/>",
+      "Example: footer must use tab stops for multi-zone layout, NOT table cells"
+    ],
+
+    "_file_checks": {
+      "_desc": "Check ZIP contents without fully unpacking. file.must_exist: path must exist inside .docx ZIP. Each path = 1 vote. Targets: word/footnotes.xml, word/media/, word/comments.xml."
+    },
+
+    "file.must_exist": [
+      "word/footnotes.xml",
+      "word/media/",
+      "Example: verify footnotes or image media were created in the document"
+    ],
+
+    "_style_checks": {
+      "_desc": "Only style.header_footer is kept — it checks non-empty header/footer content, which XML tag detection cannot verify. All other style checks (table, toc, list, heading_levels) are replaced by equivalent xml.contains checks."
+    },
+
+    "style.header_footer": true,
+    "style.header_footer _note": "CHECK NON-EMPTY header/footer. Uses python-docx to verify section has header or footer with actual text content — cannot be replaced by XML tag detection (tag may exist but be empty). 1 vote.",
+
+    "_page_checks": {
+      "_desc": "CRUDE estimate only — counts <w:br w:type='page'/> + 1. Only accurate when model uses explicit page breaks (docx-js default). page.min = vote=1 if >= min, 0 otherwise. page.max = vote=1 if <= max, 0 otherwise."
+    },
+
+    "page.min": 2,
+    "page.min _note": "Fail (vote=0) if document has fewer pages than this threshold",
+
+    "page.max": 5,
+    "page.max _note": "Fail (vote=0) if document exceeds this page count",
+
+    "_numbering_check": {
+      "_desc": "Count distinct w:numId values in numbering.xml. 1 vote if count >= specified number. Use to verify independent numbered lists (each list needs its own numId)."
+    },
+
+    "numbering_references": 2,
+    "numbering_references _note": "Minimum distinct numbering references expected (e.g., 2 = two separate numbered lists each restarting at 1)",
+
+    "_validate_check": {
+      "_desc": "Run scripts/office/validate.py. Exit non-zero = vote=0, exit zero = vote=1. Slow (~1-2s), use selectively on complex output tests."
+    },
+
+    "validate": true,
+    "validate _note": "Document must pass structural validation — catches invalid XML, missing required elements, malformed markup",
+
+    "_filename_check": {
+      "_desc": "Evaluator checks exact filename first, falls back to any .docx if not specified. 1 vote if filename matches."
+    },
+
+    "filename": "project_report.docx",
+    "filename _note": "Expected output filename — model must save as this exact name"
+  },
+
+
+  "content_checks": {
+    "_note": "Most fields → rules-based in docx_rules.py (1 vote each): keywords, keywords_absent, output_format, json_keys_from_fixture, output_is_new_file. Only 2 fields → LLM Judge (20%): values_match_fixture, original_text_preserved (via fixture_checks prompt).",
+
+    "keywords": [
+      "Design",
+      "Develop",
+      "Example: all listed keywords must appear in the output document"
+    ],
+
+    "keywords_absent": [
+      "Company",
+      "Example: model must NOT mention 'Company' — if it appears, score is reduced"
+    ],
+
+    "output_format": "json",
+    "output_format _note": "Required output format: json | markdown | text | jpg | etc.",
+
+    "json_keys_from_fixture": true,
+    "json_keys_from_fixture _note": "If output is JSON, keys must match fixture table headers (for read/edit tasks)",
+
+    "output_is_new_file": true,
+    "output_is_new_file _note": "Task requires creating a NEW file, not modifying the input fixture (set false for read-only)",
+
+    "original_text_preserved": true,
+    "original_text_preserved _note": "All source text remains intact after edit (set true for edit workflows)",
+
+    "values_match_fixture": true,
+    "values_match_fixture _note": "Extracted or computed values must exactly match fixture data — no hallucinated numbers"
+  },
+
+
+  "workflow_checks": {
+    "_note": "Process correctness — logged for debugging. NOT in rule_score or hybrid score. Used to verify the model used the correct approach/toolchain.",
+
+    "tool": "pandoc | comment.py | accept_changes.py | soffice.py",
+    "tool _note": "Specific tool the model MUST use. Mismatch is logged but does not penalize score.",
+
+    "steps": [
+      "unpack.py",
+      "str_replace",
+      "pack.py --original",
+      "Example: for edit workflow, model must follow the unpack→edit→pack pipeline"
+    ]
+  }
+}

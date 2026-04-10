@@ -22,6 +22,21 @@ from runner.logger import AgentLogger
 console = Console()
 
 
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+
+def _bash_fingerprint(cmd: str) -> str:
+    """Return a fingerprint key for a bash command.
+
+    Splits on `&&`/`;` and returns the first non-trivial command token.
+    This allows each command in a chain to be tracked independently.
+    E.g. "cd foo && node bar" → "node"; "npm install; node server" → "npm"
+    """
+    # Strip leading "cd /path && cd /path &&" prefixes
+    stripped = re.sub(r"^(cd\s+\S+\s*&&\s*)+", "", cmd.strip()).strip()
+    return stripped.split()[0] if stripped else "bash"
+
+
 # Directories/files kept across workspace cleans (npm cache, installed packages).
 # These are expensive to reinstall and safe to reuse between runs.
 _WORKSPACE_PERSISTENT = {
@@ -159,9 +174,8 @@ def run_agent(
     total_tokens: dict[str, int] = {"prompt": 0, "completion": 0}
     iteration = 0
     # Track consecutive errors per (tool, command_fingerprint) to detect loops.
-    # For bash: fingerprint = first token (e.g. "npm", "node", "sed", "python").
-    # For other tools: fingerprint = tool name.
-    # This catches "sed fails 4 times" without counting unrelated bash commands.
+    # For bash: split by `&&`/`;` and track each distinct command independently.
+    # json_parse_error is also tracked — loop intervention triggers after MAX_CONSECUTIVE_ERRORS.
     consecutive_errors: dict[str, int] = {}
     MAX_CONSECUTIVE_ERRORS = 2  # Warn after 2 identical failures, not 3
 
@@ -263,16 +277,52 @@ def run_agent(
                         "error": str(parse_err),
                     },
                 )
-                # Return the parse error directly to the model so it can retry correctly
+                # Track consecutive parse errors — same fingerprint logic as execute errors
+                if tc.function.name == "bash":
+                    # The JSON parsing already failed, so tc.function.arguments is raw text.
+                    # Try to extract "command" field manually before the parse error position.
+                    cmd_str = ""
+                    raw = tc.function.arguments
+                    key = '"command"\s*:\s*"'
+                    start = raw.find(key)
+                    if start >= 0:
+                        val_start = raw.find('"', start + len(key)) + 1
+                        val_end = raw.find('"', val_start)
+                        if val_end > val_start:
+                            cmd_str = raw[val_start:val_end]
+                    tool_key = f"bash:{_bash_fingerprint(cmd_str)}"
+                else:
+                    tool_key = tc.function.name
+
+                consecutive_errors[tool_key] = consecutive_errors.get(tool_key, 0) + 1
+                is_loop = consecutive_errors[tool_key] >= MAX_CONSECUTIVE_ERRORS
+
+                base_msg = (
+                    f"ERROR: Could not parse tool arguments as JSON: {parse_err}. "
+                    "If writing a large file, try writing it in chunks using bash with a heredoc, "
+                    "or break the content into smaller write_file calls."
+                )
+                if is_loop:
+                    base_msg = (
+                        f"{base_msg}\n\n"
+                        f"LOOP DETECTED: '{tool_key}' has produced {consecutive_errors[tool_key]} "
+                        f"consecutive parse errors. You MUST change your approach — do NOT repeat the same command. "
+                        "Alternative strategies:\n"
+                        "- If using bash heredoc with large content, split into multiple write_file calls instead\n"
+                        "- If a script has a JSON syntax error, read the script with read_file, fix it, then retry\n"
+                        "- If the tool is receiving corrupted arguments, try a completely different approach\n"
+                        "If you cannot complete the task, call end_turn with an explanation."
+                    )
+                    logger.log_event(
+                        iteration,
+                        "loop_detected",
+                        {"tool": tool_key, "count": consecutive_errors[tool_key]},
+                    )
                 tool_results.append(
                     {
                         "role": "tool",
                         "tool_call_id": tc.id,
-                        "content": (
-                            f"ERROR: Could not parse tool arguments as JSON: {parse_err}. "
-                            "If writing a large file, try writing it in chunks using bash with a heredoc, "
-                            "or break the content into smaller write_file calls."
-                        ),
+                        "content": base_msg,
                     }
                 )
                 continue
@@ -288,15 +338,19 @@ def run_agent(
             )
 
             # Track consecutive errors per (tool, command_fingerprint) to detect loops.
-            # For bash: fingerprint = first word of command (e.g. "npm", "node", "sed").
-            # This prevents counting unrelated bash calls together.
+            # For bash: split by `&&`/`;` and track each distinct command independently.
+            # This prevents a `node` failure from masking an `npm install` failure in the same call.
             if tc.function.name == "bash":
                 cmd = args.get("command", "").strip()
-                # Skip leading "cd /some/path &&" to find the meaningful command.
-                # e.g. "cd /workspace/_skills/pptx && node script.js" → "node"
-                meaningful = re.sub(r"^(cd\s+\S+\s*&&\s*)+", "", cmd).strip()
-                first_token = meaningful.split()[0] if meaningful else "bash"
-                tool_key = f"bash:{first_token}"
+                # Split on `&&` or `;` and track each command independently
+                parts = re.split(r"\s+&&\s+|\s+;\s+", cmd)
+                first_key = f"bash:{_bash_fingerprint(parts[0])}"
+                tool_key = first_key
+                # Reset errors for ALL other bash fingerprints in this call
+                for p in parts[1:]:
+                    other = f"bash:{_bash_fingerprint(p)}"
+                    if other != first_key:
+                        consecutive_errors[other] = 0
             else:
                 tool_key = tc.function.name
 
@@ -402,4 +456,5 @@ def run_agent(
         "token_usage": total_tokens,
         "output_files": output_files,
         "output_dir": config.output_dir,
+        "log_file": Path(logger.log_path).name,
     }
