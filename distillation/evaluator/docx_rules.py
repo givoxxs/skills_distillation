@@ -62,6 +62,7 @@ workflow_checks — informational only, NOT in rule_score:
 
 from __future__ import annotations
 
+import logging
 import re
 import subprocess
 import sys
@@ -71,6 +72,8 @@ from pathlib import Path
 
 from evaluator.base import CheckResult, EvalResult
 from evaluator.llm_judge import LLMJudge
+
+_logger = logging.getLogger("distillation.docx_rules")
 
 _VALIDATE_PY = (
     Path(__file__).parent.parent.parent
@@ -129,14 +132,28 @@ class DocxEvaluator:
         all_checks_dict = {**rc, **cc}  # merged flat dict
 
         # ── Locate output file ──────────────────────────────────────────
+        fixture_basename = Path(test_case.get("fixture_file", "")).name
+
         expected_filename = all_checks_dict.get("filename")
         if expected_filename:
             docx_path = out / expected_filename
             if not docx_path.exists():
-                docx_path = next(iter(out.rglob("*.docx")), None)
+                # Fallback: pick a docx that isn't the fixture
+                candidates = [
+                    f for f in out.rglob("*.docx") if f.name != fixture_basename
+                ]
+                docx_path = (
+                    candidates[0]
+                    if candidates
+                    else next(iter(out.rglob("*.docx")), None)
+                )
         else:
-            docx_files = list(out.rglob("*.docx"))
-            docx_path = docx_files[0] if docx_files else None
+            # No expected filename: prefer non-fixture docx over fixture copy
+            all_docx = list(out.rglob("*.docx"))
+            non_fixture = [f for f in all_docx if f.name != fixture_basename]
+            docx_path = (
+                non_fixture[0] if non_fixture else (all_docx[0] if all_docx else None)
+            )
 
         # ── Step 1: Prerequisite gate ───────────────────────────────────
         must_have_docx = test_case.get("must_have_docx", True)
@@ -175,6 +192,7 @@ class DocxEvaluator:
         must_have_docx: bool,
     ) -> list[CheckResult]:
         if not must_have_docx:
+            _logger.debug("prereq gate: skipped (workflow does not produce .docx)")
             return [
                 CheckResult(
                     "must_have_docx",
@@ -194,7 +212,9 @@ class DocxEvaluator:
                 "" if exists else "No .docx file found in output_dir",
             )
         )
+        _logger.debug("prereq: file_exists=%s path=%s", exists, docx_path)
         if not exists:
+            _logger.debug("prereq gate FAILED: file not found — skipping all checks")
             return checks
 
         doc = _try_load(docx_path)
@@ -209,7 +229,9 @@ class DocxEvaluator:
                 else "python-docx raised an error — file may be corrupt",
             )
         )
+        _logger.debug("prereq: file_parseable=%s", parseable)
         if not parseable:
+            _logger.debug("prereq gate FAILED: file corrupt — skipping all checks")
             return checks
 
         size = docx_path.stat().st_size
@@ -222,6 +244,9 @@ class DocxEvaluator:
                 "" if non_empty else f"File only {size} bytes — likely empty",
             )
         )
+        _logger.debug("prereq: file_not_empty=%s size=%d bytes", non_empty, size)
+        if non_empty:
+            _logger.debug("prereq gate PASSED — running all checks")
         return checks
 
     # ── All checks (format + content merged) ──────────────────────────────
@@ -236,19 +261,41 @@ class DocxEvaluator:
 
         # Baseline: no placeholder text
         if doc is not None:
-            checks.append(self._check_no_placeholders(doc))
+            ch = self._check_no_placeholders(doc)
+            _logger.debug(
+                "check %s: passed=%s score=%.1f reason=%r",
+                ch.name,
+                ch.passed,
+                ch.score,
+                ch.reason,
+            )
+            checks.append(ch)
 
         # style.header_footer
         if checks_dict.get("style.header_footer"):
-            checks.append(self._check_has_header_footer(doc))
+            ch = self._check_has_header_footer(doc)
+            _logger.debug(
+                "check %s: passed=%s score=%.1f reason=%r",
+                ch.name,
+                ch.passed,
+                ch.score,
+                ch.reason,
+            )
+            checks.append(ch)
 
         # Page count
         if checks_dict.get("page.min") or checks_dict.get("page.max"):
-            checks.append(
-                self._check_page_count(
-                    doc, checks_dict.get("page.min"), checks_dict.get("page.max")
-                )
+            ch = self._check_page_count(
+                doc, checks_dict.get("page.min"), checks_dict.get("page.max")
             )
+            _logger.debug(
+                "check %s: passed=%s score=%.1f reason=%r",
+                ch.name,
+                ch.passed,
+                ch.score,
+                ch.reason,
+            )
+            checks.append(ch)
 
         # XML / ZIP / validate (requires unzip)
         docx_path = next(iter(output_dir.rglob("*.docx")), None)
@@ -258,6 +305,12 @@ class DocxEvaluator:
         # Content checks (rules-based)
         checks += self._run_content_checks(output_dir, doc, checks_dict)
 
+        _logger.debug(
+            "all_checks: %d total, %d passed, rule_score=%.3f",
+            len(checks),
+            sum(1 for c in checks if c.passed),
+            sum(c.score for c in checks) / len(checks) if checks else 0.0,
+        )
         return checks
 
     # ── XML checks ─────────────────────────────────────────────────────────
@@ -381,7 +434,15 @@ class DocxEvaluator:
 
             # validate.py — 1 vote
             if cd.get("validate") and _VALIDATE_PY.exists():
-                checks.append(self._check_validate(docx_path))
+                ch = self._check_validate(docx_path)
+                _logger.debug(
+                    "check %s: passed=%s score=%.1f reason=%r",
+                    ch.name,
+                    ch.passed,
+                    ch.score,
+                    ch.reason,
+                )
+                checks.append(ch)
 
         finally:
             if tmp_dir:
@@ -465,11 +526,25 @@ class DocxEvaluator:
                 cwd=str(_VALIDATE_PY.parent),
             )
             ok = proc.returncode == 0
-            msg = "" if ok else (proc.stdout + proc.stderr).strip()[:200]
+            out = (proc.stdout + proc.stderr).strip()
+            msg = "" if ok else out[:200]
+            _logger.debug(
+                "validate.py: passed=%s rc=%d stdout_len=%d stderr_len=%d",
+                ok,
+                proc.returncode,
+                len(proc.stdout),
+                len(proc.stderr),
+            )
+            if out:
+                _logger.debug("validate output: %s", out[:300])
             return CheckResult("validate_passes", ok, 1.0 if ok else 0.0, msg)
         except subprocess.TimeoutExpired:
+            _logger.warning("validate.py timed out on %s", docx_path)
             return CheckResult("validate_passes", False, 0.0, "validate.py timed out")
         except Exception as e:
+            _logger.warning(
+                "validate.py error %s on %s: %s", type(e).__name__, docx_path, e
+            )
             return CheckResult("validate_passes", False, 0.0, f"validate.py error: {e}")
 
     # ── Content checks (rules-based) ──────────────────────────────────────
@@ -482,51 +557,88 @@ class DocxEvaluator:
     ) -> list[CheckResult]:
         checks: list[CheckResult] = []
         all_text = " ".join(p.text for p in doc.paragraphs) if doc else ""
+        _logger.debug("content: extracted %d chars from document", len(all_text))
 
         # keywords — each = 1 vote
         for kw in cd.get("keywords") or []:
             ok = kw in all_text
-            checks.append(
-                CheckResult(
-                    f"keyword:{kw[:30]}",
-                    ok,
-                    1.0 if ok else 0.0,
-                    "" if ok else f"Keyword not found: '{kw}'",
-                )
+            ch = CheckResult(
+                f"keyword:{kw[:30]}",
+                ok,
+                1.0 if ok else 0.0,
+                "" if ok else f"Keyword not found: '{kw}'",
             )
+            _logger.debug(
+                "check %s: passed=%s score=%.1f reason=%r",
+                ch.name,
+                ch.passed,
+                ch.score,
+                ch.reason,
+            )
+            checks.append(ch)
 
         # keywords_absent — each = 1 vote
         for kw in cd.get("keywords_absent") or []:
             ok = kw not in all_text
-            checks.append(
-                CheckResult(
-                    f"kw_absent:{kw[:30]}",
-                    ok,
-                    1.0 if ok else 0.0,
-                    "" if ok else f"Forbidden keyword found: '{kw}'",
-                )
+            ch = CheckResult(
+                f"kw_absent:{kw[:30]}",
+                ok,
+                1.0 if ok else 0.0,
+                "" if ok else f"Forbidden keyword found: '{kw}'",
             )
+            _logger.debug(
+                "check %s: passed=%s score=%.1f reason=%r",
+                ch.name,
+                ch.passed,
+                ch.score,
+                ch.reason,
+            )
+            checks.append(ch)
 
         # output_format — verify output file type exists
         fmt = cd.get("output_format")
         if fmt:
             ok = bool(list(output_dir.rglob(f"*.{fmt}")))
-            checks.append(
-                CheckResult(
-                    f"output_format:{fmt}",
-                    ok,
-                    1.0 if ok else 0.0,
-                    "" if ok else f"No .{fmt} file found in output",
-                )
+            ch = CheckResult(
+                f"output_format:{fmt}",
+                ok,
+                1.0 if ok else 0.0,
+                "" if ok else f"No .{fmt} file found in output",
             )
+            _logger.debug(
+                "check %s: passed=%s score=%.1f reason=%r",
+                ch.name,
+                ch.passed,
+                ch.score,
+                ch.reason,
+            )
+            checks.append(ch)
 
         # json_keys_from_fixture
         if cd.get("json_keys_from_fixture") and cd.get("fixture_file"):
-            checks += self._check_json_keys_from_fixture(output_dir, cd["fixture_file"])
+            for sub_ch in self._check_json_keys_from_fixture(
+                output_dir, cd["fixture_file"]
+            ):
+                _logger.debug(
+                    "check %s: passed=%s score=%.1f reason=%r",
+                    sub_ch.name,
+                    sub_ch.passed,
+                    sub_ch.score,
+                    sub_ch.reason,
+                )
+                checks.append(sub_ch)
 
         # output_is_new_file
         if cd.get("output_is_new_file") and cd.get("fixture_file"):
-            checks += self._check_new_file(output_dir, cd["fixture_file"])
+            for sub_ch in self._check_new_file(output_dir, cd["fixture_file"]):
+                _logger.debug(
+                    "check %s: passed=%s score=%.1f reason=%r",
+                    sub_ch.name,
+                    sub_ch.passed,
+                    sub_ch.score,
+                    sub_ch.reason,
+                )
+                checks.append(sub_ch)
 
         return checks
 

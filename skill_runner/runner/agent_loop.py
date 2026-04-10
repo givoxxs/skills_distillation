@@ -73,20 +73,30 @@ def _clean_workspace(workspace_dir: str, preserve: list[str] | None = None) -> N
             item.unlink()
 
 
-def _collect_output_files(workspace_dir: str, output_dir: str) -> list[str]:
+def _collect_output_files(
+    workspace_dir: str,
+    output_dir: str,
+    input_files: list[str] | None = None,
+) -> list[str]:
     """Copy output files from workspace to output_dir, skipping build artifacts.
 
     Excludes: _skills/, .npm/, node_modules/, package.json, package-lock.json.
+    Also excludes any files whose name matches input_files (e.g. fixture copies).
     Returns list of destination paths.
     """
     ws = Path(workspace_dir)
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
+    # Normalize input filenames to a set of basenames for O(1) lookup
+    exclude_basenames: set[str] = {Path(f).name for f in (input_files or [])}
     copied = []
     for item in ws.rglob("*"):
         # Skip excluded top-level dirs (check every ancestor at ws depth)
         rel = item.relative_to(ws)
         if rel.parts[0] in _OUTPUT_EXCLUDE:
+            continue
+        # Skip files that are fixture/input file copies (same basename as injected files)
+        if item.name in exclude_basenames:
             continue
         if item.is_dir():
             continue
@@ -434,7 +444,9 @@ def run_agent(
     # Collect output files before workspace gets cleaned by the next run
     output_files: list[str] = []
     if config.output_dir:
-        output_files = _collect_output_files(workspace_abs, config.output_dir)
+        output_files = _collect_output_files(
+            workspace_abs, config.output_dir, input_files=config.input_files
+        )
         logger.log_event(
             iteration,
             "output_collected",

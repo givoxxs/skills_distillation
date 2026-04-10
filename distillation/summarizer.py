@@ -10,9 +10,12 @@ The key_notes are a compact, structured text that tells the Teacher:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from evaluator.base import EvalResult
+
+_logger = logging.getLogger("distillation.summarizer")
 
 
 def summarize(
@@ -57,6 +60,15 @@ def summarize(
         lines.append(f"- Delta from round {round_n - 1}: {sign}{delta:.2f}")
     lines.append("")
 
+    _logger.debug(
+        "summarizer round=%d: %d results, avg=%.3f, pass=%d/%d",
+        round_n,
+        len(eval_results),
+        avg_score,
+        pass_count,
+        len(eval_results),
+    )
+
     # ── Failed checks breakdown ───────────────────────────────────────────────
     lines.append("## Failed Checks (all test cases)")
     fail_counts: dict[str, int] = {}
@@ -86,6 +98,11 @@ def summarize(
     # ── Agent behavior patterns from JSONL logs ───────────────────────────────
     lines.append("## Agent Behavior Patterns (from execution logs)")
     patterns = _extract_patterns(log_paths)
+    _logger.debug(
+        "summarizer: parsed %d log files → %d patterns",
+        len(log_paths),
+        len(patterns),
+    )
     if patterns:
         for p in patterns:
             lines.append(f"- {p}")
@@ -102,10 +119,17 @@ def summarize(
     # ── Rewrite guidance hint ─────────────────────────────────────────────────
     lines.append("## Suggested Focus for SKILL.md Rewrite")
     hints = _generate_hints(fail_counts, patterns)
+    _logger.debug(
+        "summarizer: fail_counts=%s → %d hints generated",
+        dict(sorted(fail_counts.items(), key=lambda x: -x[1])[:5]),
+        len(hints),
+    )
     for h in hints:
         lines.append(f"- {h}")
 
-    return "\n".join(lines)
+    key_notes = "\n".join(lines)
+    _logger.debug("summarizer: key_notes generated: %d chars", len(key_notes))
+    return key_notes
 
 
 def _extract_patterns(log_paths: list[str]) -> list[str]:
@@ -127,7 +151,8 @@ def _extract_patterns(log_paths: list[str]) -> list[str]:
                 for line in path.read_text().splitlines()
                 if line.strip()
             ]
-        except Exception:
+        except Exception as exc:
+            _logger.warning("summarizer: failed to parse JSONL %s: %s", log_path, exc)
             continue
 
         for event in events:

@@ -15,15 +15,21 @@ Usage:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import statistics
+from datetime import datetime
 from pathlib import Path
 
 import anthropic
 from dotenv import load_dotenv
 
+from utils import write_api_call
+
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
+
+_logger = logging.getLogger("distillation.llm_judge")
 
 DEFAULT_MODEL = "claude-haiku-4-5"
 DEFAULT_ENSEMBLE = 3
@@ -62,7 +68,15 @@ class LLMJudge:
         Returns:
             (score 0.0-1.0, reasoning string)
         """
-        content = _extract_content(output_dir, skill)
+        tc_id = test_case.get("id", "unknown")
+        fixture_basename = Path(test_case.get("fixture_file", "")).name
+        content = _extract_content(output_dir, skill, fixture_basename=fixture_basename)
+        _logger.debug(
+            "judging tc=%s skill=%s content_len=%d",
+            tc_id,
+            skill,
+            len(content),
+        )
         if not content:
             return 0.0, "No extractable content found in output_dir"
 
@@ -71,23 +85,54 @@ class LLMJudge:
         raw_scores: list[float] = []
         last_reasoning = ""
 
-        for _ in range(self.ensemble_n):
-            s, r = _call_claude(prompt, self.model)
+        for i in range(self.ensemble_n):
+            s, r, usage = _call_claude(prompt, self.model)
             if s >= 0:
                 raw_scores.append(s)
                 last_reasoning = r
+                write_api_call(
+                    {
+                        "type": "llm_judge",
+                        "model": self.model,
+                        "test_case": tc_id,
+                        "ensemble_idx": i,
+                        "score": s,
+                        "reasoning": r[:100],
+                        "prompt_tokens": getattr(usage, "prompt_tokens", 0),
+                        "completion_tokens": getattr(usage, "completion_tokens", 0),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
+                _logger.debug(
+                    "llm_judge[%d/%d] tc=%s score=%.3f tokens_p=%d tokens_c=%d",
+                    i + 1,
+                    self.ensemble_n,
+                    tc_id,
+                    s,
+                    getattr(usage, "prompt_tokens", 0),
+                    getattr(usage, "completion_tokens", 0),
+                )
 
         if not raw_scores:
+            _logger.warning("llm_judge: all calls failed for tc=%s", tc_id)
             return 0.0, "All Claude calls failed"
 
-        final_score = statistics.median(raw_scores)
-        return round(final_score, 3), last_reasoning
+        if len(raw_scores) > 1:
+            _logger.debug(
+                "llm_judge ensemble: scores=%s median=%.3f stddev=%.3f",
+                raw_scores,
+                statistics.median(raw_scores),
+                round(statistics.stdev(raw_scores), 4) if len(raw_scores) > 1 else 0,
+            )
+
+        final_score = round(statistics.median(raw_scores), 3)
+        return final_score, last_reasoning
 
 
 # ── Content extractors (one per skill) ────────────────────────────────────────
 
 
-def _extract_content(output_dir: str, skill: str) -> str:
+def _extract_content(output_dir: str, skill: str, fixture_basename: str = "") -> str:
     """Extract human-readable content from output files for LLM Judge."""
     extractors = {
         "docx": _extract_docx,
@@ -98,11 +143,15 @@ def _extract_content(output_dir: str, skill: str) -> str:
         "algorithmic-art": _extract_script,
     }
     fn = extractors.get(skill, _extract_any_text)
-    return fn(Path(output_dir))
+    return fn(Path(output_dir), fixture_basename=fixture_basename)
 
 
-def _extract_docx(out: Path) -> str:
-    files = list(out.rglob("*.docx"))
+def _extract_docx(out: Path, fixture_basename: str = "") -> str:
+    """Extract text+tables from a .docx, skipping fixture files."""
+    all_docx = list(out.rglob("*.docx"))
+    # Prefer non-fixture docx over fixture copies
+    non_fixture = [f for f in all_docx if f.name != fixture_basename]
+    files = non_fixture if non_fixture else all_docx
     if not files:
         return ""
     try:
@@ -144,7 +193,7 @@ def _extract_docx(out: Path) -> str:
         return f"(docx parse error: {e})"
 
 
-def _extract_xlsx(out: Path) -> str:
+def _extract_xlsx(out: Path, **kwargs) -> str:
     files = list(out.rglob("*.xlsx"))
     if not files:
         return ""
@@ -165,7 +214,7 @@ def _extract_xlsx(out: Path) -> str:
         return f"(xlsx parse error: {e})"
 
 
-def _extract_gif_meta(out: Path) -> str:
+def _extract_gif_meta(out: Path, **kwargs) -> str:
     files = list(out.rglob("*.gif"))
     if not files:
         return ""
@@ -186,7 +235,7 @@ def _extract_gif_meta(out: Path) -> str:
     return "\n".join(lines)
 
 
-def _extract_html(out: Path) -> str:
+def _extract_html(out: Path, **kwargs) -> str:
     for ext in ("*.html", "*.htm", "*.jsx", "*.tsx"):
         files = list(out.rglob(ext))
         if files:
@@ -194,7 +243,7 @@ def _extract_html(out: Path) -> str:
     return _extract_any_text(out)
 
 
-def _extract_script(out: Path) -> str:
+def _extract_script(out: Path, **kwargs) -> str:
     for ext in ("*.js", "*.ts", "*.py", "*.sh"):
         files = list(out.rglob(ext))
         if files:
@@ -202,7 +251,7 @@ def _extract_script(out: Path) -> str:
     return _extract_any_text(out)
 
 
-def _extract_any_text(out: Path) -> str:
+def _extract_any_text(out: Path, **kwargs) -> str:
     """Fallback: find any readable text file."""
     for f in sorted(out.rglob("*")):
         if f.is_file() and f.suffix in (".txt", ".md", ".json", ".log"):
@@ -285,11 +334,15 @@ def _extract_checklist(test_case: dict) -> list[str]:
     return checklist[:5]
 
 
-def _call_claude(prompt: str, model: str) -> tuple[float, str]:
-    """Call Anthropic API and parse JSON response. Returns (-1, error) on failure."""
+def _call_claude(prompt: str, model: str) -> tuple[float, str, object]:
+    """Call Anthropic API and parse JSON response.
+
+    Returns:
+        (score, reasoning, usage_or_error_str) — score=-1 on failure.
+    """
     api_key = os.getenv("ANTHROPIC_KEY")
     if not api_key:
-        return -1.0, "ANTHROPIC_KEY not set in .env"
+        return -1.0, "ANTHROPIC_KEY not set in .env", None
 
     try:
         client = anthropic.Anthropic(api_key=api_key)
@@ -300,10 +353,19 @@ def _call_claude(prompt: str, model: str) -> tuple[float, str]:
             messages=[{"role": "user", "content": prompt}],
         )
         text = message.content[0].text.strip()
+        usage = message.usage if hasattr(message, "usage") else None
+        _logger.debug(
+            "Claude API: model=%s prompt_tokens=%s completion_tokens=%s",
+            model,
+            getattr(usage, "prompt_tokens", "?"),
+            getattr(usage, "completion_tokens", "?"),
+        )
     except Exception as e:
-        return -1.0, f"API error: {e}"
+        _logger.warning("Claude API error: %s", e)
+        return -1.0, f"API error: {e}", None
 
-    return _parse_json_response(text)
+    score, reason = _parse_json_response(text)
+    return score, reason, usage
 
 
 def _parse_json_response(text: str) -> tuple[float, str]:

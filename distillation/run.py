@@ -12,6 +12,8 @@ All CLI flags override the config file.
 """
 
 import json
+import logging
+import os
 import sys
 from pathlib import Path
 
@@ -106,6 +108,12 @@ def _load_config() -> dict:
     default=False,
     help="Skip LLM Judge (rule-based only). Faster and cheaper for debugging.",
 )
+@click.option(
+    "--resume",
+    is_flag=True,
+    default=False,
+    help="Resume from last completed batch (skip already-finished batches in results_dir).",
+)
 def main(
     skill,
     rounds,
@@ -120,11 +128,31 @@ def main(
     runner_verbose,
     dry_run,
     no_llm_judge,
+    resume,
 ):
     """Run the Skill Distillation pipeline for one skill."""
-    import orchestrator
-
     cfg = _load_config()
+
+    logging_cfg = cfg.get("logging", {})
+
+    # ── Logging setup ─────────────────────────────────────────────────────────
+    from utils import setup_logging
+
+    setup_logging(
+        level=logging_cfg.get("level", "info"),
+        eval_detail=logging_cfg.get("eval_detail", True),
+        api_calls=logging_cfg.get("api_calls", True),
+        results_dir=results_dir or cfg.get("results_dir", "./results"),
+        skill=skill,
+        stream=True,
+    )
+
+    _log = logging.getLogger("distillation")
+    _log.info(
+        "OPENROUTER_AI_KEY=%s  ANTHROPIC_KEY=%s",
+        "SET" if os.environ.get("OPENROUTER_AI_KEY") else "MISSING",
+        "SET" if os.environ.get("ANTHROPIC_KEY") else "MISSING",
+    )
 
     # Resolve values: CLI flag → config.yaml → hardcoded fallback
     rounds = rounds if rounds is not None else cfg.get("max_rounds", 10)
@@ -180,6 +208,13 @@ def main(
         teacher_mod.rewrite = _dry_rewrite
 
     # ── Run pipeline ──────────────────────────────────────────────────────────
+    import orchestrator
+
+    if resume:
+        click.echo(
+            "[RESUME] Skipping batches that already have scores.json in results_dir."
+        )
+
     summary = orchestrator.run_distillation(
         skill=skill,
         test_cases=selected,
@@ -197,6 +232,7 @@ def main(
         runner_verbose=runner_verbose,
         use_llm_judge=use_llm,
         llm_judge_ensemble=llm_judge_ensemble,
+        resume=resume,
     )
 
     # ── Print final summary ───────────────────────────────────────────────────

@@ -22,8 +22,11 @@ import math
 import shutil
 import sys
 import time
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
+
+from utils import get_logger, write_api_call, write_eval_detail
 
 _SKILL_RUNNER = Path(__file__).parent.parent / "skill_runner"
 sys.path.insert(0, str(_SKILL_RUNNER))
@@ -35,6 +38,8 @@ from evaluator.base import EvalResult  # noqa: E402
 from evaluator.docx_rules import DocxEvaluator  # noqa: E402
 import summarizer  # noqa: E402
 import teacher as teacher_module  # noqa: E402
+
+_log = get_logger("orchestrator")
 
 # ── Default stopping criteria (overridable via run_distillation args) ─────────
 _STOP_THRESHOLD = 0.80
@@ -51,6 +56,35 @@ def _build_evaluators(
             judge_model=judge_model, use_llm_judge=use_llm_judge, ensemble_n=ensemble_n
         ),
     }
+
+
+def _is_batch_complete(
+    results_path: Path,
+    round_n: int,
+    batch_idx: int,
+    expected_tc_ids: list[str],
+) -> bool:
+    """Check if a batch was fully completed (all test cases have output dirs)."""
+    batch_dir = results_path / f"round_{round_n}" / f"batch_{batch_idx}"
+    for tc_id in expected_tc_ids:
+        tc_dir = batch_dir / tc_id
+        if not tc_dir.exists() or not any(tc_dir.iterdir()):
+            return False
+    scores_file = batch_dir / "scores.json"
+    return scores_file.exists()
+
+
+def _find_last_completed_batch(
+    results_path: Path,
+    round_n: int,
+    max_batch: int,
+) -> int:
+    """Find the last batch that has a complete scores.json for this round."""
+    for b in range(max_batch, 0, -1):
+        scores_file = results_path / f"round_{round_n}" / f"batch_{b}" / "scores.json"
+        if scores_file.exists():
+            return b
+    return 0
 
 
 def run_distillation(
@@ -72,6 +106,7 @@ def run_distillation(
     runner_verbose: bool = False,
     use_llm_judge: bool = True,
     llm_judge_ensemble: int = 3,
+    resume: bool = False,
 ) -> dict:
     """Run the full distillation loop for one skill.
 
@@ -154,6 +189,43 @@ def run_distillation(
         if verbose:
             print(line, flush=True)
 
+    def emit_batch_summary(
+        label: str,
+        batch_results: list[EvalResult],
+        elapsed: float,
+    ) -> None:
+        """Emit detailed per-score breakdown for a batch."""
+        if not batch_results:
+            emit(f"  [{label}] done: 0 results")
+            return
+        rule_scores = [r.rule_score for r in batch_results]
+        llm_scores = [
+            r.llm_judge_score for r in batch_results if r.llm_judge_score is not None
+        ]
+        hybrid_scores = [r.hybrid_score for r in batch_results]
+        passed = sum(1 for r in batch_results if r.hybrid_score >= 0.6)
+        emit(
+            f"  [{label}] done: {passed}/{len(batch_results)} passed "
+            f"avg_rule={sum(rule_scores)/len(rule_scores):.3f} "
+            f"avg_llm={sum(llm_scores)/len(llm_scores):.3f} "
+            f"avg_hybrid={sum(hybrid_scores)/len(hybrid_scores):.3f} "
+            f"({elapsed:.1f}s)"
+        )
+
+    def write_batch_eval_detail(
+        batch_results: list[EvalResult],
+        round_n: int,
+        batch_idx: int,
+    ) -> None:
+        """Write full EvalResult objects to eval_detail.jsonl."""
+        for r in batch_results:
+            record = {
+                "round": round_n,
+                "batch": batch_idx,
+                **asdict(r),
+            }
+            write_eval_detail(record)
+
     emit("=" * 60)
     emit(f"START  skill={skill}  student={student_model}  teacher={teacher_model}")
     emit(
@@ -181,8 +253,79 @@ def run_distillation(
             test_cases[i : i + eff_batch] for i in range(0, len(test_cases), eff_batch)
         ]
 
+        # ── Resume: find last completed batch for this round ───────────────────
+        skip_batches = 0
+        if resume:
+            last_done = _find_last_completed_batch(results_path, round_n, len(batches))
+            if last_done > 0:
+                emit(
+                    f"  [RESUME] Round {round_n}: batches 1–{last_done} already complete, skipping."
+                )
+                skip_batches = last_done
+            else:
+                emit(
+                    f"  [RESUME] No completed batches found for round {round_n}, starting fresh."
+                )
+
         for batch_idx, batch in enumerate(batches, 1):
+            # ── Resume skip: load scores from disk instead of re-running ──────
+            if batch_idx <= skip_batches:
+                batch_scores_path = (
+                    results_path
+                    / f"round_{round_n}"
+                    / f"batch_{batch_idx}"
+                    / "scores.json"
+                )
+                if batch_scores_path.exists():
+                    try:
+                        saved = json.loads(batch_scores_path.read_text())
+                        saved_results = [
+                            EvalResult(
+                                test_case_id=tc["id"],
+                                skill=skill,
+                                model=student_model,
+                                round_n=round_n,
+                                output_dir=str(
+                                    results_path
+                                    / f"round_{round_n}"
+                                    / f"batch_{batch_idx}"
+                                    / tc["id"]
+                                ),
+                                rule_score=0.0,
+                            )
+                            for tc in batch
+                        ]
+                        for sr, tc_id in zip(
+                            saved.get("eval_results", []), [tc["id"] for tc in batch]
+                        ):
+                            for r in saved_results:
+                                if r.test_case_id == tc_id:
+                                    r.rule_score = sr.get("rule_score", 0.0)
+                                    r.llm_judge_score = sr.get("llm_score", -1.0)
+                                    r.llm_judge_reasoning = sr.get("llm_reasoning", "")
+                                    break
+                        all_round_results.extend(saved_results)
+                        _log.debug(
+                            "RESUMED batch %d: loaded %d results from scores.json",
+                            batch_idx,
+                            len(saved_results),
+                        )
+                    except Exception as exc:
+                        _log.warning(
+                            "Failed to load scores.json for R%d.B%d: %s — will re-run.",
+                            round_n,
+                            batch_idx,
+                            exc,
+                        )
+                        skip_batches = batch_idx - 1
+                        emit(f"  [RESUME] Re-running batch {batch_idx} (load failed).")
+                        emit(
+                            f"  [R{round_n}.B{batch_idx}/{n_batches}] Running {len(batch)} test case(s) ..."
+                        )
+                    continue
+
             batch_label = f"R{round_n}.B{batch_idx}/{n_batches}"
+            batch_start = time.time()
             emit(f"  [{batch_label}] Running {len(batch)} test case(s) ...")
             batch_results: list[EvalResult] = []
             log_paths: list[str] = []
@@ -265,16 +408,12 @@ def run_distillation(
             all_round_results.extend(batch_results)
 
             # ── Batch summary ─────────────────────────────────────────────────
-            batch_avg = (
-                sum(r.rule_score for r in batch_results) / len(batch_results)
-                if batch_results
-                else 0.0
-            )
-            emit(f"  [{batch_label}] batch_avg={batch_avg:.3f}")
+            batch_elapsed = time.time() - batch_start
+            emit_batch_summary(batch_label, batch_results, batch_elapsed)
             _save_batch_scores(results_path, round_n, batch_idx, batch_results)
+            write_batch_eval_detail(batch_results, round_n, batch_idx)
 
-            # ── Teacher feedback after this batch (if more batches remain or
-            #    single-batch mode — always rewrite to update SKILL.md) ────────
+            # ── Teacher feedback after this batch ────────────────────────────
             emit(f"  [{batch_label}] Summarizing → Teacher ...")
             key_notes = summarizer.summarize(
                 eval_results=batch_results,
@@ -290,17 +429,50 @@ def run_distillation(
             )
             key_notes_path.parent.mkdir(parents=True, exist_ok=True)
             key_notes_path.write_text(key_notes)
+            _log.debug(
+                "key_notes written for %s: %d chars, first 200: %r",
+                batch_label,
+                len(key_notes),
+                key_notes[:200],
+            )
 
+            teacher_start = time.time()
             try:
                 new_skill_md = teacher_module.rewrite(
                     skill_md_path=str(skill_md_path),
                     key_notes=key_notes,
                     model=teacher_model,
                 )
+                teacher_elapsed = time.time() - teacher_start
                 skill_md_path.write_text(new_skill_md)
-                emit(f"  [{batch_label}] SKILL.md updated ({len(new_skill_md)} chars)")
+                emit(
+                    f"  [{batch_label}] Teacher done: "
+                    f"SKILL.md updated ({len(new_skill_md)} chars, {teacher_elapsed:.1f}s)"
+                )
+                write_api_call(
+                    {
+                        "type": "teacher",
+                        "model": teacher_model,
+                        "round": round_n,
+                        "batch": batch_idx,
+                        "key_notes_chars": len(key_notes),
+                        "new_skill_chars": len(new_skill_md),
+                        "elapsed_s": round(teacher_elapsed, 2),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
             except RuntimeError as e:
                 emit(f"  [{batch_label}] Teacher FAILED: {e}. Skipping rewrite.")
+                write_api_call(
+                    {
+                        "type": "teacher",
+                        "model": teacher_model,
+                        "round": round_n,
+                        "batch": batch_idx,
+                        "error": str(e),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
         # ── Round summary ─────────────────────────────────────────────────────
         avg_score = (

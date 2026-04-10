@@ -56,7 +56,6 @@ skill_runner/skills/*
 skill_runner/outputs/*
 
 distillation/results/*
-distillation/results_03_02_2026/*
 
 /context
 docs

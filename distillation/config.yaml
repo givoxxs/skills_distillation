@@ -17,8 +17,15 @@ distillation:
   converge_delta: 0.02    # stop if improvement < this for K consecutive rounds
   converge_k: 3           # number of consecutive rounds with tiny delta
 
-  # ── Output ──────────────────────────────────────────────────────────────────
-  results_dir: "./results/08_04_2026"
+  # ── Output paths ────────────────────────────────────────────────────────────
+  results_dir: "./results/10_04_2026"   # all run output goes here (api_calls.jsonl, run.log, round_N/)
+
+  # ── Logging ────────────────────────────────────────────────────────────────────
+logging:
+  level: info          # debug | info | warning
+  eval_detail: true   # write eval_detail.jsonl per batch (each EvalResult as JSON line)
+  api_calls: true     # write api_calls.jsonl (LLMJudge + Teacher calls)
+  # NOTE: results_dir lives in the distillation: section above, not here.
 
   # ── Evaluation ──────────────────────────────────────────────────────────────
   use_llm_judge: true          # set false for faster debug (skips all LLM Judge calls)
