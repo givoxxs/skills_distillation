@@ -7,7 +7,7 @@ distillation:
   teacher_model: "claude-haiku-4-5"
 
   # ── Loop control ────────────────────────────────────────────────────────────
-  max_rounds: 10          # hard cap on distillation rounds
+  max_rounds: 3          # hard cap on distillation rounds
   batch_size: 5           # test cases per Teacher feedback cycle (within a round)
                           #   batch_size=0 or batch_size>=len(test_cases) → no batching
                           #   (teacher called once per round, after all test cases)
@@ -18,7 +18,9 @@ distillation:
   converge_k: 3           # number of consecutive rounds with tiny delta
 
   # ── Output ──────────────────────────────────────────────────────────────────
-  results_dir: "./results"
+  results_dir: "./results/08_04_2026"
 
   # ── Evaluation ──────────────────────────────────────────────────────────────
-  use_llm_judge: true     # set to false for faster/cheaper debug runs
+  use_llm_judge: true          # set false for faster debug (skips all LLM Judge calls)
+  llm_judge_ensemble: 1        # number of Claude calls per test case (default 3, set 1 to save cost during testing)
+  llm_judge_weight: 0.20       # LLM Judge weight in hybrid score (docx = 0.20, xlsx may differ)

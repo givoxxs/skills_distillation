@@ -3,12 +3,12 @@
 Approach:
   - Extract readable content from the output file (skill-specific)
   - Ask Claude to score 0.0-1.0 against the original prompt + expected_behavior
-  - Run N=3 times (ensemble) and return the median to reduce variance
+  - Run N=3 times (default, reduced to 1 during testing via llm_judge_ensemble config)
   - Returns 0.0 on any failure (safe fallback — rule_score still counts)
 
 Usage:
     from evaluator.llm_judge import LLMJudge
-    judge = LLMJudge(model="claude-haiku-4-5", ensemble_n=3)
+    judge = LLMJudge(model="claude-haiku-4-5", ensemble_n=1)
     score, reasoning = judge.score(output_dir, test_case, skill="docx")
 """
 
@@ -29,31 +29,16 @@ DEFAULT_MODEL = "claude-haiku-4-5"
 DEFAULT_ENSEMBLE = 3
 MAX_CONTENT_CHARS = 3000  # truncate extracted content to protect context
 
-JUDGE_SYSTEM = """You are an impartial evaluator assessing AI-generated task outputs.
+JUDGE_SYSTEM = """You are a focused evaluator for AI-generated task outputs.
 
-Your job: given a task prompt, expected behavior, a checklist of specific requirements,
-and the actual output content — score how well the output satisfies each requirement.
+Score 0.0–1.0:
+  1.0 — Output is correct, on-topic, fixture properly handled
+  0.7 — Minor issues, mostly correct
+  0.4 — Significant content issues or wrong approach
+  0.0 — Completely off-topic, hallucinated, or empty
 
-Respond ONLY with valid JSON in this exact format:
-{
-  "score": <float 0.0 to 1.0>,
-  "checklist": {
-    "<requirement>": <true|false>,
-    ...
-  },
-  "reasoning": "<one sentence explaining the overall score>"
-}
-
-Scoring guide:
-  1.0 — All checklist items satisfied, content is substantive and correct
-  0.8 — Most items satisfied, minor gaps
-  0.6 — About half the items satisfied
-  0.4 — Few items satisfied, significant gaps
-  0.2 — Output exists but wrong format or almost entirely placeholder
-  0.0 — No output, empty file, or completely off-task
-
-Be strict about placeholder text: "Page 1 content goes here", "TODO", "[INSERT...]"
-should score ≤ 0.2 regardless of format correctness.
+Respond ONLY with JSON:
+{"score": <float>, "reasoning": "<2-3 sentences>", "fixture_verdict": "PASS"|"FAIL"|"N/A"}
 """
 
 
@@ -142,6 +127,18 @@ def _extract_docx(out: Path) -> str:
                 for p in zone.paragraphs:
                     if p.text.strip():
                         lines.append(f"[{label}-{i}] {p.text.strip()}")
+        # Image metadata (Phương án B — format + size, no base64)
+        try:
+            for rel in doc.part.rels.values():
+                if "image" in rel.reltype:
+                    blob = rel.target_part.blob
+                    ctype = rel.target_part.content_type
+                    fmt = ctype.split("/")[-1]
+                    lines.append(
+                        f"[IMAGE] format={fmt}, size={len(blob)} bytes, rId={rel.rId}"
+                    )
+        except Exception:
+            pass
         return _truncate("\n".join(lines))
     except Exception as e:
         return f"(docx parse error: {e})"
@@ -226,52 +223,66 @@ def _truncate(text: str) -> str:
 
 
 def _build_judge_prompt(test_case: dict, content: str) -> str:
-    checklist = _extract_checklist(test_case)
-    checklist_text = "\n".join(f"  - {item}" for item in checklist)
+    cc = test_case.get("content_checks") or {}
 
-    gotcha = test_case.get("skill_gotcha", "")
-    gotcha_section = ""
-    if gotcha:
-        gotcha_section = f"\nCritical technical rule being tested (pay special attention):\n{gotcha}\n"
+    fixture_section = ""
+    if test_case.get("fixture_file"):
+        fixture_section = f"\nSource fixture: {test_case['fixture_file']}"
 
-    return f"""Task prompt:
-{test_case.get('prompt', '')}
+    off_topic = f"\n\nVerify content is relevant to this task: {test_case.get('expected_behavior', '')[:200]}"
 
-Expected behavior:
-{test_case.get('expected_behavior', '')}
-{gotcha_section}
-Specific requirements checklist (check each one against the output):
-{checklist_text}
+    fixture_checks = ""
+    if cc.get("values_match_fixture"):
+        fixture_checks += (
+            "\n- Computed values must match actual fixture data (verify numerically)"
+        )
+    if cc.get("original_text_preserved"):
+        fixture_checks += (
+            "\n- All original text from the source must be present and intact"
+        )
 
-Actual output content:
+    return f"""Task: {test_case.get('prompt', '')[:500]}
+{fixture_section}
+{off_topic}
+{fixture_checks}
+
+Output content:
 ---
 {content}
 ---
 
-Score 0.0-1.0 based on how many checklist items are satisfied.
-Reply ONLY with JSON (include the checklist results)."""
+Score 0.0–1.0. Reply ONLY with JSON: {{"score": <float>, "reasoning": "<2-3 sentences>", "fixture_verdict": "PASS"|"FAIL"|"N/A"}}
+"""
 
 
 def _extract_checklist(test_case: dict) -> list[str]:
-    """Extract specific requirements from prompt + expected_behavior as a checklist."""
-    prompt = test_case.get("prompt", "")
+    """Build scoring checklist from test_case fields.
+
+    Simplified: keywords are now rules-based in docx_rules.py.
+    Only fixture-specific items remain here.
+    """
+    checklist: list[str] = []
+    cc = test_case.get("content_checks") or {}
+
+    if cc.get("values_match_fixture"):
+        checklist.append("Computed values match fixture table numerically")
+    if cc.get("original_text_preserved"):
+        checklist.append("All original text from fixture is preserved")
+    if cc.get("output_format") == "json":
+        checklist.append("Output is valid JSON")
+
+    # Fallback: expected_behavior (rút gọn)
     expected = test_case.get("expected_behavior", "")
+    if expected and len(checklist) < 3:
+        lines = re.split(r"[,;]\s*|\n+|(?:\d+\.\s)", expected)
+        for line in lines:
+            line = line.strip().strip("-•").strip()
+            if len(line) > 10:
+                checklist.append(line[:120])
+                if len(checklist) >= 5:
+                    break
 
-    checklist = [
-        "Output file exists and is a valid .docx document",
-        "Content is substantive (not placeholder text like 'TODO' or '[INSERT...]')",
-        f"Output addresses the core task: {prompt[:120]}",
-    ]
-
-    # Parse expected_behavior for explicit requirements
-    # Split on common list indicators and add as individual checks
-    lines = re.split(r"[,;]\s*|\n+|(?:\d+\.\s)", expected)
-    for line in lines:
-        line = line.strip().strip("-•").strip()
-        if len(line) > 10:  # skip very short fragments
-            checklist.append(line[:150])
-
-    return checklist[:8]  # cap at 8 to keep prompt concise
+    return checklist[:5]
 
 
 def _call_claude(prompt: str, model: str) -> tuple[float, str]:
@@ -304,15 +315,13 @@ def _parse_json_response(text: str) -> tuple[float, str]:
         score = float(data.get("score", -1))
         reasoning = str(data.get("reasoning", ""))
 
-        # Optionally append checklist summary to reasoning
-        checklist = data.get("checklist", {})
-        if checklist:
-            passed = sum(1 for v in checklist.values() if v)
-            total = len(checklist)
-            reasoning = f"[{passed}/{total} checks] {reasoning}"
+        # Append fixture verdict to reasoning if present
+        fixture_verdict = data.get("fixture_verdict", "N/A")
+        if fixture_verdict != "N/A":
+            reasoning = f"[fixture: {fixture_verdict}] {reasoning}"
 
         if 0.0 <= score <= 1.0:
             return score, reasoning
         return -1.0, f"Score out of range: {score}"
     except (json.JSONDecodeError, ValueError) as e:
-        return -1.0, f"JSON parse error: {e} | raw: {text[:100]}"
+        return -1.0, f"JSON parse error: {e}"

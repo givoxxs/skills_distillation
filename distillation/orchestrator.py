@@ -43,9 +43,13 @@ _CONVERGE_K = 3
 _MAX_ROUNDS = 10
 
 
-def _build_evaluators(judge_model: str, use_llm_judge: bool) -> dict:
+def _build_evaluators(
+    judge_model: str, use_llm_judge: bool, ensemble_n: int = 3
+) -> dict:
     return {
-        "docx": DocxEvaluator(judge_model=judge_model, use_llm_judge=use_llm_judge),
+        "docx": DocxEvaluator(
+            judge_model=judge_model, use_llm_judge=use_llm_judge, ensemble_n=ensemble_n
+        ),
     }
 
 
@@ -63,9 +67,11 @@ def run_distillation(
     skills_dir: str | None = None,
     workspace_dir: str | None = None,
     log_dir: str | None = None,
+    test_cases_dir: str | None = None,
     verbose: bool = False,
     runner_verbose: bool = False,
     use_llm_judge: bool = True,
+    llm_judge_ensemble: int = 3,
 ) -> dict:
     """Run the full distillation loop for one skill.
 
@@ -84,6 +90,8 @@ def run_distillation(
         skills_dir:     Path to skill_runner/skills/ (auto-detected if None).
         workspace_dir:  Path to skill_runner workspace (auto-detected if None).
         log_dir:        Path to skill_runner logs (auto-detected if None).
+        test_cases_dir: Root of test_cases/ folder (auto-detected if None).
+                        Used to resolve fixture_file paths and copy fixtures into workspace.
         verbose:        Print progress to stdout.
         runner_verbose: Show skill_runner tool calls.
         use_llm_judge:  Whether to run LLM Judge (slower, more accurate).
@@ -92,7 +100,9 @@ def run_distillation(
         Dict with keys: rounds, final_score, best_round, skill_md_versions.
     """
     evaluators = _build_evaluators(
-        judge_model=teacher_model, use_llm_judge=use_llm_judge
+        judge_model=teacher_model,
+        use_llm_judge=use_llm_judge,
+        ensemble_n=llm_judge_ensemble,
     )
     if skill not in evaluators:
         raise ValueError(
@@ -108,6 +118,20 @@ def run_distillation(
     skills_dir = skills_dir or str(sr / "skills")
     workspace_dir = workspace_dir or str(sr / "workspace")
     log_dir = log_dir or str(sr / "logs")
+    # Auto-detect test_cases_dir from the first test case that has a fixture_file
+    if test_cases_dir is None:
+        for tc in test_cases:
+            ff = tc.get("fixture_file")
+            if ff:
+                # fixture_file is relative to the test_cases dir, e.g. "fixtures/foo.docx"
+                test_cases_dir = str(
+                    Path(results_dir).parent.parent / "skill_evaluation" / "test_cases"
+                )
+                break
+        if test_cases_dir is None:
+            test_cases_dir = str(
+                Path(results_dir).parent.parent / "skill_evaluation" / "test_cases"
+            )
 
     skill_md_path = Path(skills_dir) / skill / "SKILL.md"
     if not skill_md_path.exists():
@@ -173,17 +197,36 @@ def run_distillation(
                 )
                 tc_start = time.time()
 
+                # ── Fixture handling ─────────────────────────────────────────────
+                # Copy fixture into workspace so the agent can access it.
+                fixture_filename: str | None = None
+                if tc.get("fixture_file"):
+                    fixture_src = Path(test_cases_dir) / tc["fixture_file"]
+                    if fixture_src.exists():
+                        fixture_filename = fixture_src.name
+                        fixture_dst = Path(workspace_dir) / fixture_filename
+                        shutil.copy2(fixture_src, fixture_dst)
+                        emit(f"      fixture: {fixture_filename}")
+                    else:
+                        emit(f"      WARNING: fixture not found: {fixture_src}")
+
+                # Build user prompt — prepend input file note if fixture exists
+                user_prompt = tc["prompt"]
+                if fixture_filename:
+                    user_prompt = f"[File available in workspace: {fixture_filename}]\n\n{user_prompt}"
+
                 config = RunConfig(
                     model=student_model,
                     skills_dir=skills_dir,
                     workspace_dir=workspace_dir,
                     log_dir=log_dir,
                     output_dir=output_dir,
+                    input_files=[fixture_filename] if fixture_filename else [],
                     verbose=runner_verbose,
                 )
                 try:
                     run_result = run_agent(
-                        user_prompt=tc["prompt"],
+                        user_prompt=user_prompt,
                         skill_name=skill,
                         model=student_model,
                         config=config,

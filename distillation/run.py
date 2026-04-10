@@ -133,6 +133,7 @@ def main(
     teacher = teacher or cfg.get("teacher_model", "claude-haiku-4-5")
     results_dir = results_dir or cfg.get("results_dir", "./results")
     use_llm = not no_llm_judge and cfg.get("use_llm_judge", True)
+    llm_judge_ensemble = cfg.get("llm_judge_ensemble", 3)
 
     # ── Load test cases ───────────────────────────────────────────────────────
     if test_cases_file is None:
@@ -191,9 +192,11 @@ def main(
         converge_k=cfg.get("converge_k", 3),
         results_dir=results_dir,
         skills_dir=skills_dir,
+        test_cases_dir=str(tc_path.parent),
         verbose=verbose,
         runner_verbose=runner_verbose,
         use_llm_judge=use_llm,
+        llm_judge_ensemble=llm_judge_ensemble,
     )
 
     # ── Print final summary ───────────────────────────────────────────────────
