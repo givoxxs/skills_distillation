@@ -293,7 +293,7 @@ def run_agent(
                     # Try to extract "command" field manually before the parse error position.
                     cmd_str = ""
                     raw = tc.function.arguments
-                    key = '"command"\s*:\s*"'
+                    key = r'"command"\s*:\s*"'
                     start = raw.find(key)
                     if start >= 0:
                         val_start = raw.find('"', start + len(key)) + 1
