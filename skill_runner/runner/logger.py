@@ -18,6 +18,18 @@ class AgentLogger:
         self._path = os.path.join(log_dir, filename)
         self._fh = open(self._path, "w", encoding="utf-8")
 
+    def __enter__(self) -> "AgentLogger":
+        return self
+
+    def __exit__(self, *_) -> None:
+        if not self._fh.closed:
+            self._fh.close()
+
+    def __del__(self) -> None:
+        """Safety net: close file handle if log_end() was never called (e.g. exception)."""
+        if hasattr(self, "_fh") and not self._fh.closed:
+            self._fh.close()
+
     def _write(self, record: dict[str, Any]) -> None:
         record["ts"] = datetime.now(timezone.utc).isoformat()
         self._fh.write(json.dumps(record, ensure_ascii=False) + "\n")

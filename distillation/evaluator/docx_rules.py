@@ -94,14 +94,20 @@ class DocxEvaluator:
     """
 
     skill = "docx"
+    _rule_weight: float = 0.80
+    _llm_weight: float = 0.20
 
     def __init__(
         self,
         judge_model: str = "claude-haiku-4-5",
         use_llm_judge: bool = True,
         ensemble_n: int = 3,
+        llm_judge_weight: float = 0.20,
     ) -> None:
         self.use_llm_judge = use_llm_judge
+        llm_judge_weight = max(0.0, min(1.0, llm_judge_weight))
+        DocxEvaluator._rule_weight = round(1.0 - llm_judge_weight, 6)
+        DocxEvaluator._llm_weight = llm_judge_weight
         self._judge = (
             LLMJudge(model=judge_model, ensemble_n=ensemble_n)
             if use_llm_judge
@@ -172,9 +178,9 @@ class DocxEvaluator:
         if wc:
             result.checks += self._run_workflow_checks(out, wc)
 
-        # ── Step 2: hybrid weights ───────────────────────────────────────
-        result._rule_weight = 0.80
-        result._llm_weight = 0.20
+        # ── Step 2: hybrid weights (set from config via __init__) ────────
+        result._rule_weight = self._rule_weight
+        result._llm_weight = self._llm_weight
 
         # ── LLM Judge (20%) — only if not a total failure ──────────────
         if self._judge and result.rule_score > 0:
@@ -640,6 +646,33 @@ class DocxEvaluator:
                 )
                 checks.append(sub_ch)
 
+        # values_match_fixture — verify output file exists and is non-empty
+        # (numeric verification is delegated to LLM judge; rule check gates on output presence)
+        if cd.get("values_match_fixture"):
+            ch = self._check_has_output_file(output_dir)
+            _logger.debug(
+                "check %s: passed=%s score=%.1f reason=%r",
+                ch.name,
+                ch.passed,
+                ch.score,
+                ch.reason,
+            )
+            checks.append(ch)
+
+        # original_text_preserved — sample key phrases from fixture and verify in output
+        if cd.get("original_text_preserved") and cd.get("fixture_file"):
+            for sub_ch in self._check_original_text_preserved(
+                output_dir, doc, cd["fixture_file"]
+            ):
+                _logger.debug(
+                    "check %s: passed=%s score=%.1f reason=%r",
+                    sub_ch.name,
+                    sub_ch.passed,
+                    sub_ch.score,
+                    sub_ch.reason,
+                )
+                checks.append(sub_ch)
+
         return checks
 
     def _check_json_keys_from_fixture(
@@ -702,8 +735,86 @@ class DocxEvaluator:
             )
         ]
 
+    def _check_has_output_file(self, output_dir: Path) -> CheckResult:
+        """Gate check for values_match_fixture: at least one non-empty output file exists."""
+        candidates = list(output_dir.rglob("*"))
+        output_files = [
+            f
+            for f in candidates
+            if f.is_file()
+            and f.suffix in (".json", ".md", ".txt", ".docx", ".xlsx")
+            and f.stat().st_size > 0
+        ]
+        ok = bool(output_files)
+        return CheckResult(
+            "has_output_file",
+            ok,
+            1.0 if ok else 0.0,
+            "" if ok else "No output file found — model produced no result",
+        )
+
+    def _check_original_text_preserved(
+        self, output_dir: Path, doc, fixture_file: str
+    ) -> list[CheckResult]:
+        """Sample up to 5 unique phrases from fixture and check they appear in output."""
+        fixture_path = self._find_fixture(fixture_file)
+        if not fixture_path:
+            return [
+                CheckResult("original_text_preserved", False, 0.0, "Fixture not found")
+            ]
+
+        try:
+            from docx import Document as _Doc
+
+            fixture_doc = _Doc(str(fixture_path))
+            # Collect non-trivial paragraph texts from fixture
+            phrases = [
+                p.text.strip()
+                for p in fixture_doc.paragraphs
+                if len(p.text.strip()) > 15
+            ][:5]
+        except Exception as e:
+            return [
+                CheckResult(
+                    "original_text_preserved", False, 0.0, f"Fixture load error: {e}"
+                )
+            ]
+
+        if not phrases:
+            return [
+                CheckResult(
+                    "original_text_preserved", True, 1.0, "No phrases to verify"
+                )
+            ]
+
+        # Get output text — try docx first, fallback to any text file
+        output_text = ""
+        if doc is not None:
+            output_text = " ".join(p.text for p in doc.paragraphs)
+        if not output_text:
+            for f in sorted(output_dir.rglob("*")):
+                if f.is_file() and f.suffix in (".md", ".txt", ".json"):
+                    try:
+                        output_text = f.read_text(errors="replace")
+                        break
+                    except Exception:
+                        pass
+
+        results = []
+        for phrase in phrases:
+            ok = phrase in output_text
+            results.append(
+                CheckResult(
+                    f"orig_text:{phrase[:30]}",
+                    ok,
+                    1.0 if ok else 0.0,
+                    "" if ok else f"Fixture phrase missing in output: '{phrase[:60]}'",
+                )
+            )
+        return results
+
     def _find_fixture(self, fixture_file: str) -> Path | None:
-        base = Path(__file__).parent.parent.parent / "skill_evaluation" / "test_cases"
+        base = Path(__file__).parent.parent / "test_cases"
         path = base / fixture_file
         return path if path.exists() else None
 
@@ -755,5 +866,5 @@ def _read_file(path: Path) -> str:
 
 def _avg(checks: list[CheckResult]) -> float:
     if not checks:
-        return 1.0
+        return 0.0
     return sum(c.score for c in checks) / len(checks)

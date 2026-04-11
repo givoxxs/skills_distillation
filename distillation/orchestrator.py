@@ -49,11 +49,17 @@ _MAX_ROUNDS = 10
 
 
 def _build_evaluators(
-    judge_model: str, use_llm_judge: bool, ensemble_n: int = 3
+    judge_model: str,
+    use_llm_judge: bool,
+    ensemble_n: int = 3,
+    llm_judge_weight: float = 0.20,
 ) -> dict:
     return {
         "docx": DocxEvaluator(
-            judge_model=judge_model, use_llm_judge=use_llm_judge, ensemble_n=ensemble_n
+            judge_model=judge_model,
+            use_llm_judge=use_llm_judge,
+            ensemble_n=ensemble_n,
+            llm_judge_weight=llm_judge_weight,
         ),
     }
 
@@ -106,6 +112,7 @@ def run_distillation(
     runner_verbose: bool = False,
     use_llm_judge: bool = True,
     llm_judge_ensemble: int = 3,
+    llm_judge_weight: float = 0.20,
     resume: bool = False,
 ) -> dict:
     """Run the full distillation loop for one skill.
@@ -138,6 +145,7 @@ def run_distillation(
         judge_model=teacher_model,
         use_llm_judge=use_llm_judge,
         ensemble_n=llm_judge_ensemble,
+        llm_judge_weight=llm_judge_weight,
     )
     if skill not in evaluators:
         raise ValueError(
@@ -159,14 +167,10 @@ def run_distillation(
             ff = tc.get("fixture_file")
             if ff:
                 # fixture_file is relative to the test_cases dir, e.g. "fixtures/foo.docx"
-                test_cases_dir = str(
-                    Path(results_dir).parent.parent / "skill_evaluation" / "test_cases"
-                )
+                test_cases_dir = str(Path(__file__).parent / "test_cases")
                 break
         if test_cases_dir is None:
-            test_cases_dir = str(
-                Path(results_dir).parent.parent / "skill_evaluation" / "test_cases"
-            )
+            test_cases_dir = str(Path(__file__).parent / "test_cases")
 
     skill_md_path = Path(skills_dir) / skill / "SKILL.md"
     if not skill_md_path.exists():
@@ -179,6 +183,8 @@ def run_distillation(
     n_batches = math.ceil(len(test_cases) / eff_batch)
 
     run_log_path = results_path / "run.log"
+    # Line-buffered + explicit flush() in emit() ensures no data loss even on exception.
+    # Python file __del__ closes the FD on GC when the function exits.
     run_log_file = open(run_log_path, "a", buffering=1)
 
     def emit(msg: str) -> None:
@@ -241,6 +247,9 @@ def run_distillation(
     history: list[dict] = []
     prev_all_results: list[EvalResult] = []
     recent_deltas: list[float] = []
+    round_key_notes_history: list[
+        str
+    ] = []  # accumulates key_notes across rounds for Teacher context
 
     for round_n in range(1, max_rounds + 1):
         emit("")
@@ -292,6 +301,12 @@ def run_distillation(
                                     / tc["id"]
                                 ),
                                 rule_score=0.0,
+                                _rule_weight=evaluator._rule_weight
+                                if hasattr(evaluator, "_rule_weight")
+                                else 0.5,
+                                _llm_weight=evaluator._llm_weight
+                                if hasattr(evaluator, "_llm_weight")
+                                else 0.5,
                             )
                             for tc in batch
                         ]
@@ -397,9 +412,9 @@ def run_distillation(
                     )
                     continue
 
-                log_path = _find_latest_log(log_dir, skill)
-                if log_path:
-                    log_paths.append(log_path)
+                log_filename = run_result.get("log_file")
+                if log_filename:
+                    log_paths.append(str(Path(log_dir) / log_filename))
 
                 result = evaluator.score(output_dir, tc, student_model, round_n)
                 batch_results.append(result)
@@ -442,9 +457,13 @@ def run_distillation(
                     skill_md_path=str(skill_md_path),
                     key_notes=key_notes,
                     model=teacher_model,
+                    round_history=round_key_notes_history
+                    if round_key_notes_history
+                    else None,
                 )
                 teacher_elapsed = time.time() - teacher_start
                 skill_md_path.write_text(new_skill_md)
+                round_key_notes_history.append(key_notes)
                 emit(
                     f"  [{batch_label}] Teacher done: "
                     f"SKILL.md updated ({len(new_skill_md)} chars, {teacher_elapsed:.1f}s)"
@@ -476,7 +495,7 @@ def run_distillation(
 
         # ── Round summary ─────────────────────────────────────────────────────
         avg_score = (
-            sum(r.rule_score for r in all_round_results) / len(all_round_results)
+            sum(r.hybrid_score for r in all_round_results) / len(all_round_results)
             if all_round_results
             else 0.0
         )
@@ -501,7 +520,7 @@ def run_distillation(
             break
 
         if prev_all_results:
-            prev_avg = sum(r.rule_score for r in prev_all_results) / len(
+            prev_avg = sum(r.hybrid_score for r in prev_all_results) / len(
                 prev_all_results
             )
             delta = avg_score - prev_avg
@@ -553,18 +572,6 @@ def run_distillation(
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
-def _find_latest_log(log_dir: str, skill: str) -> str | None:
-    log_path = Path(log_dir)
-    if not log_path.exists():
-        return None
-    files = sorted(
-        log_path.glob(f"{skill}_*.jsonl"),
-        key=lambda f: f.stat().st_mtime,
-        reverse=True,
-    )
-    return str(files[0]) if files else None
-
-
 def _save_skill_version(skill_md_path: Path, results_path: Path, round_n: int) -> None:
     shutil.copy2(skill_md_path, results_path / f"SKILL_round_{round_n}.md")
 
@@ -582,7 +589,7 @@ def _save_batch_scores(
             {
                 "round": round_n,
                 "batch": batch_idx,
-                "avg_score": sum(r.rule_score for r in results) / len(results)
+                "avg_score": sum(r.hybrid_score for r in results) / len(results)
                 if results
                 else 0.0,
                 "eval_results": [_serialize_result(r) for r in results],

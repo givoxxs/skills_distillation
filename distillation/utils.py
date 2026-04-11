@@ -64,23 +64,29 @@ def setup_logging(
             base = base / skill
         base.mkdir(parents=True, exist_ok=True)
 
+        _mod = sys.modules[__name__]
         if eval_detail:
-            _eval_detail_path = base / "eval_detail.jsonl"
-            _eval_detail_path.touch(exist_ok=True)
+            _mod._eval_detail_path = base / "eval_detail.jsonl"
+            _mod._eval_detail_path.touch(exist_ok=True)
         else:
-            _eval_detail_path = None
+            _mod._eval_detail_path = None
 
         if api_calls:
-            _api_calls_path = base / "api_calls.jsonl"
-            _api_calls_path.touch(exist_ok=True)
+            _mod._api_calls_path = base / "api_calls.jsonl"
+            _mod._api_calls_path.touch(exist_ok=True)
         else:
-            _api_calls_path = None
+            _mod._api_calls_path = None
     else:
-        _eval_detail_path = None
-        _api_calls_path = None
+        _mod = sys.modules[__name__]
+        _mod._eval_detail_path = None
+        _mod._api_calls_path = None
 
     logging.basicConfig(level=lvl, handlers=handlers, force=True)
     logger.setLevel(lvl)
+
+    # Silence noisy third-party loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     # Propagate to child loggers already created
     for lgr in _loggers.values():

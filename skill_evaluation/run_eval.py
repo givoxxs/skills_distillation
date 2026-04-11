@@ -16,7 +16,7 @@ from typing import Dict, List, Any
 
 # Cấu hình
 SKILL_EVAL_DIR = Path(__file__).parent
-TEST_CASES_DIR = SKILL_EVAL_DIR / "test_cases"
+TEST_CASES_DIR = SKILL_EVAL_DIR.parent / "distillation" / "test_cases"
 LOGS_DIR = SKILL_EVAL_DIR / "logs"
 SCRIPTS_DIR = SKILL_EVAL_DIR / "scripts"
 

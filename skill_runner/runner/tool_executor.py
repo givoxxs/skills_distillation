@@ -22,7 +22,6 @@ def execute_tool(
     - write_file: only allowed in workspace.
     - bash: cwd=workspace, but commands may cd into skill_path.
     - list_directory: allowed in workspace and skill folder.
-    - str_replace: only allowed in workspace.
 
     All exceptions are caught and returned as error strings — the framework never crashes
     due to a bad tool call.
@@ -30,7 +29,7 @@ def execute_tool(
     Output is truncated to 4000 chars to protect small model context windows.
 
     Args:
-        tool_name: One of bash, read_file, write_file, list_directory, str_replace, end_turn.
+        tool_name: One of bash, read_file, write_file, list_directory, end_turn.
         arguments: Parsed tool arguments dict.
         workspace: Absolute path to workspace directory.
         skill_path: Absolute path to skill folder in workspace.
@@ -51,13 +50,6 @@ def execute_tool(
         elif tool_name == "list_directory":
             return _execute_list_directory(
                 arguments.get("path", ""), workspace, skill_path
-            )
-        elif tool_name == "str_replace":
-            return _execute_str_replace(
-                arguments.get("path", ""),
-                arguments.get("old_str", ""),
-                arguments.get("new_str", ""),
-                workspace,
             )
         elif tool_name == "end_turn":
             summary = arguments.get("summary", "No summary provided")
@@ -169,34 +161,6 @@ def _execute_list_directory(path: str, workspace: str, skill_path: str) -> str:
     except PermissionError as e:
         return f"ERROR: {e}"
     return "\n".join(items) if items else "(empty directory)"
-
-
-def _execute_str_replace(path: str, old_str: str, new_str: str, workspace: str) -> str:
-    if not path:
-        return "ERROR: No path provided"
-    resolved = _resolve_path(path, workspace)
-    ws = os.path.realpath(workspace)
-    if not os.path.realpath(resolved).startswith(ws):
-        return "ERROR: Can only edit files in workspace."
-    if not os.path.isfile(resolved):
-        return f"ERROR: File not found: {path}"
-    if not old_str:
-        return "ERROR: old_str cannot be empty"
-    content = Path(resolved).read_text(encoding="utf-8")
-    count = content.count(old_str)
-    if count == 0:
-        return (
-            f"ERROR: String not found in file '{path}'. "
-            "The old_str must match the file content character-for-character. "
-            "NEXT STEPS: (1) Use read_file to see the actual file content and find the exact string, "
-            "OR (2) Use write_file to rewrite the entire file with your changes — "
-            "this is the better approach for replacing large code blocks."
-        )
-    if count > 1:
-        return f"ERROR: String appears {count} times (must be unique). Add more surrounding context to old_str to make it unique."
-    new_content = content.replace(old_str, new_str, 1)
-    Path(resolved).write_text(new_content, encoding="utf-8")
-    return f"Replaced string in {path}"
 
 
 def _bash_error_hint(command: str, stdout: str, stderr: str) -> str:

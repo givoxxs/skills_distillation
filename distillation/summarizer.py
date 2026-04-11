@@ -41,18 +41,18 @@ def summarize(
 
     # ── Score summary ─────────────────────────────────────────────────────────
     avg_score = (
-        sum(r.rule_score for r in eval_results) / len(eval_results)
+        sum(r.hybrid_score for r in eval_results) / len(eval_results)
         if eval_results
         else 0.0
     )
-    pass_count = sum(1 for r in eval_results if r.rule_score >= 0.6)
+    pass_count = sum(1 for r in eval_results if r.hybrid_score >= 0.6)
     lines.append("## Score Summary")
     lines.append(f"- Test cases run: {len(eval_results)}")
     lines.append(f"- Pass (≥0.6): {pass_count}/{len(eval_results)}")
     lines.append(f"- Average rule score: {avg_score:.2f}")
 
     if prev_round_results:
-        prev_avg = sum(r.rule_score for r in prev_round_results) / len(
+        prev_avg = sum(r.hybrid_score for r in prev_round_results) / len(
             prev_round_results
         )
         delta = avg_score - prev_avg

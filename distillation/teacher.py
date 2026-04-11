@@ -39,14 +39,17 @@ def rewrite(
     key_notes: str,
     model: str = DEFAULT_MODEL,
     dry_run: bool = False,
+    round_history: list[str] | None = None,
 ) -> str:
     """Call Anthropic API to rewrite SKILL.md.
 
     Args:
-        skill_md_path: Path to the current SKILL.md file.
-        key_notes:     Output from summarizer.summarize() — error analysis text.
-        model:         Claude model ID (default: claude-haiku-4-5).
-        dry_run:       If True, print the prompt and return unchanged content.
+        skill_md_path:  Path to the current SKILL.md file.
+        key_notes:      Output from summarizer.summarize() — error analysis text.
+        model:          Claude model ID (default: claude-haiku-4-5).
+        dry_run:        If True, print the prompt and return unchanged content.
+        round_history:  List of key_notes strings from previous rounds (most recent last).
+                        Up to 2 most recent are included to give Teacher context on past fixes.
 
     Returns:
         The new SKILL.md content as a string.
@@ -55,7 +58,7 @@ def rewrite(
         RuntimeError: If the API call fails.
     """
     current_md = Path(skill_md_path).read_text()
-    user_prompt = _build_prompt(current_md, key_notes)
+    user_prompt = _build_prompt(current_md, key_notes, round_history)
 
     if dry_run:
         print("=== DRY RUN: Teacher Prompt (first 2000 chars) ===")
@@ -66,20 +69,38 @@ def rewrite(
     return _call_api(user_prompt, model)
 
 
-def _build_prompt(current_md: str, key_notes: str) -> str:
+def _build_prompt(
+    current_md: str,
+    key_notes: str,
+    round_history: list[str] | None = None,
+) -> str:
+    history_section = ""
+    if round_history:
+        # Include up to 2 most recent rounds to keep prompt size bounded
+        recent = round_history[-2:]
+        parts = []
+        for i, h in enumerate(recent, start=max(1, len(round_history) - 1)):
+            # Truncate each history entry to 800 chars to avoid bloating prompt
+            parts.append(f"### Round {i} (previous)\n{h[:800]}")
+        history_section = (
+            "\n---\n# Previous Round Error Analyses (DO NOT revert fixes made for these)\n\n"
+            + "\n\n".join(parts)
+            + "\n"
+        )
+
     return f"""Below is the current SKILL.md and an error analysis from running \
 a small language model (Qwen3-8B) on test cases using this skill.
 
 Rewrite the SKILL.md to fix the identified problems. Follow the rules in your \
 system prompt exactly.
-
+{history_section}
 ---
 # Current SKILL.md
 
 {current_md}
 
 ---
-# Error Analysis (key_notes from Evaluator)
+# Error Analysis (key_notes from Evaluator — current round)
 
 {key_notes}
 

@@ -62,3 +62,5 @@ docs
 
 tests
 CLAUDE.md
+
+.ruff_cache

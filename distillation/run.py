@@ -19,6 +19,9 @@ from pathlib import Path
 
 import click
 import yaml
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -150,7 +153,7 @@ def main(
     _log = logging.getLogger("distillation")
     _log.info(
         "OPENROUTER_AI_KEY=%s  ANTHROPIC_KEY=%s",
-        "SET" if os.environ.get("OPENROUTER_AI_KEY") else "MISSING",
+        "SET" if os.environ.get("OPENROUTER_API_KEY") else "MISSING",
         "SET" if os.environ.get("ANTHROPIC_KEY") else "MISSING",
     )
 
@@ -159,18 +162,17 @@ def main(
     batch_size = batch_size if batch_size is not None else cfg.get("batch_size", 5)
     student = student or cfg.get("student_model", "qwen/qwen3-8b")
     teacher = teacher or cfg.get("teacher_model", "claude-haiku-4-5")
-    results_dir = results_dir or cfg.get("results_dir", "./results")
+    from datetime import datetime as _dt
+
+    _base_results = results_dir or cfg.get("results_dir", "./results")
+    results_dir = str(Path(_base_results) / _dt.now().strftime("%d_%m_%Y"))
     use_llm = not no_llm_judge and cfg.get("use_llm_judge", True)
     llm_judge_ensemble = cfg.get("llm_judge_ensemble", 3)
+    llm_judge_weight = cfg.get("llm_judge_weight", 0.20)
 
     # ── Load test cases ───────────────────────────────────────────────────────
     if test_cases_file is None:
-        default = (
-            Path(__file__).parent.parent
-            / "skill_evaluation"
-            / "test_cases"
-            / f"{skill}.json"
-        )
+        default = Path(__file__).parent / "test_cases" / f"{skill}.json"
         test_cases_file = str(default)
 
     tc_path = Path(test_cases_file)
@@ -232,6 +234,7 @@ def main(
         runner_verbose=runner_verbose,
         use_llm_judge=use_llm,
         llm_judge_ensemble=llm_judge_ensemble,
+        llm_judge_weight=llm_judge_weight,
         resume=resume,
     )
 

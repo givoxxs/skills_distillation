@@ -18,16 +18,14 @@ distillation:
   converge_k: 3           # number of consecutive rounds with tiny delta
 
   # ── Output paths ────────────────────────────────────────────────────────────
-  results_dir: "./results/10_04_2026"   # all run output goes here (api_calls.jsonl, run.log, round_N/)
-
-  # ── Logging ────────────────────────────────────────────────────────────────────
-logging:
-  level: info          # debug | info | warning
-  eval_detail: true   # write eval_detail.jsonl per batch (each EvalResult as JSON line)
-  api_calls: true     # write api_calls.jsonl (LLMJudge + Teacher calls)
-  # NOTE: results_dir lives in the distillation: section above, not here.
+  results_dir: "./results"   # base dir — date subfolder appended automatically
 
   # ── Evaluation ──────────────────────────────────────────────────────────────
   use_llm_judge: true          # set false for faster debug (skips all LLM Judge calls)
   llm_judge_ensemble: 1        # number of Claude calls per test case (default 3, set 1 to save cost during testing)
-  llm_judge_weight: 0.20       # LLM Judge weight in hybrid score (docx = 0.20, xlsx may differ)
+  llm_judge_weight: 0.20       # LLM Judge weight in hybrid score (rule_weight = 1 - this)
+
+logging:
+  level: info          # debug | info | warning
+  eval_detail: true   # write eval_detail.jsonl per batch (each EvalResult as JSON line)
+  api_calls: true     # write api_calls.jsonl (LLMJudge + Teacher calls)
