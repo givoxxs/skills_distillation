@@ -57,7 +57,7 @@ skill_runner/outputs/*
 
 distillation/results/*
 
-/context
+# /context
 docs
 
 tests

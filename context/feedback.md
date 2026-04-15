@@ -1,0 +1,93 @@
+---
+name: Feedback & Corrections
+description: Các feedback, correction và preference từ user khi build
+type: feedback
+---
+
+## Workspace cleanup
+Giữ lại `.npm/`, `node_modules/`, `package.json`, `package-lock.json`, `Library/` giữa các runs.
+**Why:** tránh reinstall npm mỗi run, tiết kiệm ~30s/run.
+**How to apply:** luôn check `_WORKSPACE_PERSISTENT` và `_OUTPUT_EXCLUDE` khi thêm exclude mới.
+
+## Rule-based không nên check content thresholds
+Không dùng `min_paragraphs`, `min_word_count` trong rule-based evaluator.
+**Why:** task có thể yêu cầu 1 câu, 1 trang — threshold arbitrary là sai.
+**How to apply:** rule-based = format only; content adequacy = LLM Judge's job.
+
+## LLM Judge cần context đủ
+LLM Judge phải nhận structured checklist từ `prompt` + `expected_behavior`, không chỉ raw text.
+Nếu test case có `skill_gotcha` → inject vào judge prompt.
+**Why:** score thấp vì Judge không biết technical rule nào đang được test.
+**How to apply:** build `_extract_checklist()` + check `skill_gotcha` field.
+
+## Teacher dùng Anthropic SDK, không dùng CLI subprocess
+**Why:** `ANTHROPIC_KEY` đã verify hoạt động, SDK sạch hơn subprocess.
+**How to apply:** import `anthropic`, load `ANTHROPIC_KEY` từ `.env` root.
+
+## Logging với timestamp + file
+Orchestrator nên emit() ra cả stdout và `results/<skill>/run.log` đồng thời, line-buffered.
+**Why:** user muốn `tail -f` theo dõi tiến trình trong terminal khác.
+**How to apply:** mở file log với `buffering=1`, dùng hàm `emit()` thay `print()`.
+
+## Test case structural checks dùng explicit fields
+`rule_checks` object phải explicit (không scan keywords trong `expected_behavior`).
+**Why:** keyword scan brittle, false positive/negative. Explicit field chính xác hơn.
+**How to apply:** khi viết test case mới, luôn điền `rule_checks` rõ ràng.
+
+## Hybrid weights 80/20 cho docx (configurable)
+Rule-based 80%, LLM Judge 20% cho docx.
+**Why:** rule_checks trong docx schema v4 là ground truth (binary XML checks). LLM judge chỉ bổ sung semantic signal.
+**How to apply:** `llm_judge_weight: 0.20` trong `distillation:` section của config.yaml.
+Weights tự động tính: `rule_weight = 1 - llm_judge_weight`. Configurable per run qua code, không hardcode.
+⚠️ Trước đây từng là 40/60 (thesis spec cũ) — đã đổi và xác nhận 80/20 là đúng.
+
+## Batch size trong distillation
+Dùng `config.yaml` cho project-level defaults, CLI flag để override.
+**Why:** SKILL.md cải thiện progressive trong round thay vì chờ cả round xong.
+
+## xml.absent_pattern phải là list, không phải string
+`xml.absent_pattern` trong rule_checks phải luôn là `["pattern"]`, không bao giờ `"pattern"`.
+**Why:** evaluator dùng `for pattern in value` — string bị iterate từng ký tự → 31 votes sai hoàn toàn.
+**How to apply:** khi viết test case mới, luôn bọc pattern trong `[]`.
+
+## must_have_docx: false cho workflow read-only
+Tất cả test case có workflow `read` hoặc `convert` mà output KHÔNG phải `.docx` phải có `must_have_docx: false`.
+**Why:** không có `must_have_docx: false` → prerequisite gate tìm không thấy .docx → rule_score=0 → LLM judge không chạy → hybrid luôn 0.
+**How to apply:** tc_b01, tc_b02, tc_b04, tc_d02 và các test tương tự luôn cần flag này.
+
+## Phân biệt xml.contains vs style.* checks
+- `xml.contains` → verify **exact format / API usage** (attribute values, specific tags)
+- `style.*` → verify **sự tồn tại** của element (có table không, có list không...)
+**How to apply:** dùng cả hai khi cần (tc_a03: xml.contains ["<w:instrText"] + style.toc).
+Không dùng style.* khi cần kiểm tra attribute value cụ thể → dùng xml.contains.
+
+## validate: true — dùng có chọn lọc
+Chỉ thêm `validate: true` cho test case phức tạp (sections, tracked changes, comments, images).
+Không cần cho test chỉ check 1-2 attribute đơn giản.
+**Why:** validate.py chậm ~1-2s/file, chạy với 32 test cases × nhiều rounds = tốn kém.
+**How to apply:** mặc định không có validate; thêm khi test có complex XML structure.
+
+## str_replace tool đã bị xóa hoàn toàn — không tái tạo
+`str_replace` đã bị remove khỏi tool_executor.py, tool_definitions.py, và file str_replace.py đã delete.
+**Why:** user test thực tế thấy tool này gây infinite loop với small model (qwen3-8b).
+**How to apply:** không define lại str_replace trong bất kỳ context nào. Agent chỉ dùng: bash, read_file, write_file, list_directory, end_turn.
+
+## workflow_checks KHÔNG implement actual checking
+`_run_workflow_checks()` chỉ return `passed=True, score=0.5` — không check gì cả.
+**Why:** signal không giúp ích cho Teacher (tool usage information), và log matching approach cũ có bug.
+**How to apply:** workflow_checks trong docx.json chỉ có giá trị tài liệu hóa. Không implement thêm.
+
+## Stopping criterion và avg_score phải dùng hybrid_score
+Tất cả avg_score, pass_count, convergence check trong orchestrator và summarizer phải dùng `hybrid_score`, KHÔNG phải `rule_score`.
+**Why:** stopping criterion nhất quán với metric thực tế được report. Rule_score và hybrid_score có thể diverge đáng kể.
+**How to apply:** luôn dùng `result.hybrid_score` khi aggregate scores.
+
+## load_dotenv phải gọi trước khi check env vars
+`run.py` phải có `load_dotenv(Path(__file__).parent.parent / ".env")` ở đầu file, trước mọi `os.environ.get()`.
+**Why:** không có load_dotenv → `.env` không được đọc → key luôn báo MISSING dù file tồn tại.
+**How to apply:** pattern chuẩn: `load_dotenv` ở top-level module scope, không trong function.
+
+## results_dir không hardcode ngày
+`config.yaml` chỉ lưu base path `"./results"`. Code tự append `DD_MM_YYYY`.
+**Why:** hardcode ngày trong config phải sửa tay mỗi ngày.
+**How to apply:** `results_dir = str(Path(_base_results) / _dt.now().strftime("%d_%m_%Y"))` trong run.py.
