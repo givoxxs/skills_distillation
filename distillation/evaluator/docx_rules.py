@@ -555,6 +555,26 @@ class DocxEvaluator:
 
     # ── Content checks (rules-based) ──────────────────────────────────────
 
+    def _extract_all_text(self, output_dir: Path, doc, cd: dict) -> str:
+        """Extract searchable text from output. Reads doc.paragraphs when available;
+        also scans .md/.txt/.json files when doc is None or search_output_files=True."""
+        if doc is not None and not cd.get("search_output_files"):
+            return " ".join(p.text for p in doc.paragraphs)
+        parts: list[str] = []
+        if doc is not None:
+            parts.append(" ".join(p.text for p in doc.paragraphs))
+        for f in sorted(output_dir.rglob("*")):
+            if (
+                f.is_file()
+                and f.suffix in (".md", ".txt", ".json")
+                and f.stat().st_size > 0
+            ):
+                try:
+                    parts.append(f.read_text(errors="replace"))
+                except Exception:
+                    pass
+        return " ".join(parts)
+
     def _run_content_checks(
         self,
         output_dir: Path,
@@ -562,7 +582,7 @@ class DocxEvaluator:
         cd: dict,
     ) -> list[CheckResult]:
         checks: list[CheckResult] = []
-        all_text = " ".join(p.text for p in doc.paragraphs) if doc else ""
+        all_text = self._extract_all_text(output_dir, doc, cd)
         _logger.debug("content: extracted %d chars from document", len(all_text))
 
         # keywords — each = 1 vote

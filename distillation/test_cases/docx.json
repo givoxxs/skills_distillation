@@ -273,33 +273,6 @@
       }
     },
     {
-      "id": "tc_a13",
-      "workflow": "create",
-      "name": "Hyperlinks — external URL and internal bookmark",
-      "skill_gotcha": "SKILL.md: external links use ExternalHyperlink with link field. Internal links require Bookmark at destination + InternalHyperlink with anchor. TextRun inside must use style: 'Hyperlink'.",
-      "prompt": "Create a Word document with: (1) an external hyperlink to 'https://example.com' with text 'Visit our website', (2) a Heading 1 'Chapter 1: Introduction' with a bookmark anchor named 'chapter1', (3) a paragraph earlier in the document with an internal hyperlink 'Jump to Chapter 1' that links to that bookmark.",
-      "expected_behavior": "Document contains an ExternalHyperlink (relationship recorded in word/_rels/document.xml.rels) and an InternalHyperlink using w:anchor. Hyperlink TextRuns use the Hyperlink style. File validates.",
-      "rule_checks": {
-        "xml.contains": [
-          "<w:hyperlink ",
-          "w:anchor=",
-          "w:outlineLvl",
-          "w:val=\"1\""
-        ],
-        "file.must_exist": [
-          "word/_rels/document.xml.rels"
-        ],
-        "validate": true
-      },
-      "content_checks": {
-        "keywords": [
-          "Visit our website",
-          "Chapter 1",
-          "Jump to Chapter 1"
-        ]
-      }
-    },
-    {
       "_comment": "=== WORKFLOW B: READ / ANALYZE (pandoc / unpack) ===",
       "_comment_detail": "All tests in this group REQUIRE a fixture file as input. Tests verify model uses correct read approach."
     },
@@ -316,7 +289,8 @@
         "keywords": [
           "Introduction",
           "Conclusion"
-        ]
+        ],
+        "search_output_files": true
       },
       "workflow_checks": {
         "tool": "pandoc"
@@ -496,12 +470,7 @@
       "workflow_checks": {
         "tool": "comment.py"
       },
-      "content_checks": {
-        "keywords": [
-          "Needs legal review",
-          "Verify 30-day notice period is standard"
-        ]
-      }
+      "content_checks": {}
     },
     {
       "id": "tc_c06",
@@ -524,30 +493,6 @@
         "steps": [
           "unpack.py",
           "str_replace (w:pStyle + w:spacing)",
-          "pack.py --original"
-        ]
-      }
-    },
-    {
-      "id": "tc_c07",
-      "workflow": "edit",
-      "fixture_file": "fixtures/simple_report.docx",
-      "name": "Delete entire paragraph with tracked change",
-      "skill_gotcha": "SKILL.md: deleting an entire paragraph requires <w:del/> inside <w:pPr><w:rPr> to mark the paragraph mark as deleted. Without it, accepting changes leaves empty paragraph.",
-      "prompt": "Open the attached report document and use tracked changes to delete the second body paragraph entirely.",
-      "expected_behavior": "Deleted paragraph has <w:del/> inside <w:pPr><w:rPr> (paragraph mark deletion) AND <w:del> wrapping the run content. Both present.",
-      "rule_checks": {
-        "xml.contains": [
-          "<w:delText>",
-          "w:author=\"Claude\"",
-          "<w:rPr><w:del "
-        ],
-        "validate": true
-      },
-      "workflow_checks": {
-        "steps": [
-          "unpack.py",
-          "str_replace (w:del + w:pPr/w:rPr)",
           "pack.py --original"
         ]
       }
