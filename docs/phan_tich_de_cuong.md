@@ -8,7 +8,7 @@
 
 Đề tài đặt ra một câu hỏi cụ thể và thực tế:
 
-> **"Liệu có thể thu hẹp khoảng cách năng lực giữa Small Language Model (SLM) và Large Language Model (LLM) trong bối cảnh agentic tool call, mà không cần fine-tuning?"**
+> **"Liệu có thể thu hẹp khoảng cách năng lực giữa Small Large Language Model (SLLM) và Large Language Model (LLM) trong bối cảnh agentic tool call, mà không cần fine-tuning?"****
 
 Câu trả lời được đề xuất là **Skill Distillation** — thay vì nén kiến thức vào trọng số mô hình (như Knowledge Distillation truyền thống), đề tài coi file `SKILL.md` (hướng dẫn kỹ năng cho agent) như một **biến tối ưu hóa**. Một Teacher LLM (Claude Haiku) tự động phân tích lỗi của Student SLM, rồi viết lại `SKILL.md` tốt hơn theo từng vòng lặp phản hồi.
 
@@ -69,7 +69,7 @@ Câu trả lời được đề xuất là **Skill Distillation** — thay vì n
 
 ### 3.5. Tên đề tài thay đổi giữa các phiên bản
 - File cũ: *"Skill Distillation without Fine-Tuning"*
-- File v7: *"Skill Distillation for Small Language Models via Skill Definition Optimization"*
+- File v7: *"Skill Distillation for Small Large Language Models via Skill Definition Optimization"*
 - Tên v7 mô tả chính xác hơn và ít gây hiểu lầm hơn ("without fine-tuning" nghe như đặc điểm phụ, trong khi *via Skill Definition Optimization* đặt đúng trọng tâm kỹ thuật).
 
 ---

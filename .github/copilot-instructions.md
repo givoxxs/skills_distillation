@@ -6,7 +6,7 @@
 
 ## Quick Facts
 
-- **What:** Automated optimization of Agent Skill definitions (SKILL.md) for small language models using a Teacher LLM (Claude) and rule-based evaluator
+- **What:** Automated optimization of Agent Skill definitions (SKILL.md) for small large language models using a Teacher LLM (Claude) and rule-based evaluator
 - **Status:** Active research + development project (2026); reproducible end-to-end pipeline
 - **Tech Stack:** Python 3.11+, OpenRouter API (student models), Anthropic SDK (teacher), Bash/file tools, YAML config
 - **Key Dependencies:** `anthropic`, `click`, `rich`, `pyyaml`
@@ -281,10 +281,23 @@ ANTHROPIC_KEY=sk-ant-...            # From console.anthropic.com (Claude teacher
 
 ### Scoring & Evaluation
 
-- **Rule Score (docx):** Weighted average of XML structure checks (30%), file validity (30%), content quality (40%)
-- **LLM Judge Score:** Ensemble of N Claude calls (0–10 range, normalized)
-- **Hybrid Score:** 0.80 × rule_score + 0.20 × llm_judge_score
-- **Pass Threshold:** score ≥ 0.60 (configurable)
+**⚠️ Scoring formula is FLEXIBLE and test-case dependent (NOT fixed):**
+
+- **Rule Score:** Dynamic average of checks specific to each test case
+  - Checks are defined per test case in `distillation/test_cases/<skill>.json`
+  - File validity checks (file exists, parseable, not empty)
+  - Content quality checks (min paragraphs, word count, no placeholders)
+  - Structure checks (has heading, table, list, etc. — only if test case requires)
+  - **Formula:** score = average of all applicable checks for that test case
+  - **Example:** If test case doesn't require a table, `has_table` check is not applied
+  - **Pass threshold:** rule_score ≥ 0.60 (configurable)
+
+- **LLM Judge Score:** Ensemble of N Claude calls (0–10 range, normalized) — optional
+  - Only run if rule_score passes to save API costs
+  - Semantic quality validation
+
+- **Hybrid Score:** Configurable weighting (default: 0.80 × rule_score + 0.20 × llm_judge_score)
+  - Can be adjusted per evaluator in config
 
 ### Stopping Criteria
 

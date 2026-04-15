@@ -1,6 +1,6 @@
 # Skill Distillation Pipeline
 
-Tự động tối ưu hóa file `SKILL.md` để Small Language Model (SLM) thực thi kỹ năng tốt hơn — không cần fine-tuning, không cần GPU.
+Tự động tối ưu hóa file `SKILL.md` để Small Large Language Model (SLLM) thực thi kỹ năng tốt hơn — không cần fine-tuning, không cần GPU.
 
 ## Ý tưởng cốt lõi
 
@@ -118,28 +118,37 @@ distillation/
 
 ## Evaluator — Rule-based checks cho docx
 
-Mỗi output `.docx` được chấm theo 3 nhóm:
+Mỗi output `.docx` được chấm linh hoạt theo các check được định nghĩa trong test case. Weights tự động điều chỉnh dựa trên nội dung của test case:
 
 ```
-Group 1 — File validity (weight 30%)
-  file_exists       → có file .docx trong output_dir không
-  file_parseable    → python-docx mở được, không corrupt
-  file_not_empty    → file > 1 KB
+Các loại check (tùy test case):
+  File validity checks:
+    file_exists       → có file .docx trong output_dir không
+    file_parseable    → python-docx mở được, không corrupt
+    file_not_empty    → file > 1 KB
 
-Group 2 — Content quality (weight 40%)
-  min_paragraphs    → ≥ 3 paragraphs không rỗng
-  min_word_count    → ≥ 50 words
-  no_placeholders   → không có [INSERT...] hay {{field}} chưa fill
+  Content quality checks:
+    min_paragraphs    → ≥ 3 paragraphs không rỗng
+    min_word_count    → ≥ 50 words
+    no_placeholders   → không có [INSERT...] hay {{field}} chưa fill
 
-Group 3 — Structure, tự detect từ expected_behavior (weight 30%)
-  has_heading       → khi expected chứa "heading", "H1", "tiêu đề"
-  has_table         → khi expected chứa "table", "bảng"
-  has_list          → khi expected chứa "list", "danh sách", "numbered"
-  has_toc           → khi expected chứa "table of contents", "mục lục"
-  heading_hierarchy → H1 trước H2, không skip level
+  Structure checks (tự detect từ test case requirements):
+    has_heading       → khi test case yêu cầu "heading", "H1", "tiêu đề"
+    has_table         → khi test case yêu cầu "table", "bảng"
+    has_list          → khi test case yêu cầu "list", "danh sách", "numbered"
+    has_toc           → khi test case yêu cầu "table of contents", "mục lục"
+    heading_hierarchy → H1 trước H2, không skip level
+    [... thêm tuỳ test case ...]
 ```
 
-**Score cuối = weighted average.** Pass/fail ngưỡng: `rule_score ≥ 0.6`.
+**Scoring formula — LINH HOẠT theo test case:**
+- Score = trung bình cộng của tất cả checks áp dụng cho test case đó
+- Weights tự động điều chỉnh: nếu test case không yêu cầu table, check `has_table` không ảnh hưởng
+- Pass/fail ngưỡng: `rule_score ≥ 0.6` (configurable per evaluator)
+
+**Ví dụ:**
+- Test case A (đơn giản): chỉ check file_exists → score = 1 hoặc 0
+- Test case B (phức tạp): check file_exists + has_table + has_heading + word_count → score = avg(4 checks)
 
 ---
 
@@ -158,17 +167,32 @@ Group 3 — Structure, tự detect từ expected_behavior (weight 30%)
 
 Tất cả lệnh chạy từ trong thư mục `distillation/`.
 
-### Chạy thử không tốn token (dry-run)
+### Cách 1: Activate conda trước, rồi chạy
+
+```bash
+conda activate skills
+cd distillation/
+python run.py --skill docx --rounds 1 --test-cases 3 --verbose
+```
+
+### Cách 2: Chạy trực tiếp với conda run (không cần activate)
 
 ```bash
 cd distillation/
+conda run -n skills python run.py --skill docx --rounds 1 --test-cases 3 --verbose
+```
 
-conda run -n skills python3 run.py \
-  --skill docx \
-  --rounds 2 \
-  --test-cases 3 \
-  --dry-run \
-  --verbose
+### Chạy thử không tốn token (dry-run)
+
+```bash
+# Cách 1
+conda activate skills
+cd distillation/
+python run.py --skill docx --rounds 2 --test-cases 3 --dry-run --verbose
+
+# Cách 2
+cd distillation/
+conda run -n skills python run.py --skill docx --rounds 2 --test-cases 3 --dry-run --verbose
 ```
 
 `--dry-run` chạy toàn bộ pipeline (skill_runner + evaluator + summarizer) nhưng **bỏ qua bước gọi Teacher** — SKILL.md không thay đổi. Dùng để kiểm tra pipeline chạy được trước khi tiêu token thật.
@@ -178,11 +202,14 @@ conda run -n skills python3 run.py \
 ### Chạy full pipeline
 
 ```bash
-conda run -n skills python3 run.py \
-  --skill docx \
-  --rounds 5 \
-  --test-cases 5 \
-  --verbose
+# Cách 1: activate trước
+conda activate skills
+cd distillation/
+python run.py --skill docx --rounds 5 --test-cases 5 --verbose
+
+# Cách 2: dùng conda run
+cd distillation/
+conda run -n skills python run.py --skill docx --rounds 5 --test-cases 5 --verbose
 ```
 
 ---
@@ -207,26 +234,23 @@ conda run -n skills python3 run.py \
 ### Ví dụ các tình huống
 
 ```bash
-# Chạy với model mạnh hơn để làm ceiling reference
-conda run -n skills python3 run.py \
-  --skill docx \
-  --student anthropic/claude-haiku-4-5 \
-  --rounds 1 \
-  --test-cases 10 \
-  --results-dir ./results_ceiling
+# Setup: activate conda một lần
+conda activate skills
+cd distillation/
 
-# Chạy nhiều test cases hơn, nhiều rounds hơn để có kết quả tốt
-conda run -n skills python3 run.py \
-  --skill docx \
-  --rounds 10 \
-  --test-cases 10 \
-  --verbose
+# Tình huống 1: Chạy với model mạnh hơn để làm ceiling reference
+python run.py --skill docx --student anthropic/claude-haiku-4-5 --rounds 1 --test-cases 10 --results-dir ./results_ceiling
 
-# Dùng file test cases tùy chỉnh
-conda run -n skills python3 run.py \
-  --skill docx \
-  --test-cases-file ./my_custom_cases.json \
-  --rounds 3
+# Tình huống 2: Chạy nhiều test cases hơn, nhiều rounds hơn để có kết quả tốt
+python run.py --skill docx --rounds 10 --test-cases 10 --verbose
+
+# Tình huống 3: Dùng file test cases tùy chỉnh
+python run.py --skill docx --test-cases-file ./my_custom_cases.json --rounds 3
+
+# Tình huống 4: Khi bạn chưa activate, dùng conda run
+# (từ terminal khác hoặc session khác)
+cd distillation/
+conda run -n skills python run.py --skill docx --rounds 2 --test-cases 5
 ```
 
 ---
