@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import time
 from pathlib import Path
 
 import anthropic
 from dotenv import load_dotenv
+
+_log = logging.getLogger("distillation.teacher")
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -114,15 +118,35 @@ def _call_api(user_prompt: str, model: str) -> str:
         raise RuntimeError("ANTHROPIC_KEY not set in .env")
 
     client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model=model,
-        max_tokens=MAX_TOKENS,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
 
-    output = message.content[0].text.strip()
-    if not output:
-        raise RuntimeError("Anthropic API returned empty response")
+    delays = [3, 6, 15]  # seconds between retries on overload
+    last_exc: Exception | None = None
+    for attempt, delay in enumerate([0] + delays):
+        if delay:
+            _log.warning(
+                "Anthropic overloaded, retrying in %ds (attempt %d/%d)…",
+                delay,
+                attempt + 1,
+                len(delays) + 1,
+            )
+            time.sleep(delay)
+        try:
+            message = client.messages.create(
+                model=model,
+                max_tokens=MAX_TOKENS,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            output = message.content[0].text.strip()
+            if not output:
+                raise RuntimeError("Anthropic API returned empty response")
+            return output
+        except anthropic.APIStatusError as e:
+            if e.status_code == 529:
+                last_exc = e
+                continue
+            raise
 
-    return output
+    raise RuntimeError(
+        f"Anthropic API still overloaded after {len(delays)} retries"
+    ) from last_exc

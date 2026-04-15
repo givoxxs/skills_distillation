@@ -138,6 +138,13 @@ def main(
 
     logging_cfg = cfg.get("logging", {})
 
+    # Resolve results_dir with date suffix first so logging goes to the same
+    # dated folder as the rest of the pipeline output.
+    from datetime import datetime as _dt
+
+    _base_results = results_dir or cfg.get("results_dir", "./results")
+    results_dir = str(Path(_base_results) / _dt.now().strftime("%d_%m_%Y"))
+
     # ── Logging setup ─────────────────────────────────────────────────────────
     from utils import setup_logging
 
@@ -145,7 +152,7 @@ def main(
         level=logging_cfg.get("level", "info"),
         eval_detail=logging_cfg.get("eval_detail", True),
         api_calls=logging_cfg.get("api_calls", True),
-        results_dir=results_dir or cfg.get("results_dir", "./results"),
+        results_dir=results_dir,
         skill=skill,
         stream=True,
     )
@@ -162,10 +169,6 @@ def main(
     batch_size = batch_size if batch_size is not None else cfg.get("batch_size", 5)
     student = student or cfg.get("student_model", "qwen/qwen3-8b")
     teacher = teacher or cfg.get("teacher_model", "claude-haiku-4-5")
-    from datetime import datetime as _dt
-
-    _base_results = results_dir or cfg.get("results_dir", "./results")
-    results_dir = str(Path(_base_results) / _dt.now().strftime("%d_%m_%Y"))
     use_llm = not no_llm_judge and cfg.get("use_llm_judge", True)
     llm_judge_ensemble = cfg.get("llm_judge_ensemble", 3)
     llm_judge_weight = cfg.get("llm_judge_weight", 0.20)
