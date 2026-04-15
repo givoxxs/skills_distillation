@@ -91,3 +91,30 @@ Tất cả avg_score, pass_count, convergence check trong orchestrator và summa
 `config.yaml` chỉ lưu base path `"./results"`. Code tự append `DD_MM_YYYY`.
 **Why:** hardcode ngày trong config phải sửa tay mỗi ngày.
 **How to apply:** `results_dir = str(Path(_base_results) / _dt.now().strftime("%d_%m_%Y"))` trong run.py.
+⚠️ Phải compute dated path TRƯỚC khi gọi `setup_logging()` — nếu không api_calls.jsonl ghi sai thư mục.
+
+## keyword check cho non-docx output (workflow read)
+Khi workflow output là .md/.txt (pandoc), KHÔNG dùng keyword check đơn thuần — `doc=None` → `all_text=""` → luôn fail.
+**Why:** `doc.paragraphs` chỉ đọc được .docx, không đọc .md output.
+**How to apply:** thêm `"search_output_files": true` trong `content_checks` → evaluator fallback đọc .md/.txt/.json.
+
+## check comment text bằng file.must_exist, không phải keyword
+Comment text trong docx nằm trong `word/comments.xml`, KHÔNG phải `document.xml`.
+**Why:** `doc.paragraphs` chỉ parse body text, không parse comments.xml — keyword check luôn fail.
+**How to apply:** dùng `"file.must_exist": ["word/comments.xml"]` thay vì keyword để verify comment đã được tạo.
+
+## Teacher retry delays cho 529
+Retry delays cho 529 OverloadedError: **[3, 6, 15]s** — không dùng 30/60/120s (quá dài không cần thiết).
+**Why:** 529 overloaded thường chỉ cần vài giây, không phải hàng phút.
+**How to apply:** `delays = [3, 6, 15]` trong `_call_api`, catch `anthropic.APIStatusError` với `status_code == 529`.
+
+## Test cases phải match SKILL.md technology
+`docx.json` test cases viết cho **docx-js** (Node.js). SKILL.md dùng trong pipeline phải là docx-js version (`anthropic_skills/skills/docx/`), KHÔNG phải python-docx version (`skill_runner/skills/docx/`).
+**Why:** mismatch gây ra toàn bộ kết quả sai — model học python-docx API nhưng bị evaluate bằng docx-js XML structure. R1-R3 của 11_04 đều bị ảnh hưởng.
+**How to apply:** trước khi chạy distillation cho skill mới, luôn verify test cases và SKILL.md dùng cùng technology stack.
+`skill_runner/skills/` đã được sync với `anthropic_skills/` — đây là nguồn chuẩn.
+
+## Test case quality over quantity
+Bỏ test case nếu: 0/3 rounds pass VÀ yêu cầu kỹ năng quá advanced cho SLM 8B.
+**Why:** test case không bao giờ pass = không có signal cho Teacher = lãng phí token và thời gian.
+**How to apply:** sau mỗi 3 rounds, review test cases có hybrid=0.0 xuyên suốt → cân nhắc bỏ hoặc đơn giản hóa.

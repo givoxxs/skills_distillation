@@ -164,12 +164,48 @@ Copy sang output_dir: exclude toàn bộ trên.
 `bash`, `read_file`, `write_file`, `list_directory`, `end_turn`
 **str_replace đã bị xóa hoàn toàn** — gây infinite loop với small model, là dead code.
 
-## Known Gap: Fixture handling không implement
-`orchestrator.py` không copy `fixture_file` vào workspace và không inject path vào prompt.
-`fixture_file` field chỉ được evaluator đọc cho content_checks text.
-→ 14/32 tests (workflow B/C/D) sẽ fail nếu không fix.
+## Text extraction cho content checks
 
-Fix: copy fixture → workspace, thêm vào `config.input_files`, prepend path vào prompt.
+`_run_content_checks` dùng `_extract_all_text(output_dir, doc, cd)`:
+
+```python
+# Nếu doc exists VÀ không có search_output_files → đọc doc.paragraphs (python-docx)
+# Nếu doc is None HOẶC search_output_files=True → fallback đọc .md/.txt/.json từ output_dir
+```
+
+Dùng `search_output_files: true` trong `content_checks` khi workflow output không phải .docx (pandoc → .md):
+```json
+"content_checks": { "keywords": ["..."], "search_output_files": true }
+```
+
+## python-docx usage trong evaluator
+
+python-docx dùng cho:
+- `doc.paragraphs[i].text` — keyword check, no_placeholders check
+- `doc.sections[i].header/footer` — style.header_footer check
+
+XML/ZIP checks (`xml.contains`, `xml.absent`, `validate`, ...) dùng `zipfile` trực tiếp, KHÔNG qua python-docx.
+
+**Dependencies:** `python-docx>=1.1.0` — đã thêm vào pyproject.toml, requirements.sh, skill_runner/requirements.txt.
+
+## SKILL.md version — docx-js (đã đồng bộ)
+
+`skill_runner/skills/docx/SKILL.md` đã được cập nhật sang **docx-js** (Node.js) — đồng bộ với `anthropic_skills/skills/docx/`.
+`distillation/test_cases/docx.json` cũng viết cho docx-js → không còn mismatch.
+
+Toàn bộ skills trong `skill_runner/skills/` đã được cập nhật với version mới từ `anthropic_skills/`.
+
+⚠️ Kết quả 11_04_2026 chạy với version python-docx cũ → scores thấp một phần do mismatch này, không phản ánh đúng khả năng thực tế của pipeline.
+
+## Fixture handling
+
+`orchestrator.py` copy `fixture_file` vào workspace và inject path vào prompt (đã implement).
+Evaluator dùng `fixture_file` cho: `original_text_preserved`, `json_keys_from_fixture`, `output_is_new_file`.
+
+## Teacher retry logic
+
+`teacher.py` retry 529 OverloadedError với delays [3, 6, 15]s (tổng 4 lần).
+Chỉ catch `status_code == 529` — lỗi khác raise ngay.
 
 ## Skill tiers
 - Tier 1 (auto eval): slack-gif-creator, xlsx, docx
