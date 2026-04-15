@@ -48,8 +48,8 @@ logs/
 # .claude/
 .antigravity/
 .cursor/
-.github/
-.claude
+# .github/
+# .claude
 
 skill_runner/workspace/*
 skill_runner/skills/*
