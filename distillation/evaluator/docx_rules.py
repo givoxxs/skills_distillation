@@ -533,7 +533,7 @@ class DocxEvaluator:
             )
             ok = proc.returncode == 0
             out = (proc.stdout + proc.stderr).strip()
-            msg = "" if ok else out[:200]
+            msg = "" if ok else out[:800]
             _logger.debug(
                 "validate.py: passed=%s rc=%d stdout_len=%d stderr_len=%d",
                 ok,

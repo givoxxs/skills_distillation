@@ -37,6 +37,84 @@ def _bash_fingerprint(cmd: str) -> str:
     return stripped.split()[0] if stripped else "bash"
 
 
+def _trim_messages(messages: list[dict], window: int) -> list[dict]:
+    """Compress old tool-call/result pairs to prevent O(n²) token growth.
+
+    Keeps the initial user message plus the last `window` assistant turns in full.
+    Turns older than the window are replaced by a single compact summary message so
+    the model retains context of what it has already done without re-sending full
+    bash outputs.
+
+    A "turn" is one assistant message (possibly containing tool_calls) plus all
+    the immediately following tool-result messages.
+    """
+    if not messages:
+        return messages
+
+    # Split into: [user_msg] + [turns...]
+    # A turn boundary = every assistant message in the list.
+    user_msg = messages[0]
+    history = messages[1:]
+
+    # Partition history into turns: each turn starts with an assistant message.
+    turns: list[list[dict]] = []
+    current: list[dict] = []
+    for msg in history:
+        if msg.get("role") == "assistant":
+            if current:
+                turns.append(current)
+            current = [msg]
+        else:
+            current.append(msg)
+    if current:
+        turns.append(current)
+
+    if len(turns) <= window:
+        return messages  # nothing to trim
+
+    old_turns = turns[:-window]
+    keep_turns = turns[-window:]
+
+    # Build compact summary from old turns
+    lines: list[str] = []
+    for turn in old_turns:
+        asst = turn[0]
+        tool_calls = asst.get("tool_calls") or []
+        for tc in tool_calls:
+            fn = tc.get("function", {})
+            name = fn.get("name", "?")
+            try:
+                args = json.loads(fn.get("arguments", "{}"))
+            except Exception:
+                args = {}
+            if name == "bash":
+                cmd = args.get("command", "")[:120]
+                lines.append(f"- bash: {cmd!r}")
+            elif name in ("read_file", "write_file"):
+                lines.append(f"- {name}: {args.get('path','?')}")
+            elif name == "end_turn":
+                lines.append("- end_turn called")
+            else:
+                lines.append(f"- {name}")
+        # Append tool result summary (first 80 chars of each result)
+        for msg in turn[1:]:
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                content = " ".join(
+                    c.get("text", "") for c in content if isinstance(c, dict)
+                )
+            snippet = str(content)[:80].replace("\n", " ")
+            lines.append(f"  → {snippet}")
+
+    summary_content = "Summary of earlier steps (already done):\n" + "\n".join(lines)
+    summary_msg = {"role": "user", "content": summary_content}
+
+    result = [user_msg, summary_msg]
+    for turn in keep_turns:
+        result.extend(turn)
+    return result
+
+
 # Directories/files kept across workspace cleans (npm cache, installed packages).
 # These are expensive to reinstall and safe to reuse between runs.
 _WORKSPACE_PERSISTENT = {
@@ -172,6 +250,10 @@ def run_agent(
     messages: list[dict[str, Any]] = [{"role": "user", "content": user_prompt}]
     tools = get_tool_definitions()
     client = create_openrouter_client(config.api_key, config.base_url)
+    # Keep only the last N full tool-call/result pairs in the message list.
+    # Older pairs are collapsed into a single summary message to prevent O(n²)
+    # token growth. The user turn at index 0 is always preserved.
+    _HISTORY_WINDOW = 4  # number of recent assistant+tool_result pairs to keep in full
     logger = AgentLogger(
         log_dir=config.log_dir,
         skill_name=skill_name or "none",
@@ -201,10 +283,11 @@ def run_agent(
     for iteration in range(config.max_iterations):
         # === API call ===
         try:
+            trimmed = _trim_messages(messages, _HISTORY_WINDOW)
             response = call_with_retry(
                 lambda: client.chat.completions.create(
                     model=model,
-                    messages=[{"role": "system", "content": system_prompt}] + messages,
+                    messages=[{"role": "system", "content": system_prompt}] + trimmed,
                     tools=tools,
                     tool_choice="auto",
                     temperature=config.temperature,
