@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skill-distillation"
+version = "0.1.0"
+description = "Đồ án tốt nghiệp 2026: Tối ưu hóa Agent Skill definitions (SKILL.md) cho small large language models sử dụng Teacher LLM và rule-based evaluator."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Givoxxs", email = ""}
+]
+keywords = ["skill-distillation", "prompt-optimization", "small-language-models", "agent-skills", "claude", "qwen"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Natural Language :: Vietnamese",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "anthropic==0.84.0",           # Anthropic API client (Teacher LLM)
+    "openai==2.28.0",              # OpenRouter API client (Student models)
+    "python-dotenv==1.2.2",        # Environment variable management
+    "click>=8.1.0",                 # CLI framework
+    "rich>=13.0.0",                 # Terminal output formatting
+    "pyyaml>=6.0",                  # YAML config parsing
+    "python-docx>=1.1.0",          # Read .docx files in evaluator (rule checks)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",                  # Testing framework
+    "pre-commit>=4.5.0",            # Git hooks for code quality
+]
+
+[project.urls]
+Repository = "https://github.com/givoxxs/skills_distillation"
+
+[tool.setuptools]
+packages = ["distillation", "skill_runner", "skill_evaluation"]
+
+[tool.setuptools.package-data]
+skill_runner = [
+    "skills/**/*.md",
+    "skills/**/*.py",
+]
+distillation = [
+    "test_cases/**/*.json",
+    "test_cases/fixtures/**/*",
+    "evaluator/**/*.py",
+    "config.yaml",
+]
