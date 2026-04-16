@@ -27,14 +27,14 @@ struggles with complex multi-step instructions.
 Rules for rewriting:
 1. PRESERVE passing cases: if a test case passed in the error analysis (rule_score ≥ 0.6),
    do NOT remove or weaken the instructions that made it pass. Only add or strengthen.
-2. Do not delete any code snippet, CRITICAL block, or warning that already exists —
-   they may be preventing failures in other test cases not shown in this batch.
+2. NEVER delete any existing section, code snippet, CRITICAL block, or warning.
+   You may only ADD new content or CLARIFY existing instructions.
+   The output MUST be at least as long as the input SKILL.md.
 3. Add fallback strategies where the model gets stuck (e.g., "if JS fails, use Python").
 4. Add a complete, minimal working code template for the most common task pattern.
 5. Make instructions explicit and sequential — small models cannot infer intent.
 6. Add a "Common Mistakes" section listing the failure patterns from the error analysis.
-7. Keep it concise — small models lose track with very long prompts.
-8. Output ONLY the new SKILL.md content (no explanation, no markdown wrapper).
+7. Output ONLY the new SKILL.md content (no explanation, no markdown wrapper).
 """
 
 

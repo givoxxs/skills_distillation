@@ -416,7 +416,25 @@ def run_distillation(
                 if log_filename:
                     log_paths.append(str(Path(log_dir) / log_filename))
 
-                result = evaluator.score(output_dir, tc, student_model, round_n)
+                try:
+                    result = evaluator.score(output_dir, tc, student_model, round_n)
+                except Exception as e:
+                    import traceback
+
+                    _log.error(
+                        "evaluator.score() crashed for %s: %s\n%s",
+                        tc["id"],
+                        e,
+                        traceback.format_exc(),
+                    )
+                    result = EvalResult(
+                        test_case_id=tc["id"],
+                        skill=skill,
+                        model=student_model,
+                        round_n=round_n,
+                        output_dir=output_dir,
+                        rule_score=0.0,
+                    )
                 batch_results.append(result)
                 emit(f"      score: {result.summary_line()}")
 
@@ -462,7 +480,20 @@ def run_distillation(
                     else None,
                 )
                 teacher_elapsed = time.time() - teacher_start
-                skill_md_path.write_text(new_skill_md)
+                prev_len = len(skill_md_path.read_text())
+                min_len = int(prev_len * 0.80)
+                if len(new_skill_md) < min_len:
+                    emit(
+                        f"  [{batch_label}] Teacher WARNING: new SKILL.md too short "
+                        f"({len(new_skill_md)} chars < 80% of {prev_len}). Keeping previous."
+                    )
+                    _log.warning(
+                        "Teacher shrink rejected: new=%d chars < 80%% of prev=%d chars",
+                        len(new_skill_md),
+                        prev_len,
+                    )
+                else:
+                    skill_md_path.write_text(new_skill_md)
                 round_key_notes_history.append(key_notes)
                 emit(
                     f"  [{batch_label}] Teacher done: "
