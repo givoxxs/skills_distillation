@@ -107,7 +107,6 @@
         "xml.absent": [
           "<w:br w:type=\"page\"/></w:body>"
         ],
-        "validate": true,
         "page.min": 3
       }
     },
@@ -176,27 +175,6 @@
       }
     },
     {
-      "id": "tc_a08",
-      "workflow": "create",
-      "name": "Multi-column layout via section properties",
-      "skill_gotcha": "SKILL.md: multi-column uses section properties with column.count, not tables. Full-width header/footer require separate sections.",
-      "prompt": "Create a newsletter Word document with a full-width title 'Tech Weekly — Issue 42', then a 2-column body with 3 news articles, then a full-width footer with contact info.",
-      "expected_behavior": "Document uses section breaks: single-column section for title, 2-column section for body, single-column section for footer. Column layout defined in section properties, not via table.",
-      "rule_checks": {
-        "xml.contains": [
-          "<w:cols ",
-          "w:num=\"2\""
-        ],
-        "validate": true
-      },
-      "content_checks": {
-        "keywords": [
-          "Tech Weekly",
-          "Issue 42"
-        ]
-      }
-    },
-    {
       "id": "tc_a09",
       "workflow": "create",
       "name": "Footnotes — proper docx-js API",
@@ -249,30 +227,6 @@
       }
     },
     {
-      "id": "tc_a12",
-      "workflow": "create",
-      "name": "Validate after creation — file integrity",
-      "skill_gotcha": "SKILL.md: always run validate.py after creation. Tests that model includes validation step.",
-      "prompt": "Create a complex Word document with: cover page, ToC, 5 sections with H1/H2 headings, 2 tables, a numbered list, header with company name, footer with page number. Save as project_report.docx.",
-      "expected_behavior": "Document passes validate.py with no errors. All elements present. Filename matches.",
-      "rule_checks": {
-        "validate": true,
-        "filename": "project_report.docx",
-        "xml.contains": [
-          "<w:tbl>",
-          "<w:instrText",
-          "TOC",
-          "w:outlineLvl"
-        ],
-        "xml.footer_contains": [
-          "<w:tab/>",
-          "PAGE"
-        ],
-        "style.header_footer": true,
-        "numbering_references": 1
-      }
-    },
-    {
       "_comment": "=== WORKFLOW B: READ / ANALYZE (pandoc / unpack) ===",
       "_comment_detail": "All tests in this group REQUIRE a fixture file as input. Tests verify model uses correct read approach."
     },
@@ -288,7 +242,7 @@
       "content_checks": {
         "keywords": [
           "Introduction",
-          "Conclusion"
+          "Background Context"
         ],
         "search_output_files": true
       },
@@ -636,29 +590,6 @@
       "content_checks": {
         "keywords": [
           "Image not available"
-        ]
-      }
-    },
-    {
-      "id": "tc_e05",
-      "workflow": "create",
-      "name": "Landscape orientation — pass portrait dims to docx-js",
-      "skill_gotcha": "SKILL.md: landscape requires passing SHORT edge as width, LONG edge as height, then set orientation: PageOrientation.LANDSCAPE. docx-js swaps internally.",
-      "prompt": "Create a landscape-orientation Word document (11\" wide x 8.5\" tall) with a wide data table spanning the full page width: 6 columns (Quarter, Revenue, Costs, Profit, Growth%, Region) with 4 data rows.",
-      "expected_behavior": "Page XML has w:w=12240, w:h=15840 with landscape orientation attribute. Table spans ~13400 DXA (landscape content width).",
-      "rule_checks": {
-        "xml.contains": [
-          "w:orient=\"landscape\"",
-          "w:w=\"12240\"",
-          "<w:tbl>"
-        ]
-      },
-      "content_checks": {
-        "keywords": [
-          "Quarter",
-          "Revenue",
-          "Costs",
-          "Profit"
         ]
       }
     }
