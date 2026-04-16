@@ -61,6 +61,6 @@ distillation/results/*
 skill_runner/context/*
 
 tests
-CLAUDE.md
+# CLAUDE.md
 
 .ruff_cache
