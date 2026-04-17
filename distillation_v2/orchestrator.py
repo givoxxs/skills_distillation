@@ -196,15 +196,16 @@ def run_distillation(
     test_cases_dir = test_cases_dir or str(
         v2_root.parent / "distillation" / "test_cases"
     )
-    skill_md_path = Path(skills_dir) / skill / "SKILL.md"
+    skill_dir = Path(skills_dir) / skill
+    skill_md_path = skill_dir / "SKILL.md"
     if not skill_md_path.is_file():
         raise FileNotFoundError(f"SKILL.md not found at {skill_md_path}")
 
-    # ── Rubric (one-time per (skill, SKILL.md hash, test case set)) ─────────
+    # ── Rubric (one-time per (skill_dir, all test cases)) ────────────────────
     rubric = generate_rubric(
         skill_name=skill,
-        skill_md_path=skill_md_path,
-        test_cases=test_cases,
+        skill_dir=skill_dir,  # ← pass full skill directory
+        test_cases=test_cases,  # ← pass ALL test cases
         cache_dir=rubric_cache_dir,
         model=judge_model,
         regenerate=regenerate_rubric,

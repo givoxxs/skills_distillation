@@ -49,9 +49,13 @@ MAX_TOKENS = 4096
 _SYSTEM_PROMPT = """You design evaluation rubrics for AI agent skills executed \
 by SMALL language models (e.g. Qwen3-8B via Claude Code CLI).
 
-Given a SKILL.md definition and sample test cases, produce a rubric of 4-8 \
-independent, checkable criteria that distinguish high-quality from low-quality \
-outputs for THIS skill.
+Given:
+  - Full skill context (SKILL.md, helper scripts, requirements)
+  - ALL test cases for the skill (30 cases typical)
+
+Produce a rubric of 4-8 independent, checkable criteria that distinguish \
+high-quality from low-quality outputs for THIS skill. The rubric must work for \
+ALL test cases (CREATE, READ, EDIT, CONVERT, EDGE workflows).
 
 Rules:
 1. Each criterion must be OBJECTIVELY checkable by another LLM reading the output.
@@ -60,7 +64,8 @@ Rules:
 4. Include at least one criterion about FILE VALIDITY / FORMAT (e.g. valid DOCX, \
 parseable JSON, non-empty output).
 5. Include at least one criterion about TASK COMPLETION (did it do what was asked?).
-6. Include criteria specific to the skill (structure, content quality, edge cases).
+6. Include criteria specific to the skill's technical requirements (structure, \
+API usage, edge cases covered by test cases).
 7. Write descriptions in imperative form so a judge LLM knows how to evaluate.
 
 Output ONLY valid JSON, no prose, no markdown fence. Schema:
@@ -69,19 +74,52 @@ Output ONLY valid JSON, no prose, no markdown fence. Schema:
     {"name": "...", "description": "...", "weight": 0.0, "pass_threshold": 0.0},
     ...
   ],
-  "notes": "one-sentence rationale"
+  "notes": "one-sentence rationale covering key skill requirements"
 }"""
 
 
 # ── Cache helpers ─────────────────────────────────────────────────────────────
 
 
-def _cache_key(skill_md_content: str, test_case_ids: list[str]) -> str:
-    md_hash = hashlib.sha256(skill_md_content.encode("utf-8")).hexdigest()[:12]
+def _read_skill_context(skill_dir: Path) -> str:
+    """Read SKILL.md + scripts + requirements from skill folder."""
+    parts = []
+
+    # 1. SKILL.md
+    skill_md_path = skill_dir / "SKILL.md"
+    if skill_md_path.is_file():
+        content = skill_md_path.read_text(encoding="utf-8")
+        parts.append(f"# SKILL.md\n\n{content}")
+
+    # 2. Helper scripts (first 1KB each to avoid huge tokens)
+    scripts_dir = skill_dir / "scripts"
+    if scripts_dir.exists():
+        parts.append("\n# Scripts\n")
+        for py_file in sorted(scripts_dir.glob("*.py")):
+            try:
+                content = py_file.read_text(encoding="utf-8")[:1000]
+                parts.append(f"## {py_file.name}\n\n{content}...")
+            except Exception as e:  # noqa: BLE001
+                _log.debug("Failed to read %s: %s", py_file, e)
+
+    # 3. Requirements
+    req_file = skill_dir / "requirements.txt"
+    if req_file.is_file():
+        try:
+            parts.append(f"\n# requirements.txt\n\n{req_file.read_text()}")
+        except Exception as e:  # noqa: BLE001
+            _log.debug("Failed to read requirements.txt: %s", e)
+
+    return "\n---\n".join(parts)
+
+
+def _cache_key(skill_dir_content: str, test_case_ids: list[str]) -> str:
+    """Generate cache key from skill_dir content + all test_case IDs."""
+    skill_hash = hashlib.sha256(skill_dir_content.encode("utf-8")).hexdigest()[:12]
     ids_hash = hashlib.sha256(
         ",".join(sorted(test_case_ids)).encode("utf-8")
     ).hexdigest()[:12]
-    return f"{md_hash}_{ids_hash}"
+    return f"{skill_hash}_{ids_hash}"
 
 
 def _cache_path(cache_dir: Path, skill_name: str, key: str) -> Path:
@@ -93,25 +131,23 @@ def _cache_path(cache_dir: Path, skill_name: str, key: str) -> Path:
 
 def generate_rubric(
     skill_name: str,
-    skill_md_path: str | Path,
+    skill_dir: str | Path,
     test_cases: list[dict[str, Any]],
     cache_dir: str | Path,
     model: str = DEFAULT_MODEL,
-    num_samples: int = 5,
     regenerate: bool = False,
     anthropic_api_key: str | None = None,
 ) -> dict[str, Any]:
     """Return a rubric dict for the skill, generating + caching if needed.
 
     Args:
-        skill_name:      Folder name of the skill (e.g. "docx").
-        skill_md_path:   Path to the current SKILL.md (post-Teacher-rewrite).
-        test_cases:      List of test case dicts with at least 'id', 'prompt',
-                         and optionally 'expected_behavior'.
-        cache_dir:       Root directory for cached rubric JSON files.
-        model:           Claude model ID for rubric generation.
-        num_samples:     How many test cases to include in the prompt (head-sampled).
-        regenerate:      If True, bypass the cache and always call the API.
+        skill_name:       Folder name of the skill (e.g. "docx").
+        skill_dir:        Path to the skill folder (contains SKILL.md + scripts/).
+        test_cases:       List of ALL test case dicts with 'id', 'prompt',
+                          'expected_behavior'. This will be passed in full to Claude.
+        cache_dir:        Root directory for cached rubric JSON files.
+        model:            Claude model ID for rubric generation.
+        regenerate:       If True, bypass the cache and always call the API.
         anthropic_api_key: If provided, used via anthropic_env context manager.
                            Defaults to ANTHROPIC_KEY env var.
 
@@ -119,9 +155,14 @@ def generate_rubric(
         dict with keys: criteria (list), notes (str), generated_at, model,
         token_usage, cache_key.
     """
-    skill_md_content = Path(skill_md_path).read_text(encoding="utf-8")
+    skill_dir = Path(skill_dir)
+    if not skill_dir.is_dir():
+        raise FileNotFoundError(f"skill_dir not found: {skill_dir}")
+
+    # Read full skill context (SKILL.md + scripts + requirements)
+    skill_content = _read_skill_context(skill_dir)
     tc_ids = [tc.get("id", "") for tc in test_cases]
-    key = _cache_key(skill_md_content, tc_ids)
+    key = _cache_key(skill_content, tc_ids)
 
     cache_root = Path(cache_dir)
     cache_root.mkdir(parents=True, exist_ok=True)
@@ -134,15 +175,19 @@ def generate_rubric(
         except json.JSONDecodeError:
             _log.warning("corrupt rubric cache, regenerating: %s", cache_file)
 
-    _log.info("rubric cache miss, generating via %s…", model)
+    _log.info(
+        "rubric cache miss, generating via %s… (%d test cases)",
+        model,
+        len(test_cases),
+    )
     api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
     if not api_key:
         raise RuntimeError("ANTHROPIC_KEY not set (rubric generator requires it)")
 
     rubric = _call_api(
         skill_name=skill_name,
-        skill_md=skill_md_content,
-        test_cases=test_cases[:num_samples],
+        skill_content=skill_content,
+        test_cases=test_cases,  # ← pass ALL, not sampled
         model=model,
         api_key=api_key,
     )
@@ -161,12 +206,12 @@ def generate_rubric(
 
 def _call_api(
     skill_name: str,
-    skill_md: str,
+    skill_content: str,
     test_cases: list[dict[str, Any]],
     model: str,
     api_key: str,
 ) -> dict[str, Any]:
-    user_prompt = _build_user_prompt(skill_name, skill_md, test_cases)
+    user_prompt = _build_user_prompt(skill_name, skill_content, test_cases)
 
     with anthropic_env(api_key):
         client = anthropic.Anthropic()
@@ -187,6 +232,7 @@ def _call_api(
             "type": "rubric_generator",
             "model": model,
             "skill": skill_name,
+            "test_cases_count": len(test_cases),
             "prompt_tokens": usage["prompt_tokens"],
             "completion_tokens": usage["completion_tokens"],
         }
@@ -206,31 +252,35 @@ def _call_api(
 
 
 def _build_user_prompt(
-    skill_name: str, skill_md: str, test_cases: list[dict[str, Any]]
+    skill_name: str, skill_content: str, test_cases: list[dict[str, Any]]
 ) -> str:
-    sample_lines: list[str] = []
-    for i, tc in enumerate(test_cases, 1):
-        tc_id = tc.get("id", f"tc_{i}")
-        prompt = (tc.get("prompt") or "")[:400]
+    """Build prompt with full skill context and ALL test cases."""
+    # Format all test cases
+    test_lines: list[str] = []
+    for tc in test_cases:
+        tc_id = tc.get("id", "tc_unknown")
+        name = tc.get("name", "")
+        prompt = (tc.get("prompt") or "")[:300]  # truncate to avoid huge prompt
         exp = (tc.get("expected_behavior") or "")[:200]
-        sample_lines.append(f"### {tc_id}\nPrompt: {prompt}\nExpected: {exp}")
-    samples = "\n\n".join(sample_lines) if sample_lines else "(no samples available)"
+        test_lines.append(f"**{tc_id}** ({name})\nPrompt: {prompt}\nExpected: {exp}")
+    test_cases_str = "\n\n".join(test_lines)
 
     return f"""Skill name: {skill_name}
 
-## SKILL.md
+## Full Skill Context
 
-{skill_md}
-
----
-
-## Sample test cases
-
-{samples}
+{skill_content}
 
 ---
 
-Produce the rubric JSON now."""
+## All Test Cases ({len(test_cases)} cases)
+
+{test_cases_str}
+
+---
+
+Based on the full skill context and all {len(test_cases)} test cases, produce \
+the evaluation rubric JSON now."""
 
 
 def _parse_and_validate(raw: str) -> dict[str, Any]:

@@ -146,14 +146,9 @@ def main(
     ensemble_n = ensemble_n if ensemble_n is not None else cfg.get("ensemble_n", 1)
     rubric_cache_dir = rubric_cache_dir or rubric_cfg.get("cache_dir", "./rubrics")
 
-    # Test cases file
+    # Test cases file (default to v2 test_cases/)
     if test_cases_file is None:
-        default_file = (
-            Path(__file__).parent.parent
-            / "distillation"
-            / "test_cases"
-            / f"{skill}.json"
-        )
+        default_file = Path(__file__).parent / "test_cases" / f"{skill}.json"
         test_cases_file = str(default_file)
     tc_path = Path(test_cases_file)
     if not tc_path.is_file():

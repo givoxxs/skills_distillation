@@ -1,0 +1,209 @@
+{
+  "skill": "docx",
+  "version": "2.0",
+  "description": "V2 simplified test cases — no rule_checks. Evaluated via Claude LLM-only judge with auto-generated rubric.",
+  "test_cases": [
+    {
+      "id": "tc_a01",
+      "workflow": "create",
+      "name": "List — bullet must use LevelFormat not unicode",
+      "prompt": "Create a Word document with a bulleted list of 5 items: 'Design', 'Develop', 'Test', 'Deploy', 'Monitor'. Use proper Word list formatting.",
+      "expected_behavior": "File uses native Word numbering (w:numPr), NOT unicode bullet characters inserted as text"
+    },
+    {
+      "id": "tc_a02",
+      "workflow": "create",
+      "name": "Table — dual widths + DXA + ShadingType.CLEAR",
+      "prompt": "Create a Word document with a 3-column table (Name, Department, Salary) with 4 data rows. Add a blue-grey shaded header row. Use US Letter page size.",
+      "expected_behavior": "Table has columnWidths in DXA, each cell has explicit DXA width, shading uses CLEAR type, no PERCENTAGE widths"
+    },
+    {
+      "id": "tc_a03",
+      "workflow": "create",
+      "name": "Heading styles — outlineLevel required for ToC",
+      "prompt": "Create a Word document with 3 sections using Heading 1 for section titles and Heading 2 for subsections. Add a Table of Contents on the first page. Sections: Introduction (2 subs), Methodology (3 subs), Results (2 subs).",
+      "expected_behavior": "ToC generated from headings; if custom styles used, outlineLevel is present in paragraphStyles. ToC uses HeadingLevel enum not custom style names."
+    },
+    {
+      "id": "tc_a04",
+      "workflow": "create",
+      "name": "Page break — must be inside Paragraph",
+      "prompt": "Create a 3-page Word document where each page has a distinct section title and body text. Force page breaks between sections.",
+      "expected_behavior": "Page breaks are valid — each PageBreak is a child of a Paragraph element, not standalone. File passes validate.py."
+    },
+    {
+      "id": "tc_a05",
+      "workflow": "create",
+      "name": "No \\n in paragraphs — separate Paragraph objects",
+      "prompt": "Create a memo Word document with To, From, Date, Subject fields on separate lines, followed by 3 body paragraphs.",
+      "expected_behavior": "Each field and each paragraph is a separate Paragraph element. No \\n characters inside TextRun content."
+    },
+    {
+      "id": "tc_a06",
+      "workflow": "create",
+      "name": "Footer with tab stops — not table",
+      "prompt": "Create a Word document with a footer containing: company name on the left, document title centered, page number on the right.",
+      "expected_behavior": "Footer uses tab stops (TabStopType.CENTER and TabStopType.RIGHT) not a Table. No table elements inside footer XML."
+    },
+    {
+      "id": "tc_a07",
+      "workflow": "create",
+      "name": "ImageRun — type parameter required",
+      "prompt": "Create a Word document with a placeholder company logo image (generate a simple 100x50px colored rectangle as PNG) and a title 'Annual Report 2026'. Image should appear at the top.",
+      "expected_behavior": "ImageRun has explicit type field. Image appears in document. File is valid."
+    },
+    {
+      "id": "tc_a09",
+      "workflow": "create",
+      "name": "Footnotes — proper docx-js API",
+      "prompt": "Create a research summary Word document with 3 paragraphs. Add footnotes: paragraph 1 cites 'Smith et al. 2024', paragraph 2 cites 'See appendix A', paragraph 3 cites 'Data from WHO 2025'.",
+      "expected_behavior": "Document has footnotes section in XML (word/footnotes.xml). FootnoteReferenceRun used correctly. Footnotes appear at page bottom."
+    },
+    {
+      "id": "tc_a10",
+      "workflow": "create",
+      "name": "US Letter page size explicit — not A4 default",
+      "prompt": "Create a US Letter format business letter (8.5\" x 11\") with 1-inch margins. Include a letterhead, date, recipient address, 2-paragraph body, and signature block.",
+      "expected_behavior": "Page size in XML is exactly 12240 width x 15840 height DXA. Margins are 1440 DXA (1 inch) on all sides."
+    },
+    {
+      "id": "tc_a11",
+      "workflow": "create",
+      "name": "Numbered list — independent vs continuing references",
+      "prompt": "Create a Word document with two separate numbered lists. List 1: Steps to install (3 items). List 2: Steps to configure (4 items). Each list must start numbering from 1 independently.",
+      "expected_behavior": "Two distinct numbering references used so each list restarts at 1. No shared reference that would cause list 2 to start at 4."
+    },
+    {
+      "id": "tc_b01",
+      "workflow": "read",
+      "name": "Extract all text with structure preserved",
+      "prompt": "Read the attached Word document and extract all its text content. Preserve the heading hierarchy in your output.",
+      "expected_behavior": "Model uses pandoc for extraction. Output shows heading levels (# ## ###) matching the fixture. All paragraph text present.",
+      "fixture_file": "fixtures/simple_report.docx"
+    },
+    {
+      "id": "tc_b02",
+      "workflow": "read",
+      "name": "Extract table data as structured output",
+      "prompt": "Read the attached Word document and extract the table data as a JSON array of objects, using the header row as keys.",
+      "expected_behavior": "JSON output with correct keys from header row. All data rows present. Values match fixture table content.",
+      "fixture_file": "fixtures/simple_report.docx"
+    },
+    {
+      "id": "tc_b03",
+      "workflow": "read",
+      "name": "Summarize document — read then write",
+      "prompt": "Read the attached Word document and create a new 1-page executive summary Word document based on its content.",
+      "expected_behavior": "Model reads source with pandoc first, then creates new .docx. Summary contains key points from fixture. Output is valid .docx.",
+      "fixture_file": "fixtures/simple_report.docx"
+    },
+    {
+      "id": "tc_b04",
+      "workflow": "read",
+      "name": "Read and compute statistics from table",
+      "prompt": "Read the attached Word document, extract the numeric data from the table, and report: sum of each column, average of each column, and which row has the highest total.",
+      "expected_behavior": "Computed values match actual numbers in fixture table. No invented values.",
+      "fixture_file": "fixtures/data_table.docx"
+    },
+    {
+      "id": "tc_c01",
+      "workflow": "edit",
+      "name": "Find and replace — unpack→edit→pack workflow",
+      "prompt": "Open the attached Word document and replace all occurrences of 'Company' with 'Acme Corp'. Preserve all formatting.",
+      "expected_behavior": "Model unpacks with unpack.py, uses str_replace on document.xml directly, repacks with pack.py --original. All 6 instances replaced. No formatting lost.",
+      "fixture_file": "fixtures/contract_draft.docx"
+    },
+    {
+      "id": "tc_c02",
+      "workflow": "edit",
+      "name": "Add tracked changes (w:ins / w:del)",
+      "prompt": "Open the attached contract Word document and use tracked changes to: (1) change '30 days' to '60 days' in the Payment Terms section, (2) delete the sentence containing 'Party A reserves the right'.",
+      "expected_behavior": "Changes appear as tracked (w:ins/w:del in XML). Original text remains readable. Document is valid.",
+      "fixture_file": "fixtures/contract_draft.docx"
+    },
+    {
+      "id": "tc_c03",
+      "workflow": "edit",
+      "name": "Add comments to specific text",
+      "prompt": "Open the attached document and add a comment to the text 'Methodology' saying 'Clarify this section with recent research'.",
+      "expected_behavior": "Comment appears in word/comments.xml. Document is valid. Comment attached to correct location.",
+      "fixture_file": "fixtures/simple_report.docx"
+    },
+    {
+      "id": "tc_c04",
+      "workflow": "edit",
+      "name": "Change text formatting — bold, italic, underline",
+      "prompt": "Open the attached document. Find all instances of the word 'important' and make them bold. Find all instances of 'Note:' and make them italic and underline.",
+      "expected_behavior": "Formatting applied correctly. No other text modified. Document valid.",
+      "fixture_file": "fixtures/simple_report.docx"
+    },
+    {
+      "id": "tc_c05",
+      "workflow": "edit",
+      "name": "Insert header and footer",
+      "prompt": "Open the attached document. Add a header with the text 'CONFIDENTIAL' centered, and a footer with page numbers centered.",
+      "expected_behavior": "Header and footer added. Page numbers auto-increment. Document valid.",
+      "fixture_file": "fixtures/simple_report.docx"
+    },
+    {
+      "id": "tc_c06",
+      "workflow": "edit",
+      "name": "Merge/combine multiple documents",
+      "prompt": "You have two Word documents available: simple_report.docx and newsletter_raw.docx. Merge them into a single document with simple_report.docx content first, then newsletter_raw.docx content on a new page.",
+      "expected_behavior": "Both documents' content appears. Page break between them. Output is single valid .docx.",
+      "fixture_file": "fixtures/simple_report.docx"
+    },
+    {
+      "id": "tc_d01",
+      "workflow": "convert",
+      "name": "Convert .doc to .docx",
+      "prompt": "Convert the attached legacy .doc file to .docx format. Preserve all formatting, tables, and content.",
+      "expected_behavior": "Output file is valid .docx (OOXML ZIP structure). All content from original present. No corruption.",
+      "fixture_file": "fixtures/legacy_document.doc"
+    },
+    {
+      "id": "tc_d02",
+      "workflow": "convert",
+      "name": "Convert .docx to Markdown",
+      "prompt": "Convert the attached Word document to Markdown format. Preserve heading hierarchy, tables (as ASCII tables), and bold/italic formatting using Markdown syntax.",
+      "expected_behavior": "Output is valid Markdown. Headings use #, ##, ### syntax. Tables converted to ASCII/Markdown table format. All content present.",
+      "fixture_file": "fixtures/simple_report.docx"
+    },
+    {
+      "id": "tc_e01",
+      "workflow": "edge",
+      "name": "Empty document — valid but minimal",
+      "prompt": "Create an empty Word document with just default formatting. File should be valid and openable.",
+      "expected_behavior": "Output file is valid .docx. Has default page setup. No errors when opened in Word."
+    },
+    {
+      "id": "tc_e02",
+      "workflow": "edge",
+      "name": "Very large document — many pages",
+      "prompt": "Create a Word document with 50 pages of Lorem Ipsum text. Include page breaks between every 5 pages.",
+      "expected_behavior": "File is valid .docx. Page count is 50. File size reasonable (no bloat). Opens without errors."
+    },
+    {
+      "id": "tc_e03",
+      "workflow": "edge",
+      "name": "Special characters — Unicode and symbols",
+      "prompt": "Create a Word document containing text with various special characters: emoji (😀🎉), math symbols (∑∫√), currency (€¥₹), and other Unicode: 你好 (Chinese), مرحبا (Arabic).",
+      "expected_behavior": "All characters render correctly. Document is valid. No corruption or mojibake."
+    },
+    {
+      "id": "tc_e04",
+      "workflow": "edge",
+      "name": "Mixed content — text, images, tables, all together",
+      "prompt": "Create a Word document with: title heading, intro paragraph, a 2x2 table with mixed content (text and numbers), an image below the table, conclusion text, and footer with page number.",
+      "expected_behavior": "All elements present and properly formatted. Layout is clean. Document is valid."
+    },
+    {
+      "id": "tc_e05",
+      "workflow": "edge",
+      "name": "Tracked deletions — read and preserve",
+      "prompt": "Read the attached Word document that contains tracked deletions. Output a summary showing: (1) what text was deleted, (2) who made the changes, (3) whether the deletions are still visible.",
+      "expected_behavior": "Correctly identifies all deleted text. Author names extracted. Shows understanding of tracked changes state.",
+      "fixture_file": "fixtures/tracked_deletion_review.docx"
+    }
+  ]
+}
