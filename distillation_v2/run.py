@@ -1,0 +1,226 @@
+"""CLI entry point for Skill Distillation v2.
+
+Usage:
+    cd distillation_v2/
+    python run.py --skill docx --rounds 3 --test-cases 5 --verbose
+    python run.py --skill docx --dry-run                     # skip Teacher
+    python run.py --skill docx --regenerate-rubric           # force new rubric
+    python run.py --skill docx --resume                      # continue partial run
+
+Config defaults are loaded from config.yaml in this directory.
+All CLI flags override the config file.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import click
+import yaml
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent.parent / ".env")
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+_CONFIG_FILE = Path(__file__).parent / "config.yaml"
+
+
+def _load_config() -> dict:
+    if not _CONFIG_FILE.is_file():
+        return {}
+    with _CONFIG_FILE.open() as f:
+        return yaml.safe_load(f) or {}
+
+
+@click.command()
+@click.option("--skill", "-s", required=True, help="Skill name (e.g. docx).")
+@click.option("--rounds", "-r", type=int, default=None, help="Max distillation rounds.")
+@click.option(
+    "--batch-size", "-b", type=int, default=None, help="Test cases per batch."
+)
+@click.option(
+    "--test-cases",
+    "-n",
+    type=int,
+    default=None,
+    help="Number of test cases to use (from top of file). Default: all.",
+)
+@click.option("--student", default=None, help="OpenRouter model ID for Student.")
+@click.option("--teacher", default=None, help="Claude model for Teacher.")
+@click.option(
+    "--judge", default=None, help="Claude model for Judge + Rubric generator."
+)
+@click.option("--test-cases-file", default=None, help="Path to test cases JSON.")
+@click.option("--results-dir", default=None, help="Root results dir.")
+@click.option(
+    "--skills-dir", default=None, help="Override path to skill_runner/skills/."
+)
+@click.option("--rubric-cache-dir", default=None, help="Rubric cache directory.")
+@click.option(
+    "--regenerate-rubric",
+    is_flag=True,
+    default=False,
+    help="Bypass rubric cache and generate a fresh rubric.",
+)
+@click.option(
+    "--ensemble-n", type=int, default=None, help="LLM Judge calls per test case."
+)
+@click.option(
+    "--verbose", "-v", is_flag=True, default=False, help="Verbose progress output."
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Run Student + Judge but skip Teacher (no SKILL.md rewrites).",
+)
+@click.option(
+    "--resume",
+    is_flag=True,
+    default=False,
+    help="Resume from last completed batch in the results dir.",
+)
+def main(
+    skill,
+    rounds,
+    batch_size,
+    test_cases,
+    student,
+    teacher,
+    judge,
+    test_cases_file,
+    results_dir,
+    skills_dir,
+    rubric_cache_dir,
+    regenerate_rubric,
+    ensemble_n,
+    verbose,
+    dry_run,
+    resume,
+):
+    """Run Skill Distillation v2 for one skill."""
+    full_cfg = _load_config()
+    cfg = full_cfg.get("distillation", {})
+    sandbox_cfg = full_cfg.get("sandbox", {})
+    env_cfg = full_cfg.get("env", {})
+    rubric_cfg = full_cfg.get("rubric", {})
+    student_cfg = full_cfg.get("student", {})
+    logging_cfg = full_cfg.get("logging", {})
+
+    # Results dir with date subfolder
+    base_results = results_dir or cfg.get("results_dir", "./results")
+    results_dir = str(Path(base_results) / datetime.now().strftime("%d_%m_%Y"))
+
+    # Logging setup — must import orchestrator first so that v1's `utils` module
+    # is registered in sys.modules (side effect of orchestrator._load_v1_module).
+    import orchestrator  # noqa: F401
+    from utils import setup_logging  # now resolvable via sys.modules alias
+
+    setup_logging(
+        level=logging_cfg.get("level", "info"),
+        eval_detail=logging_cfg.get("eval_detail", True),
+        api_calls=logging_cfg.get("api_calls", True),
+        results_dir=results_dir,
+        skill=skill,
+        stream=True,
+    )
+    _log = logging.getLogger("distillation")
+    _log.info(
+        "v2  OPENROUTER_API_KEY=%s  ANTHROPIC_KEY=%s",
+        "SET" if os.environ.get("OPENROUTER_API_KEY") else "MISSING",
+        "SET" if os.environ.get("ANTHROPIC_KEY") else "MISSING",
+    )
+
+    # Resolve CLI > config > default
+    rounds = rounds if rounds is not None else cfg.get("max_rounds", 3)
+    batch_size = batch_size if batch_size is not None else cfg.get("batch_size", 5)
+    student = student or cfg.get("student_model", "qwen/qwen3-8b")
+    teacher = teacher or cfg.get("teacher_model", "claude-haiku-4-5")
+    judge = judge or cfg.get("judge_model", "claude-haiku-4-5")
+    ensemble_n = ensemble_n if ensemble_n is not None else cfg.get("ensemble_n", 1)
+    rubric_cache_dir = rubric_cache_dir or rubric_cfg.get("cache_dir", "./rubrics")
+
+    # Test cases file
+    if test_cases_file is None:
+        default_file = (
+            Path(__file__).parent.parent
+            / "distillation"
+            / "test_cases"
+            / f"{skill}.json"
+        )
+        test_cases_file = str(default_file)
+    tc_path = Path(test_cases_file)
+    if not tc_path.is_file():
+        click.echo(f"[ERROR] test cases file not found: {tc_path}", err=True)
+        sys.exit(1)
+
+    all_cases = [
+        tc for tc in json.loads(tc_path.read_text()).get("test_cases", []) if "id" in tc
+    ]
+    if not all_cases:
+        click.echo(f"[ERROR] no test cases in {tc_path}", err=True)
+        sys.exit(1)
+    selected = all_cases[:test_cases] if test_cases else all_cases
+
+    click.echo(
+        f"Loaded {len(selected)}/{len(all_cases)} test cases from {tc_path.name}"
+    )
+    click.echo(
+        f"Config: rounds={rounds}  batch={batch_size}  student={student}  "
+        f"teacher={teacher}  judge={judge}  ensemble_n={ensemble_n}"
+    )
+    click.echo(f"Rubric: cache_dir={rubric_cache_dir}  regenerate={regenerate_rubric}")
+
+    summary = orchestrator.run_distillation(
+        skill=skill,
+        test_cases=selected,
+        student_model=student,
+        teacher_model=teacher,
+        judge_model=judge,
+        anthropic_key=os.getenv(env_cfg.get("anthropic_key", "ANTHROPIC_KEY")),
+        max_rounds=rounds,
+        batch_size=batch_size,
+        stop_threshold=cfg.get("stop_threshold", 0.7),
+        converge_delta=cfg.get("converge_delta", 0.02),
+        converge_k=cfg.get("converge_k", 3),
+        results_dir=results_dir,
+        rubric_cache_dir=rubric_cache_dir,
+        skills_dir=skills_dir,
+        test_cases_dir=str(tc_path.parent),
+        regenerate_rubric=regenerate_rubric,
+        ensemble_n=ensemble_n,
+        sandbox_tmp_root=sandbox_cfg.get("tmp_root", "~/.cache/distill_v2"),
+        sandbox_keep_on_fail=sandbox_cfg.get("keep_on_fail", True),
+        claude_binary=student_cfg.get("claude_binary", "claude"),
+        verbose=verbose,
+        dry_run=dry_run,
+        resume=resume,
+    )
+
+    click.echo("\n" + "=" * 60)
+    click.echo("DISTILLATION V2 COMPLETE")
+    click.echo("=" * 60)
+    click.echo(f"Skill:        {summary['skill']}")
+    click.echo(f"Rounds run:   {summary['rounds_run']}")
+    click.echo(f"Final score:  {summary['final_score']:.3f}")
+    click.echo(
+        f"Best round:   {summary['best_round']} (score={summary['best_score']:.3f})"
+    )
+    click.echo("\nScore history:")
+    for entry in summary["score_history"]:
+        bar = "█" * int(entry["avg_score"] * 20)
+        click.echo(
+            f"  Round {entry['round']:2d} [{entry['n_batches']} batches]: "
+            f"{entry['avg_score']:.3f} {bar}"
+        )
+    click.echo(f"\nResults saved to: {Path(results_dir) / skill}")
+
+
+if __name__ == "__main__":
+    main()

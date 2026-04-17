@@ -188,9 +188,26 @@ Quyết định: **không implement** vì signal không giúp ích cho Teacher v
 41. **results_dir date bug** — compute dated `results_dir` TRƯỚC khi gọi `setup_logging()`.
     Trước: api_calls.jsonl/eval_detail.jsonl ghi vào `results/docx/`, không phải `results/DD_MM/docx/`.
 
+## distillation_v2/ (NEW — 2026-04-17, end-to-end verified)
+
+Pipeline song song, KHÔNG xoá v1. Xem chi tiết: [distillation_v2.md](distillation_v2.md).
+
+**Khác biệt vs v1:**
+- Student: `skill_runner/` → **Claude Code CLI** (`claude -p --output-format stream-json`) trỏ tới OpenRouter qua `ANTHROPIC_BASE_URL`.
+- Evaluator: rule-based `docx_rules.py` → **LLM-only judge** với rubric **tự sinh** per-skill (cache theo hash SKILL.md + tc_ids).
+- Sandbox: subprocess + env dict explicit + fresh HOME, KHÔNG leak `ANTHROPIC_BASE_URL` ra parent shell.
+- Teacher isolation: gọi qua `anthropic_env()` context manager.
+- Reuse v1 modules (summarizer, teacher, utils, evaluator.base, llm_judge._extract_content) qua `importlib.util` by path (tránh namespace collision).
+
+**Tests**: 48/48 pass offline (sandbox 16, stream_parser 12, rubric 12, judge 8).
+
+**Smoke live 2026-04-17**: 1 round × 1 tc với `--dry-run` — rubric sinh 7 criteria, Claude Code chạy qwen3-8b 41s, judge score 0.21, parent env không leak.
+
 ## Cần làm tiếp
 
 1. ✅ Fixture `tracked_deletion_review.docx` đã tạo
 2. ✅ Kết quả 11_04 đã phân tích, bugs đã fix
-3. Chạy lại pipeline với 30 test cases sau fix: `python run.py --skill docx --verbose`
+3. Chạy lại pipeline v1 với 30 test cases sau fix: `python run.py --skill docx --verbose`
 4. Theo dõi xem tc_b01, tc_c05 có cải thiện không
+5. **v2**: test Teacher loop (bỏ `--dry-run`) để verify không leak env qua rewrite call
+6. **v2**: so sánh v1 vs v2 trên cùng test set cho thesis writeup

@@ -1,0 +1,52 @@
+# Skill Distillation v2 — Default Configuration
+# v2 uses Claude Code CLI + LLM-only judge with auto-generated rubric.
+# CLI flags override these values when provided.
+
+distillation:
+  # ── Models ──────────────────────────────────────────────────────────────────
+  student_model: "qwen/qwen3-8b"     # run via Claude Code CLI + OpenRouter
+  teacher_model: "claude-haiku-4-5"
+  judge_model: "claude-haiku-4-5"
+
+  # ── Loop control ────────────────────────────────────────────────────────────
+  max_rounds: 3
+  batch_size: 5
+
+  # ── Stopping criteria ───────────────────────────────────────────────────────
+  stop_threshold: 0.7
+  converge_delta: 0.02
+  converge_k: 3
+
+  # ── Output paths ────────────────────────────────────────────────────────────
+  results_dir: "./results"
+
+  # ── Evaluation ──────────────────────────────────────────────────────────────
+  ensemble_n: 1               # LLM Judge calls per test case (median of N)
+
+# ── Sandbox ──────────────────────────────────────────────────────────────────
+sandbox:
+  tmp_root: "~/.cache/distill_v2"
+  keep_on_fail: true          # keep sandbox dir when student run errors (debugging)
+
+# ── API keys (env var names) ─────────────────────────────────────────────────
+env:
+  openrouter_key: "OPENROUTER_API_KEY"
+  openrouter_base_url: "https://openrouter.ai/api"
+  anthropic_key: "ANTHROPIC_KEY"   # shared by Teacher + Judge
+
+# ── Rubric ───────────────────────────────────────────────────────────────────
+rubric:
+  cache_dir: "./rubrics"
+  num_sample_test_cases: 5
+
+# ── Student invocation ───────────────────────────────────────────────────────
+student:
+  claude_binary: "claude"
+  timeout_seconds: 300
+  max_turns: 30
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+logging:
+  level: info
+  eval_detail: true
+  api_calls: true
