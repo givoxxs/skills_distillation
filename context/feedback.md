@@ -38,6 +38,16 @@ Orchestrator nên emit() ra cả stdout và `results/<skill>/run.log` đồng th
 Rule-based 80%, LLM Judge 20% cho docx.
 **Why:** rule_checks trong docx schema v4 là ground truth (binary XML checks). LLM judge chỉ bổ sung semantic signal.
 **How to apply:** `llm_judge_weight: 0.20` trong `distillation:` section của config.yaml.
+
+## v2: không đụng vào session Claude Code thật của user
+Sandbox cho Claude Code CLI PHẢI dùng `subprocess.Popen(env=sandbox.env)` với dict EXPLICIT — KHÔNG bao giờ `os.environ.copy()`.
+**Why:** user đang dùng Claude Code thật với tài khoản Anthropic cá nhân trên cùng máy. Leak `ANTHROPIC_BASE_URL=openrouter` sẽ route Claude Code thật vào OpenRouter → hỏng session và có thể tốn credit sai nơi.
+**How to apply:** `Sandbox._build_env()` chỉ whitelist PATH/HOME/TERM/LANG + ANTHROPIC_*. Pre-flight guard từ chối start nếu parent env đã có `ANTHROPIC_BASE_URL ~ openrouter`. Integration test assert parent env không đổi sau khi chạy.
+
+## v2: không xoá v1 — song song codebase
+Tạo `distillation_v2/` sibling với `distillation/`, không nested.
+**Why:** thesis cần so sánh side-by-side; v2 rủi ro cao (CLI schema drift, rubric quality chưa verify); dễ rollback nếu abandon.
+**How to apply:** import v1 modules qua `importlib.util.spec_from_file_location` thay vì copy code. Pre-register shim trong `sys.modules` khi v1 internals có collision tên (vd `evaluator.base`).
 Weights tự động tính: `rule_weight = 1 - llm_judge_weight`. Configurable per run qua code, không hardcode.
 ⚠️ Trước đây từng là 40/60 (thesis spec cũ) — đã đổi và xác nhận 80/20 là đúng.
 

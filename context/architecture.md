@@ -7,26 +7,25 @@ type: project
 ## Cấu trúc repo
 ```
 skill_distillation/
-├── skill_runner/           # Agent executor — OpenRouter API cho Student SLM
+├── skill_runner/           # Agent executor — OpenRouter API cho Student SLM (dùng bởi v1)
 ├── skill_evaluation/       # Test harness (run_eval.py chạy trực tiếp, không qua distillation)
-├── distillation/           # Distillation pipeline — Anthropic SDK
-│   ├── config.yaml         # Project defaults
-│   ├── test_cases/         # ← ĐÃ MOVE từ skill_evaluation/test_cases/ (session 2026-04-11)
-│   │   ├── docx.json           # Schema v4 (32 cases)
-│   │   ├── fixtures/           # 6 fixture files (thiếu tracked_deletion_review.docx)
-│   │   └── description/
-│   │       └── docx_rule_checks.md  # Tài liệu giải thích toàn bộ rule_checks
-│   ├── evaluator/
-│   │   ├── base.py         # EvalResult — hybrid_score property
-│   │   ├── docx_rules.py   # DocxEvaluator — schema v4, weights từ config
-│   │   └── llm_judge.py    # LLMJudge — ensemble, median scoring
-│   ├── orchestrator.py     # Batch loop + stopping criteria
-│   ├── summarizer.py       # JSONL → key_notes
-│   ├── teacher.py          # Anthropic SDK → rewrite SKILL.md
-│   └── run.py              # CLI entry point
+├── distillation/           # v1 pipeline — rule-based evaluator + LLM Judge hybrid
+│   ├── config.yaml
+│   ├── test_cases/         # docx.json schema v4, fixtures/, description/
+│   ├── evaluator/          # base.py, docx_rules.py, llm_judge.py
+│   ├── orchestrator.py, summarizer.py, teacher.py, run.py
+├── distillation_v2/        # v2 pipeline (NEW 2026-04-17) — Claude Code CLI + LLM-only judge
+│   ├── config.yaml, run.py, orchestrator.py, README.md
+│   ├── runner/             # sandbox, anthropic_env, stream_parser, claude_code_runner
+│   ├── evaluator/          # rubric_generator, llm_only_judge
+│   ├── rubrics/            # cached rubric JSON per (skill, SKILL.md hash, tc_ids hash)
+│   └── tests/              # 48 offline unit tests
 ├── docs/                   # Đề cương + phân tích
+├── context/                # MEMORY.md + per-topic context markdown
 └── .env                    # ANTHROPIC_KEY + OPENROUTER_API_KEY
 ```
+
+Chi tiết v2: xem [distillation_v2.md](distillation_v2.md).
 
 ## API mapping
 | Component | API | Key env var |
