@@ -48,6 +48,8 @@ logs/
 # .claude/
 .antigravity/
 .cursor/
+.claude/settings.json
+.claude/settings.local.json
 # .github/
 # .claude
 
@@ -64,3 +66,6 @@ tests
 # CLAUDE.md
 
 .ruff_cache
+
+distillation_v2/rubrics
+distillation_v2/results
