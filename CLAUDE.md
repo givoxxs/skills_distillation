@@ -15,8 +15,8 @@ bash requirements.sh
 
 # Configure API keys
 cp .env.example .env
-# OPENROUTER_AI_KEY=sk-or-v1-...   (student models via OpenRouter)
-# ANTHROPIC_KEY=sk-ant-...          (teacher Claude API calls)
+# OPENROUTER_API_KEY=sk-or-v1-...   (student models via OpenRouter)
+# ANTHROPIC_KEY=sk-ant-...           (teacher Claude API calls)
 
 # Install pre-commit hooks
 pre-commit install
@@ -87,11 +87,11 @@ run.py (CLI) → orchestrator.py (main loop)
 
 | Module | Role |
 |--------|------|
-| `distillation/orchestrator.py` | Outer distillation loop; batching, stopping criteria, round management |
+| `distillation/orchestrator.py` | Outer distillation loop; batching, stopping criteria, round management, resume support |
 | `distillation/teacher.py` | Calls Anthropic SDK to rewrite SKILL.md based on key_notes |
 | `distillation/summarizer.py` | Reads JSONL logs → structured markdown failure analysis |
-| `distillation/evaluator/docx_rules.py` | Rule-based scoring: file validity (30%), content quality (40%), structure (30%) |
-| `distillation/evaluator/llm_judge.py` | Semantic scoring via Claude ensemble; hybrid = 40% rule + 60% LLM |
+| `distillation/evaluator/docx_rules.py` | Rule-based scoring: dynamic average of per-test-case checks (file validity, content, structure). Only applicable checks are counted per test case. |
+| `distillation/evaluator/llm_judge.py` | Semantic scoring via Claude ensemble; hybrid = 80% rule + 20% LLM (configurable via `llm_judge_weight`) |
 | `skill_runner/runner/agent_loop.py` | Core agent execution loop with tool calling; writes JSONL logs |
 | `skill_runner/runner/prompt_builder.py` | Builds system prompt injecting SKILL.md content |
 | `skill_runner/runner/openrouter_client.py` | OpenRouter API client with retries |
@@ -104,21 +104,39 @@ run.py (CLI) → orchestrator.py (main loop)
 
 ### Scoring
 
-- `rule_score`: Weighted average of rule checks (threshold ≥ 0.6 to pass)
-- `llm_judge_score`: Ensemble of N Claude calls (0–10, normalized)
-- `hybrid_score` = 0.40 × rule_score + 0.60 × llm_judge_score
-- Stopping: `stop_threshold` (default 0.80), or convergence delta < 0.02 for 3 rounds, or `max_rounds`
+- `rule_score`: Dynamic average of all applicable rule checks for a test case (pass threshold ≥ 0.60)
+- `llm_judge_score`: Ensemble of N Claude calls (0–10, normalized); **only runs when rule_score passes** to save API cost
+- `hybrid_score` = 0.80 × rule_score + 0.20 × llm_judge_score (weight set by `llm_judge_weight` in `config.yaml`)
+- Stopping: `stop_threshold` (config.yaml default 0.70), or convergence delta < 0.02 for 3 consecutive rounds, or `max_rounds`
+
+### Batching & Round Structure
+
+Within each round, test cases are split into batches of `batch_size`. The Teacher is invoked **per batch** (not per round), so SKILL.md is progressively rewritten multiple times within a single round. If `batch_size=0` or `batch_size ≥ len(test_cases)`, the Teacher is called once per round (no intra-round batching).
+
+The orchestrator supports **resume from partial runs**: `_is_batch_complete()` checks for existing output dirs and `scores.json` to skip already-completed batches on re-run.
+
+### Results Layout
+
+```
+distillation/results/DD_MM_YYYY/round_<N>/batch_<M>/
+    ├── <tc_id>/              # per-test-case output files
+    ├── scores.json            # batch-level aggregated scores
+    ├── evaluation_results.json
+    └── key_notes.md           # Teacher's failure analysis for this batch
+```
 
 ### Test Cases
 
-Located in `skill_evaluation/test_cases/` as JSON files. The docx schema (v3) defines 32 test cases grouped by workflow (A=Create, B=Read, C=Edit, D=Convert, E=Edge). Each test case has:
+Located in `distillation/test_cases/` as JSON files (one per skill). The docx schema (v3) defines 32 test cases grouped by workflow (A=Create, B=Read, C=Edit, D=Convert, E=Edge). Each test case has:
 - `rule_checks`: XML/style checks (`xml.contains`, `xml.absent`, `style.*`)
 - `content_checks`: Semantic checks (keywords, output_format)
 - `must_have_docx`: Gate field — if the output docx doesn't exist, skip content checks
 
+Fixtures for Read/Edit/Convert workflows live in `distillation/test_cases/fixtures/`.
+
 ### Skills
 
-`skill_runner/skills/` contains 18 skill folders. Each skill has a `SKILL.md` that the agent uses as instructions. The distillation process improves the SKILL.md for a target skill (typically `docx`).
+`skill_runner/skills/` contains 17 skill folders. Each skill has a `SKILL.md` that the agent uses as instructions. The distillation process improves the SKILL.md for a target skill (typically `docx`).
 
 ### Workspace Persistence
 
