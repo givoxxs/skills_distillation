@@ -11,46 +11,19 @@ Reuses v1's content extraction (_extract_content) to read docx/pdf/xlsx outputs.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import logging
 import os
 import statistics
-import sys
 from pathlib import Path
 from typing import Any
 
 import anthropic
 
-
-def _load_v1_module(rel: str, name: str):
-    """Load a module from distillation/ by absolute file path to avoid
-    namespace collisions with distillation_v2/evaluator/."""
-    p = Path(__file__).resolve().parent.parent.parent / "distillation" / rel
-    spec = importlib.util.spec_from_file_location(name, p)
-    module = importlib.util.module_from_spec(spec)
-    # Pre-register so cross-references inside that module work
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-# Reuse v1 utilities. Register v1's utils under the bare name "utils" so that
-# v1's llm_judge.py (which does `from utils import write_api_call`) resolves.
-_v1_utils = _load_v1_module("utils.py", "utils")
-write_api_call = _v1_utils.write_api_call
-
-_v1_base = _load_v1_module("evaluator/base.py", "_v1_eval_base")
-CheckResult = _v1_base.CheckResult
-EvalResult = _v1_base.EvalResult
-
-_v1_judge = _load_v1_module("evaluator/llm_judge.py", "_v1_llm_judge")
-_extract_content = _v1_judge._extract_content
-
-_V2_ROOT = Path(__file__).resolve().parent.parent
-if str(_V2_ROOT) not in sys.path:
-    sys.path.insert(0, str(_V2_ROOT))
-from runner.anthropic_env import anthropic_env  # noqa: E402
+from utils import write_api_call
+from evaluator.base import CheckResult, EvalResult
+from evaluator.llm_judge import _extract_content
+from runner.anthropic_env import anthropic_env
 
 _log = logging.getLogger("distillation.v2.llm_only_judge")
 

@@ -12,7 +12,6 @@ shape so downstream tooling (visualize_log.py, viewer.html) keeps working.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import math
 import shutil
@@ -23,50 +22,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# ── v1 module loading (avoid package-name collisions) ────────────────────────
-
-
-def _load_v1_module(rel: str, name: str):
-    p = Path(__file__).resolve().parent.parent / "distillation" / rel
-    spec = importlib.util.spec_from_file_location(name, p)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-# Register "utils" so v1 internals that do `from utils import ...` resolve.
-_v1_utils = _load_v1_module("utils.py", "utils")
-get_logger = _v1_utils.get_logger
-setup_logging = _v1_utils.setup_logging
-write_api_call = _v1_utils.write_api_call
-write_eval_detail = _v1_utils.write_eval_detail
-
-# Pre-register v1's evaluator package so v1 internals resolve
-# `from evaluator.base import EvalResult` correctly even though distillation_v2
-# has its own `evaluator/` package.
-import types as _types  # noqa: E402
-
-_v1_eval_pkg = _types.ModuleType("evaluator")
-_v1_eval_pkg.__path__ = [
-    str(Path(__file__).resolve().parent.parent / "distillation" / "evaluator")
-]
-sys.modules["evaluator"] = _v1_eval_pkg
-
-_v1_base = _load_v1_module("evaluator/base.py", "evaluator.base")
-EvalResult = _v1_base.EvalResult
-
-_v1_summarizer = _load_v1_module("summarizer.py", "_v1_summarizer")
-_v1_teacher = _load_v1_module("teacher.py", "_v1_teacher")
-
-# Now that v1 modules have loaded, remove the v1 evaluator shim so v2's
-# `evaluator.llm_only_judge` import below resolves to the real v2 package.
-del sys.modules["evaluator"]
-del sys.modules["evaluator.base"]
-
-# ── v2 local imports ─────────────────────────────────────────────────────────
+# ── Local imports (all modules live inside distillation_v2/) ─────────────────
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from utils import get_logger, write_api_call, write_eval_detail  # noqa: E402
+from evaluator.base import EvalResult  # noqa: E402
+import summarizer as _v1_summarizer  # noqa: E402
+import teacher as _v1_teacher  # noqa: E402
 from evaluator.llm_only_judge import LLMOnlyJudge  # noqa: E402
 from evaluator.rubric_generator import generate_rubric  # noqa: E402
 from runner.anthropic_env import anthropic_env  # noqa: E402
@@ -192,10 +155,8 @@ def run_distillation(
     results_path = Path(results_dir) / skill
     results_path.mkdir(parents=True, exist_ok=True)
 
-    skills_dir = skills_dir or str(v2_root.parent / "skill_runner" / "skills")
-    test_cases_dir = test_cases_dir or str(
-        v2_root.parent / "distillation" / "test_cases"
-    )
+    skills_dir = skills_dir or str(v2_root / "skills")
+    test_cases_dir = test_cases_dir or str(v2_root / "test_cases")
     skill_dir = Path(skills_dir) / skill
     skill_md_path = skill_dir / "SKILL.md"
     if not skill_md_path.is_file():

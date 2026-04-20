@@ -11,35 +11,17 @@ changes (Teacher rewrites it) or the test set changes, the cache invalidates.
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import logging
 import os
-import sys
 import time
 from pathlib import Path
 from typing import Any
 
 import anthropic
 
-
-def _load_v1_module(rel: str, name: str):
-    """Load a v1 module by absolute path to avoid package-name collisions."""
-    p = Path(__file__).resolve().parent.parent.parent / "distillation" / rel
-    spec = importlib.util.spec_from_file_location(name, p)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-_v1_utils = _load_v1_module("utils.py", "_v1_utils_for_rubric")
-write_api_call = _v1_utils.write_api_call
-
-_V2_ROOT = Path(__file__).resolve().parent.parent
-if str(_V2_ROOT) not in sys.path:
-    sys.path.insert(0, str(_V2_ROOT))
-from runner.anthropic_env import anthropic_env  # noqa: E402
+from utils import write_api_call
+from runner.anthropic_env import anthropic_env
 
 _log = logging.getLogger("distillation.v2.rubric_generator")
 

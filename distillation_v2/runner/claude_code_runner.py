@@ -15,7 +15,6 @@ stable. Internally:
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import logging
 import os
@@ -26,26 +25,9 @@ from pathlib import Path
 from typing import Any
 
 from .config import RunConfigV2
+from .logger import AgentLogger
 from .sandbox import Sandbox
 from .stream_parser import Event, ParserState, parse_line
-
-
-def _load_v1_agent_logger():
-    """Load v1's AgentLogger by absolute path to avoid the runner/runner
-    package-name collision with skill_runner.runner."""
-    v1_logger_path = (
-        Path(__file__).resolve().parent.parent.parent
-        / "skill_runner"
-        / "runner"
-        / "logger.py"
-    )
-    spec = importlib.util.spec_from_file_location("_v1_logger", v1_logger_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.AgentLogger
-
-
-AgentLogger = _load_v1_agent_logger()
 
 _log = logging.getLogger("distillation.v2.claude_code_runner")
 

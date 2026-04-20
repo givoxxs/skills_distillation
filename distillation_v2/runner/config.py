@@ -13,8 +13,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load .env from project root (one level up from distillation_v2/)
+# Load .env from project root (two levels up from distillation_v2/runner/)
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+
+_DEFAULT_SKILLS_DIR = str(Path(__file__).resolve().parent.parent / "skills")
 
 
 @dataclass
@@ -30,8 +32,8 @@ class RunConfigV2:
     max_turns: int = 30
     timeout_seconds: int = 300  # 5 min per test case
 
-    # ── Paths (relative to distillation_v2/) ────────────────────────────────
-    skills_dir: str = "../skill_runner/skills"
+    # ── Paths ────────────────────────────────────────────────────────────────
+    skills_dir: str = _DEFAULT_SKILLS_DIR
     log_dir: str = "./logs"
     output_dir: str | None = None  # per-testcase output dir; set by orchestrator
 

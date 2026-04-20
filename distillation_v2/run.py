@@ -117,10 +117,9 @@ def main(
     base_results = results_dir or cfg.get("results_dir", "./results")
     results_dir = str(Path(base_results) / datetime.now().strftime("%d_%m_%Y"))
 
-    # Logging setup — must import orchestrator first so that v1's `utils` module
-    # is registered in sys.modules (side effect of orchestrator._load_v1_module).
-    import orchestrator  # noqa: F401
-    from utils import setup_logging  # now resolvable via sys.modules alias
+    # Logging setup
+    import orchestrator
+    from utils import setup_logging
 
     setup_logging(
         level=logging_cfg.get("level", "info"),
