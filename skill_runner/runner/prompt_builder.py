@@ -61,7 +61,13 @@ HOW TO USE SKILL FILES:
 - BEFORE calling any script with bash, verify it appears in RUNNABLE SCRIPTS above.
   If a script is NOT listed above, it does NOT exist — do not try to run it.
 - To run a listed script: bash: python /path/to/script.py <args>
+- LIBRARY MODULES are helper modules — do NOT run them directly with bash.
+  Write your own script that imports from them, then run your script.
 - To read a listed doc or template: read_file: /path/to/file.md
+- BINARY/ASSET FILES and FONT ASSETS cannot be opened with read_file — use their
+  absolute path directly inside your scripts (e.g. as a font path argument).
+- [COLLAPSED] directories are used internally by the listed scripts — you do not
+  need to list or read their contents directly.
 - When scripts need input files, pass absolute workspace paths:
   bash: python {skill_path}/scripts/xxx.py {workspace_path}/input.pdf
 - Output files MUST always go to workspace root using absolute paths:
