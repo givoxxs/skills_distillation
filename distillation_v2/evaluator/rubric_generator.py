@@ -63,34 +63,53 @@ Output ONLY valid JSON, no prose, no markdown fence. Schema:
 # ── Cache helpers ─────────────────────────────────────────────────────────────
 
 
+_TEXT_EXTENSIONS = {
+    ".md",
+    ".txt",
+    ".py",
+    ".js",
+    ".ts",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".html",
+    ".css",
+    ".sh",
+    ".toml",
+    ".cfg",
+    ".ini",
+}
+_MAX_FILE_BYTES = 3000  # per file — keep total prompt manageable
+_SKIP_DIRS = {"__pycache__", ".git", "node_modules", ".npm"}
+
+
 def _read_skill_context(skill_dir: Path) -> str:
-    """Read SKILL.md + scripts + requirements from skill folder."""
+    """Read all text files from skill folder, SKILL.md first."""
     parts = []
 
-    # 1. SKILL.md
+    # 1. SKILL.md always first (full content)
     skill_md_path = skill_dir / "SKILL.md"
     if skill_md_path.is_file():
-        content = skill_md_path.read_text(encoding="utf-8")
-        parts.append(f"# SKILL.md\n\n{content}")
+        parts.append(f"# SKILL.md\n\n{skill_md_path.read_text(encoding='utf-8')}")
 
-    # 2. Helper scripts (first 1KB each to avoid huge tokens)
-    scripts_dir = skill_dir / "scripts"
-    if scripts_dir.exists():
-        parts.append("\n# Scripts\n")
-        for py_file in sorted(scripts_dir.glob("*.py")):
-            try:
-                content = py_file.read_text(encoding="utf-8")[:1000]
-                parts.append(f"## {py_file.name}\n\n{content}...")
-            except Exception as e:  # noqa: BLE001
-                _log.debug("Failed to read %s: %s", py_file, e)
-
-    # 3. Requirements
-    req_file = skill_dir / "requirements.txt"
-    if req_file.is_file():
+    # 2. All other text files, sorted, each truncated to _MAX_FILE_BYTES
+    for fpath in sorted(skill_dir.rglob("*")):
+        if fpath == skill_md_path:
+            continue
+        if any(part in _SKIP_DIRS for part in fpath.parts):
+            continue
+        if not fpath.is_file():
+            continue
+        if fpath.suffix.lower() not in _TEXT_EXTENSIONS:
+            continue
+        rel = fpath.relative_to(skill_dir)
         try:
-            parts.append(f"\n# requirements.txt\n\n{req_file.read_text()}")
+            raw = fpath.read_text(encoding="utf-8", errors="replace")
+            if len(raw) > _MAX_FILE_BYTES:
+                raw = raw[:_MAX_FILE_BYTES] + f"\n... [truncated, {len(raw)} chars]"
+            parts.append(f"# {rel}\n\n{raw}")
         except Exception as e:  # noqa: BLE001
-            _log.debug("Failed to read requirements.txt: %s", e)
+            _log.debug("Failed to read %s: %s", fpath, e)
 
     return "\n---\n".join(parts)
 
