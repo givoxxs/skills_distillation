@@ -72,3 +72,8 @@ distillation_v2/results
 
 skillsbench/
 # skillsbench_tasks/
+
+# UI (React/pnpm)
+ui/node_modules/
+ui/dist/
+ui/.pnpm-store/
