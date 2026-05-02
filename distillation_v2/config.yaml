@@ -1,45 +1,54 @@
-# Skill Distillation v2 — Default Configuration
-# v2 uses Claude Code CLI + LLM-only judge with auto-generated rubric.
+# Skill Distillation v2 — Configuration
 # CLI flags override these values when provided.
 
 distillation:
   # ── Models ──────────────────────────────────────────────────────────────────
-  student_model: "qwen/qwen3-8b"     # run via Claude Code CLI + OpenRouter
+  student_model: "google/gemma-4-26b-a4b-it"   # via Claude Code CLI + OpenRouter
   teacher_model: "claude-haiku-4-5"
-  judge_model: "claude-haiku-4-5"
+  judge_model:   "claude-haiku-4-5"
 
   # ── Loop control ────────────────────────────────────────────────────────────
-  max_rounds: 3
+  max_rounds: 10
   batch_size: 5
 
   # ── Stopping criteria ───────────────────────────────────────────────────────
-  stop_threshold: 0.7
+  stop_threshold: 0.70
   converge_delta: 0.02
   converge_k: 3
 
-  # ── Output paths ────────────────────────────────────────────────────────────
-  results_dir: "./results"
+  # ── Rollback (post-Teacher validation) ──────────────────────────────────────
+  rollback_threshold: 0.05       # drop > threshold → rollback to old SKILL.md
+  validation_tc_count: 3         # TCs to run for validation (randomly selected)
+
+  # ── Student retry ────────────────────────────────────────────────────────────
+  max_retry_per_tc: 3            # retry on transient failures, then skip TC
+
+  # ── Visual judging ────────────────────────────────────────────────────────────
+  max_image_pages: 10            # max PNG pages sent to LLM Judge
 
   # ── Evaluation ──────────────────────────────────────────────────────────────
-  ensemble_n: 1               # LLM Judge calls per test case (median of N)
+  ensemble_n: 1                  # LLM Judge calls per TC (median of N)
+
+  # ── Output ──────────────────────────────────────────────────────────────────
+  results_dir: "./results"
 
 # ── Sandbox ──────────────────────────────────────────────────────────────────
 sandbox:
   tmp_root: "~/.cache/distill_v2"
-  keep_on_fail: true          # keep sandbox dir when student run errors (debugging)
+  keep_on_fail: true             # keep sandbox dir on student error (for debugging)
 
 # ── API keys (env var names) ─────────────────────────────────────────────────
 env:
   openrouter_key: "OPENROUTER_API_KEY"
   openrouter_base_url: "https://openrouter.ai/api"
-  anthropic_key: "ANTHROPIC_KEY"   # shared by Teacher + Judge
+  anthropic_key: "ANTHROPIC_KEY"    # used by Teacher + Judge (normal Anthropic SDK)
 
 # ── Rubric ───────────────────────────────────────────────────────────────────
 rubric:
   cache_dir: "./rubrics"
-  num_sample_test_cases: 5
+  watch_skill_hash: false        # true → auto-regenerate rubric when SKILL.md changes
 
-# ── Student invocation ───────────────────────────────────────────────────────
+# ── Student (Claude Code CLI) ────────────────────────────────────────────────
 student:
   claude_binary: "claude"
   timeout_seconds: 300

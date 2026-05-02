@@ -1,126 +1,219 @@
 ---
-name: Distillation v2 — Parallel Pipeline
-description: Pipeline v2 song song với v1, dùng Claude Code CLI + LLM-only judge, implemented 2026-04-17
+name: Distillation v2 — Current Architecture
+description: Pipeline v2 dùng Claude Code CLI + LLM-only judge — kiến trúc hiện tại sau refactor
 type: project
 ---
 
-## Mục tiêu v2 (không xoá v1)
+## Mục tiêu v2
 
 Song song với `distillation/`, giải quyết 2 vấn đề scale của v1:
-1. **skill_runner hand-rolled** → thay bằng **Claude Code CLI** (binary `claude`) với OpenRouter làm backend qua `ANTHROPIC_BASE_URL`.
-2. **Rule-based evaluator per-skill** → thay bằng **LLM-only judge với rubric tự sinh** cho mỗi skill (cache theo hash SKILL.md + test case ids).
+1. **skill_runner hand-rolled** → **Claude Code CLI** với OpenRouter qua `ANTHROPIC_BASE_URL`.
+2. **Rule-based evaluator per-skill** → **LLM-only judge với rubric tự sinh** per skill.
 
-**Why:** Thêm skill mới giờ chỉ cần JSON test cases — không phải viết thêm `<skill>_rules.py`. Demo dễ dàng cho nhiều skill trong thesis.
+**Why:** Thêm skill mới chỉ cần JSON test cases — không viết thêm `<skill>_rules.py`.
 
-## Quyết định kiến trúc đã chốt (qua AskUserQuestion)
+---
 
-- **Layout**: `distillation_v2/` sibling với `distillation/` (không nested).
-- **Sandbox**: subprocess + env dict explicit + fresh HOME (không Docker, không sandbox-exec).
-  - Lý do: user đang dùng Claude Code thật trên máy, KHÔNG được leak `ANTHROPIC_BASE_URL=openrouter` ra parent shell.
-  - Pre-flight guard: refuse start nếu parent env đã có `ANTHROPIC_BASE_URL` trỏ tới openrouter.
-- **API keys**: chung 1 `ANTHROPIC_KEY` cho Judge + Teacher. Isolation qua `anthropic_env()` context manager (os.environ swap + restore).
-- **Skill injection**: inline SKILL.md trong prompt tới Claude Code (không dùng `.claude/CLAUDE.md` file).
-
-## Files tạo mới (15 files, ~2,000 LOC)
+## Cấu trúc file hiện tại
 
 ```
 distillation_v2/
-├── run.py                        # CLI (click) — mirror v1 flags + --regenerate-rubric
-├── orchestrator.py               # Main loop — reuse v1 summarizer/teacher/utils
-├── config.yaml                   # Defaults: sandbox, env, rubric, student cfg
-├── README.md                     # User-facing doc (tiếng Việt)
+├── run.py              # CLI (click) — entry point
+├── pipeline.py         # Main orchestration loop (thay orchestrator.py cũ)
+├── config.yaml         # Defaults: models, loop control, sandbox, env
+├── stages/
+│   ├── student.py      # Claude Code CLI runner — run_student(), _run_once()
+│   ├── teacher.py      # Anthropic SDK → rewrite SKILL.md — rewrite()
+│   ├── judge.py        # LLM-only judge — Judge.score()
+│   ├── rubric_gen.py   # Generate rubric — generate_rubric() với cache
+│   └── summarizer.py   # run_log.md generation — make_run_log()
 ├── runner/
-│   ├── sandbox.py                # class Sandbox (context mgr, env isolation)
-│   ├── anthropic_env.py          # anthropic_env() context mgr cho Teacher/Judge
-│   ├── stream_parser.py          # Claude Code stream-json → v1 AgentLogger events
-│   ├── claude_code_runner.py     # run_agent() — cùng return shape như v1
-│   └── config.py                 # RunConfigV2 dataclass
+│   ├── sandbox.py      # class Sandbox — env isolation + fresh HOME
+│   ├── anthropic_env.py # anthropic_env() context manager cho Teacher/Judge
+│   ├── stream_parser.py # stream-json → AgentLogger events
+│   ├── config.py       # RunConfigV2 dataclass
+│   └── logger.py       # AgentLogger — JSONL log writer
 ├── evaluator/
-│   ├── rubric_generator.py       # generate_rubric() — cache theo sha256(SKILL.md + tc_ids)
-│   └── llm_only_judge.py         # LLMOnlyJudge — rule_weight=0, llm_weight=1
-├── rubrics/                      # Cache per-skill JSON
-├── logs/                          # JSONL logs khớp v1 schema
-└── tests/                        # 48 tests offline (pytest)
+│   └── base.py         # EvalResult, CheckResult (dùng chung với v1)
+├── utils/
+│   ├── __init__.py     # get_logger, write_api_call, write_eval_detail, setup_logging
+│   └── rollback.py     # choose_validation_tcs, decide, run_validation
+├── test_cases/         # JSON test cases
+├── rubrics/            # Cached rubric JSON
+├── logs/               # JSONL logs per run
+└── tests/              # 63 passing, 1 skipped (live API)
 ```
 
-## Import pattern: importlib-by-path
+**Lưu ý:** Không còn dùng `importlib-by-path` để import v1 modules. v2 là standalone hoàn toàn.
 
-v2 `evaluator/` package collide với v1 `distillation/evaluator/` (cùng tên). Solution: load v1 modules qua `importlib.util.spec_from_file_location` bằng absolute path. Trong `orchestrator.py` còn phải pre-register v1's `evaluator` package trong `sys.modules` trước khi load `summarizer.py` (vì summarizer có `from evaluator.base import EvalResult`), rồi xoá shim trước khi import v2.
+---
 
-**Why:** tránh copy v1 code — keep summarizer/teacher/utils/llm_judge `_extract_content` reusable as-is.
+## Kiến trúc pipeline (pipeline.py)
 
-## Rubric generator
+```
+Round N:
+  1. _run_batch() × all batches
+     ├── run_student() → _run_once() → _stream_claude()  [stages/student.py]
+     ├── Judge.score()                                    [stages/judge.py]
+     └── make_run_log()                                   [stages/summarizer.py]
+  2. teacher_rewrite() — once per round, reads ALL run_logs  [stages/teacher.py]
+  3. choose_validation_tcs() — top-N by score từ round_results
+  4. run_validation() + decide() → keep or rollback SKILL.md
+  5. Check stopping criteria
+```
 
-- **Input prompt**: skill name + full SKILL.md + 3-5 test cases (`prompt` + `expected_behavior`).
-- **System prompt**: yêu cầu 4-8 criteria, weights sum = 1.0, pass_threshold mỗi criterion.
-- **Cache key**: `sha256(SKILL.md)[:12] + "_" + sha256(sorted tc_ids)[:12]`.
-- **Cache path**: `distillation_v2/rubrics/{skill}_{key}.json`.
-- **Invalidate**: khi SKILL.md thay đổi (Teacher rewrite) hoặc test set đổi. Flag `--regenerate-rubric` bypass cache.
-- **Auto-normalize**: weights được re-scale để sum = 1.0 nếu LLM trả về lệch.
+---
 
-**Ví dụ**: docx rubric đầu tiên có 7 criteria: File Validity, Task Completion, Correct Numbering, Native Word Formatting, Not Text Substitution, Clean Structure, Output in Right Location.
+## Skill injection (key design — đã fix)
 
-## LLM-only judge
+**Sai (cũ):** copy SKILL.md vào `.claude/commands/<skill>.md`
+**Đúng (hiện tại):** `shutil.copytree(skill_dir, ~/.claude/skills/<skill_name>/)` — copy cả folder
 
-- Reuse `_extract_content()` từ v1's `llm_judge.py` (handles docx/pdf/xlsx/txt).
-- Prompt = rubric JSON + test_case prompt + expected_behavior + extracted content.
-- Response JSON: `{criteria:[{name,score,reason}], overall, verdict}`.
-- Ensemble N calls → `statistics.median(overalls)`.
-- Map vào `EvalResult`: `_rule_weight=0.0, _llm_weight=1.0` → `hybrid_score == llm_judge_score`. Summarizer và stopping criteria v1 chạy không đổi.
+Claude Code CLI đọc skills từ `~/.claude/skills/<name>/`, không phải `commands/`.
+
+```python
+# stages/student.py: _install_skill_in_sandbox()
+skills_dst = claude_dir / "skills" / skill_name
+shutil.copytree(skill_dir, skills_dst, dirs_exist_ok=True)
+```
+
+**settings.json** inject để force model (tránh haiku/sonnet charges):
+```json
+{"model": "<student_model>"}
+```
+→ ghi vào `sandbox_home/.claude/settings.json`
+
+**Source skill:** `~/.claude/skills/` (default trong pipeline.py) — docx-js version.
+CLI flag `--skills-dir` override nếu cần.
+
+---
+
+## Claude Code CLI flags dùng trong student
+
+```python
+["claude", "--model", model, "-p", prompt, "--bare", "--verbose",
+ "--output-format", "stream-json", "--dangerously-skip-permissions",
+ "--max-turns", str(config.max_turns)]
+```
+
+- `--bare`: bỏ hooks, LSP, plugins → faster, ít tool calls dư
+- `--dangerously-skip-permissions`: non-interactive
+- `--output-format stream-json`: parse events real-time
+
+---
+
+## Retry logic (student)
+
+```python
+_RETRIABLE_STOP_REASONS = {"runner_error", "no_end_event", "cli_exit_1", "cli_exit_2", "timeout"}
+```
+
+Thêm check mới (C2): nếu `stop_reason == "end_turn"` nhưng `output_files == []` (Gemma hallucination pattern — claim success không tạo file) → `stop_reason = "runner_error: no_output_files"` → retriable.
+
+Max retries: 3 (configurable `max_retry_per_tc`). Sau khi hết → `make_skip_result()` (score=0).
+
+---
 
 ## Sandbox mechanics
 
 ```
 Sandbox.__enter__:
-  - Preflight: raise nếu parent env có ANTHROPIC_BASE_URL ~ openrouter.ai
-  - mkdir {tmp_root}/{name}-{uuid8}/{home,cwd}
-  - Build env dict explicit: PATH, HOME, TERM, LANG, ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL
-    + PRESERVE NODE_PATH/NVM_*/SHELL từ parent (Claude Code shells out to node)
-    + KHÔNG dùng os.environ.copy() — tránh leak biến khác
-  - Best-effort `claude logout` trong sandbox HOME (timeout 10s, ignore exit code)
+  - Preflight: raise SandboxError nếu parent env có ANTHROPIC_BASE_URL ~ openrouter
+  - mkdir {tmp_root}/{name}-{uuid8}/{home, cwd}
+  - Build env EXPLICIT (không copy os.environ):
+      PATH, HOME, TERM, LANG, ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL (if set)
+      NODE_PATH = os.environ.get("NODE_PATH", "/usr/local/lib/node_modules")  ← hardcoded default
+      NVM_DIR, NVM_BIN, SHELL (nếu có trong parent)
+  - Best-effort claude logout (timeout 10s)
 
-Sandbox.__exit__:
-  - shutil.rmtree trừ khi (keep_on_fail=True AND có exception)
+list_outputs(): skip node_modules, .npm, __pycache__, .git, hidden dirs
+_copy_outputs(): chỉ copy extensions trong _OUTPUT_EXTENSIONS + skip _SKIP_NAMES
 ```
+
+`NODE_PATH=/usr/local/lib/node_modules` → `require('docx')` hoạt động không cần `npm install` per run. Package docx@9.6.1 đã cài globally.
+
+---
+
+## Teacher system prompt (rewritten)
+
+Prompt mới có sections rõ ràng: ## Context, ## Your Task, ## Rules (What MUST do / MUST NOT do).
+
+Key rules:
+- **Fix failures** trực tiếp từ run_logs
+- **Preserve** những gì đã pass
+- **Common Mistakes section** + fallback strategies
+- **NO self-check loops** (confuse small models)
+- **No 80% length guard** — shorter is acceptable nếu tăng clarity
+
+Không còn sanity check "reject nếu new SKILL.md < 80% old length" trong pipeline.py.
+
+---
+
+## Validation TC selection (H5)
+
+`choose_validation_tcs()` giờ nhận `round_results: list[EvalResult] | None`:
+- Có results → top-N by `hybrid_score` (stable, deterministic)
+- Không có results → random fallback
+
+---
+
+## Rubric generator
+
+- **Cache key**: `sha256(SKILL.md)[:12] + "_" + sha256(sorted tc_ids)[:12]`
+- **Cache path**: `distillation_v2/rubrics/{skill}_{key}.json`
+- **Criteria**: 4–8 criteria, weights sum = 1.0 (auto-normalize nếu LLM trả lệch)
+- **Invalidate**: flag `--regenerate-rubric` hoặc `watch_skill_hash=true`
+
+---
 
 ## Stream parser
 
-Map Claude Code `--output-format stream-json` sang v1 `AgentLogger` events:
-
-| Stream-json type | v1 event |
+| stream-json type | event |
 |---|---|
-| `system.init` | `cli_init` (thay thế `start` — `start` gọi trước khi stream) |
+| `system.init` | `cli_init` |
 | `assistant.content[tool_use]` | `tool_call` (tăng iteration) |
-| `assistant.content[text]` | `assistant_text` (v2-only, không có trong v1) |
+| `assistant.content[text]` | `assistant_text` |
 | `user.content[tool_result]` | `tool_result` |
-| `result.subtype!="success"` | `api_error` + `end` |
-| `result.subtype="success"` | `end` |
+| `result.subtype=success` | `end` |
+| `result.subtype!=success` | `api_error` + `end` |
 
-Unknown type → log + skip (schema drift defensive, không crash).
+---
 
-## Smoke test 2026-04-17 (verified live)
+## Gemma 4 26B hallucination pattern
 
-Command: `python run.py --skill docx --rounds 1 --test-cases 1 --dry-run --verbose`
+Model nhận Skill tool → `"Launching skill: docx"` → claim success, iters=1, không tạo file.
+→ C2 fix xử lý case này bằng cách treat end_turn + no output = retriable.
 
-- Rubric sinh tự động: 7 criteria, cached.
-- Claude Code CLI (v2.1.112) chạy qwen3-8b qua OpenRouter trong sandbox.
-- 2 iterations (Write script.py → Bash python script.py), 41s wall.
-- Output: `output.docx` + `script.py` copied tới `results/17_04_2026/docx/round_1/batch_1/tc_a01/`.
-- Judge score: 0.21 (fail — qwen3-8b nhầm `scripts/office/validate.py` không tồn tại trong sandbox).
-- **Parent env không leak**: `ANTHROPIC_BASE_URL` vẫn unset sau khi chạy.
-- JSONL log khớp schema v1: `start → cli_init → tool_call/tool_result × N → assistant_text → end`.
+Token cost: ~68K base tokens/run = ~62K CLI system prompt + 6.5K SKILL.md.
+→ `--bare` giảm overhead, `settings.json` tránh haiku/sonnet charges qua OpenRouter.
 
-## Test coverage (48 tests offline)
+---
 
-- `test_sandbox.py` (16): env isolation, cleanup, preflight guard, file listing.
-- `test_stream_parser.py` (12): 3 fixture transcripts + edge cases + unknown types.
-- `test_rubric_generator.py` (12): cache key stability, cache invalidation, JSON parse + weight normalization.
-- `test_llm_only_judge_smoke.py` (8): empty output, mocked API call, EvalResult mapping.
+## Test coverage (63 passing, 1 skipped)
 
-Run: `conda run -n skills python -m pytest distillation_v2/tests/ -v`.
+- `test_sandbox.py` (16): env isolation, cleanup, preflight, NODE_PATH
+- `test_stream_parser.py` (12): fixtures + edge cases
+- `test_rubric_gen.py` (11 + 1 live skipped): cache, parse, normalize
+- `test_student.py` (7): build_prompt, skill install, retry/skip logic
+- `test_rollback.py` (11): top-N selection, decide logic
+- `test_converter.py` (1)
 
-## Known gaps / next steps
+Run: `conda run -n skills pytest distillation_v2/tests/ -v`
 
-1. **Smoke chưa test Teacher loop** — `--dry-run` bỏ qua. Cần test Teacher rewrite trong `anthropic_env()` context (expected: không leak env qua rewrite call).
-2. **qwen3-8b nhầm path validate.py** — trong v1 có workspace script, v2 sandbox chưa copy. Cần đánh giá xem có cần copy `skill_runner/workspace/scripts/` hay không, hay để LLM Judge đánh giá output.docx trực tiếp (preferred cho v2 để giảm complexity).
-3. **So sánh v1 vs v2** — chạy cùng test set, report chênh lệch score cho thesis writeup.
+---
+
+## Config priority
+
+```
+CLI flag → config.yaml → hardcoded default
+```
+
+`skills_dir` default: `~/.claude/skills` (pipeline.py line `Path.home() / ".claude" / "skills"`)
+
+---
+
+## Known issues / Cần làm tiếp
+
+1. **Scripts copy**: SKILL.md có `python scripts/office/validate.py` — scripts chưa được copy vào `sandbox.cwd/`. Hiện tại bỏ qua (validate không chạy được trong sandbox).
+2. **Gemma variance**: cùng SKILL.md, round 1→2 score dao động 0.66→0.42. Cần nhiều rounds hơn để đánh giá trend thực tế.
+3. **So sánh v1 vs v2** cho thesis writeup: chạy cùng test set, report chênh lệch score.

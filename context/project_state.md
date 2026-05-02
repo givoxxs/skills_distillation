@@ -188,26 +188,37 @@ Quyết định: **không implement** vì signal không giúp ích cho Teacher v
 41. **results_dir date bug** — compute dated `results_dir` TRƯỚC khi gọi `setup_logging()`.
     Trước: api_calls.jsonl/eval_detail.jsonl ghi vào `results/docx/`, không phải `results/DD_MM/docx/`.
 
-## distillation_v2/ (NEW — 2026-04-17, end-to-end verified)
+## distillation_v2/ (refactored — last updated 2026-05-02)
 
 Pipeline song song, KHÔNG xoá v1. Xem chi tiết: [distillation_v2.md](distillation_v2.md).
 
-**Khác biệt vs v1:**
-- Student: `skill_runner/` → **Claude Code CLI** (`claude -p --output-format stream-json`) trỏ tới OpenRouter qua `ANTHROPIC_BASE_URL`.
-- Evaluator: rule-based `docx_rules.py` → **LLM-only judge** với rubric **tự sinh** per-skill (cache theo hash SKILL.md + tc_ids).
-- Sandbox: subprocess + env dict explicit + fresh HOME, KHÔNG leak `ANTHROPIC_BASE_URL` ra parent shell.
-- Teacher isolation: gọi qua `anthropic_env()` context manager.
-- Reuse v1 modules (summarizer, teacher, utils, evaluator.base, llm_judge._extract_content) qua `importlib.util` by path (tránh namespace collision).
+**Cấu trúc hiện tại** (sau refactor — không còn dùng importlib v1):
+- `pipeline.py` (thay `orchestrator.py`) — orchestration loop
+- `stages/` — student, teacher, judge, rubric_gen, summarizer
+- `runner/` — sandbox, anthropic_env, stream_parser, config, logger
+- `evaluator/base.py` — EvalResult, CheckResult
+- `utils/rollback.py` — choose_validation_tcs (top-N by score), decide, run_validation
 
-**Tests**: 48/48 pass offline (sandbox 16, stream_parser 12, rubric 12, judge 8).
+**Bugs đã fix trong v2 (sessions 04-05/2026):**
+- `--sandbox` flag không tồn tại trong claude CLI → đã xóa
+- Skill injection sai path (commands/ → đúng là `.claude/skills/<name>/`) → đã fix
+- `settings.json` inject để force model (tránh haiku/sonnet qua OpenRouter)
+- Output filter: node_modules, .json lock files không copy sang output
+- `list_outputs()` skip node_modules, .npm, hidden dirs
+- `end_turn` + no output files → `runner_error: no_output_files` (retriable, Gemma hallucination fix)
+- `NODE_PATH=/usr/local/lib/node_modules` hardcoded → `require('docx')` không cần npm install
+- `skills_dir` default → `~/.claude/skills` (docx-js version, không phải python-docx)
+- Validation TCs: top-N by hybrid_score thay vì random
+- 80% length guard xóa khỏi pipeline.py (teacher prompt mới cho phép shorter)
+- Teacher system prompt rewrite: markdown rõ ràng, MUST/MUST NOT rules
 
-**Smoke live 2026-04-17**: 1 round × 1 tc với `--dry-run` — rubric sinh 7 criteria, Claude Code chạy qwen3-8b 41s, judge score 0.21, parent env không leak.
+**Tests**: 63 pass, 1 skipped (live API). Run: `conda run -n skills pytest distillation_v2/tests/ -v`
 
 ## Cần làm tiếp
 
 1. ✅ Fixture `tracked_deletion_review.docx` đã tạo
 2. ✅ Kết quả 11_04 đã phân tích, bugs đã fix
-3. Chạy lại pipeline v1 với 30 test cases sau fix: `python run.py --skill docx --verbose`
-4. Theo dõi xem tc_b01, tc_c05 có cải thiện không
-5. **v2**: test Teacher loop (bỏ `--dry-run`) để verify không leak env qua rewrite call
-6. **v2**: so sánh v1 vs v2 trên cùng test set cho thesis writeup
+3. ✅ v2 refactor complete — bugs fixed, tests green
+4. Chạy v2 distillation thực tế (vài rounds) để verify end-to-end với docx-js SKILL.md
+5. **v2**: so sánh v1 vs v2 trên cùng test set cho thesis writeup
+6. **v2 pending**: copy `scripts/` vào `sandbox.cwd/scripts/` để `validate.py` chạy được

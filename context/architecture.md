@@ -14,12 +14,14 @@ skill_distillation/
 │   ├── test_cases/         # docx.json schema v4, fixtures/, description/
 │   ├── evaluator/          # base.py, docx_rules.py, llm_judge.py
 │   ├── orchestrator.py, summarizer.py, teacher.py, run.py
-├── distillation_v2/        # v2 pipeline (NEW 2026-04-17) — Claude Code CLI + LLM-only judge
-│   ├── config.yaml, run.py, orchestrator.py, README.md
-│   ├── runner/             # sandbox, anthropic_env, stream_parser, claude_code_runner
-│   ├── evaluator/          # rubric_generator, llm_only_judge
+├── distillation_v2/        # v2 pipeline — Claude Code CLI + LLM-only judge (standalone)
+│   ├── config.yaml, run.py, pipeline.py
+│   ├── stages/             # student.py, teacher.py, judge.py, rubric_gen.py, summarizer.py
+│   ├── runner/             # sandbox.py, anthropic_env.py, stream_parser.py, config.py, logger.py
+│   ├── evaluator/          # base.py (EvalResult, CheckResult)
+│   ├── utils/              # rollback.py, __init__.py (logging, write_api_call)
 │   ├── rubrics/            # cached rubric JSON per (skill, SKILL.md hash, tc_ids hash)
-│   └── tests/              # 48 offline unit tests
+│   └── tests/              # 63 passing, 1 skipped
 ├── docs/                   # Đề cương + phân tích
 ├── context/                # MEMORY.md + per-topic context markdown
 └── .env                    # ANTHROPIC_KEY + OPENROUTER_API_KEY

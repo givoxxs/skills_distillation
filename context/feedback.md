@@ -119,12 +119,31 @@ Retry delays cho 529 OverloadedError: **[3, 6, 15]s** — không dùng 30/60/120
 **How to apply:** `delays = [3, 6, 15]` trong `_call_api`, catch `anthropic.APIStatusError` với `status_code == 529`.
 
 ## Test cases phải match SKILL.md technology
-`docx.json` test cases viết cho **docx-js** (Node.js). SKILL.md dùng trong pipeline phải là docx-js version (`anthropic_skills/skills/docx/`), KHÔNG phải python-docx version (`skill_runner/skills/docx/`).
-**Why:** mismatch gây ra toàn bộ kết quả sai — model học python-docx API nhưng bị evaluate bằng docx-js XML structure. R1-R3 của 11_04 đều bị ảnh hưởng.
-**How to apply:** trước khi chạy distillation cho skill mới, luôn verify test cases và SKILL.md dùng cùng technology stack.
-`skill_runner/skills/` đã được sync với `anthropic_skills/` — đây là nguồn chuẩn.
+`docx.json` test cases viết cho **docx-js** (Node.js). SKILL.md dùng trong pipeline phải là docx-js version (`~/.claude/skills/docx/`), KHÔNG phải python-docx version.
+**Why:** mismatch gây ra toàn bộ kết quả sai — model học python-docx API nhưng bị evaluate bằng docx-js XML structure.
+**How to apply:** `skills_dir` default trong pipeline.py trỏ tới `~/.claude/skills`. Trước khi chạy skill mới, verify test cases và SKILL.md cùng technology stack.
 
 ## Test case quality over quantity
 Bỏ test case nếu: 0/3 rounds pass VÀ yêu cầu kỹ năng quá advanced cho SLM 8B.
 **Why:** test case không bao giờ pass = không có signal cho Teacher = lãng phí token và thời gian.
 **How to apply:** sau mỗi 3 rounds, review test cases có hybrid=0.0 xuyên suốt → cân nhắc bỏ hoặc đơn giản hóa.
+
+## v2: skill injection dùng shutil.copytree, không copy từng file
+Copy cả folder `skill_dir/` → `sandbox_home/.claude/skills/<skill_name>/`.
+**Why:** Claude Code CLI đọc skills từ `~/.claude/skills/<name>/` (cả folder), không phải `~/.claude/commands/<name>.md`.
+**How to apply:** `shutil.copytree(skill_dir, claude_dir / "skills" / skill_name, dirs_exist_ok=True)`.
+
+## v2: settings.json bắt buộc để tránh haiku/sonnet charges
+Inject `{"model": "<student_model>"}` vào `sandbox_home/.claude/settings.json` trước mỗi run.
+**Why:** Claude Code CLI dùng haiku/sonnet cho auto-compaction mặc định. Khi `ANTHROPIC_BASE_URL=openrouter`, tất cả internal calls đều route qua OpenRouter → tốn tiền không mong muốn.
+**How to apply:** `_install_skill_in_sandbox()` luôn ghi settings.json khi model được pass.
+
+## v2: teacher prompt không được có ±% length constraint
+Không dùng "shorter by ±20%" hay guard 80% trong pipeline.
+**Why:** small model dễ hiểu nhầm "shorter is better" thành cắt bớt nội dung quan trọng. Guard 80% cũng block teacher cải thiện skill bằng cách tái cấu trúc ngắn gọn hơn.
+**How to apply:** teacher system prompt chỉ nói "shorter is acceptable if it improves clarity" — không số cụ thể. Pipeline.py không reject output dựa trên độ dài.
+
+## conda env cho tests
+Dùng `conda run -n skills pytest ...` để chạy tests trong project này.
+**Why:** python3 global là 3.14, không có pytest. Env `skills` có đầy đủ dependencies.
+**How to apply:** `conda run -n skills pytest distillation_v2/tests/ -v`
