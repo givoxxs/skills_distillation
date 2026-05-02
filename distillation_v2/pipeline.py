@@ -86,17 +86,12 @@ def run_distillation(
         raise FileNotFoundError(f"SKILL.md not found: {skill_md_path}")
 
     # ── Fresh-run cleanup (skip when resuming) ────────────────────────────────
-    # Without --resume, remove stale round dirs, reset the working SKILL copy,
-    # and clear the run log so each run starts with a clean slate.
-    if not resume:
-        for old_round in results_path.glob("round_*"):
-            if old_round.is_dir():
-                shutil.rmtree(old_round)
-        for old_val in results_path.glob("validation"):
-            if old_val.is_dir():
-                shutil.rmtree(old_val)
-        (results_path / "run.log").unlink(missing_ok=True)
-        (results_path / "SKILL_current.md").unlink(missing_ok=True)
+    # Without --resume, wipe the entire skill results dir so each run starts
+    # with a clean slate (no stale round dirs, logs, JSONL files, or SKILL
+    # snapshots from a previous run).
+    if not resume and results_path.exists():
+        shutil.rmtree(results_path)
+    results_path.mkdir(parents=True, exist_ok=True)
 
     # working_md is the mutable copy; original skill_md_path is never modified.
     working_md = results_path / "SKILL_current.md"
