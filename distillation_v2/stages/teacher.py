@@ -162,6 +162,17 @@ def _call_api(
             if e.status_code == 529:
                 last_exc = e
                 continue
+            # Log non-529 errors (e.g. 500, 503) so they appear in the audit trail
+            write_api_call(
+                {
+                    "type": "teacher",
+                    "model": model,
+                    "round": round_n,
+                    "error": str(e),
+                    "status_code": e.status_code,
+                    "elapsed_s": round(time.time() - start, 2),
+                }
+            )
             raise
 
     raise RuntimeError(

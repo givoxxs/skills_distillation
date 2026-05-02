@@ -73,7 +73,9 @@ class AgentLogger:
                 "tokens": tokens,
             }
         )
-        self._fh.close()
+        # File is closed by __exit__ (context manager) or __del__ (safety net).
+        # Closing here would cause a double-close if the logger is used as a
+        # context manager, since __exit__ also calls close.
 
     @property
     def log_path(self) -> str:

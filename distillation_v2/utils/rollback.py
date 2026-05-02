@@ -58,7 +58,11 @@ def run_validation(
         emit(f"  [validation] avg_score={avg:.3f}")
         return avg
     finally:
-        skill_md_path.write_text(original, encoding="utf-8")
+        try:
+            skill_md_path.write_text(original, encoding="utf-8")
+        except Exception as exc:
+            emit(f"  [validation] CRITICAL: failed to restore SKILL.md: {exc}")
+            _log.error("Failed to restore SKILL.md at %s: %s", skill_md_path, exc)
 
 
 def decide(

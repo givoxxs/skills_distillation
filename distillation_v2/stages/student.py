@@ -17,6 +17,7 @@ import logging
 import os
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -310,6 +311,20 @@ def _stream_claude(
     tokens: dict[str, int] = {"prompt": 0, "completion": 0}
     final_text = ""
 
+    # Drain stderr in a background thread to prevent pipe deadlock.
+    # If stderr buffer fills (>64 KB) while we're blocking on stdout reads,
+    # the child process stalls writing stderr and we stall reading stdout.
+    stderr_chunks: list[str] = []
+
+    def _drain_stderr() -> None:
+        if proc.stderr:
+            data = proc.stderr.read()
+            if data:
+                stderr_chunks.append(data)
+
+    stderr_drainer = threading.Thread(target=_drain_stderr, daemon=True)
+    stderr_drainer.start()
+
     try:
         assert proc.stdout is not None
         for raw_line in proc.stdout:
@@ -328,11 +343,18 @@ def _stream_claude(
                     tokens = event.data.get("tokens", tokens)
                     final_text = event.data.get("final_text", "")
 
+        # stdout exhausted — wait for stderr drainer then for the process to exit
+        stderr_drainer.join(timeout=30)
+        stderr_text = stderr_chunks[0] if stderr_chunks else ""
+
         try:
-            _, stderr_text = proc.communicate(timeout=config.timeout_seconds)
+            proc.wait(timeout=config.timeout_seconds)
         except subprocess.TimeoutExpired:
             proc.kill()
-            _, stderr_text = proc.communicate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                _log.warning("Process refused to die after SIGKILL")
             stop_reason = "timeout"
 
         if proc.returncode != 0 and stop_reason == "no_end_event":
