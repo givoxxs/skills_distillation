@@ -110,7 +110,24 @@ def _skill_md_hash(skill_dir: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else ""
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
+def _cleanup_old_rubrics(cache_dir: Path, skill_name: str, keep: int) -> None:
+    """Delete old rubric files for this skill, keeping the N most recent."""
+    if keep <= 0:
+        return
+    files = sorted(
+        cache_dir.glob(f"{skill_name}_*.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for old in files[keep:]:
+        try:
+            old.unlink()
+            _log.debug("deleted old rubric: %s", old.name)
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("failed to delete old rubric %s: %s", old.name, exc)
+
+
+# ── Public API ─────────────────────────────────────────────────────────────────
 
 
 def generate_rubric(
@@ -121,6 +138,7 @@ def generate_rubric(
     model: str = DEFAULT_MODEL,
     regenerate: bool = False,
     watch_skill_hash: bool = False,
+    keep_recent: int = 5,
     anthropic_api_key: str | None = None,
 ) -> dict[str, Any]:
     """Return rubric dict, generating + caching if needed.
@@ -128,6 +146,8 @@ def generate_rubric(
     Args:
         watch_skill_hash: If True, regenerate when SKILL.md content has changed
                           since the cached rubric was produced (stored in cache).
+        keep_recent: Keep only the N most recent rubric files for this skill;
+                     older files are deleted after a new rubric is saved.
     """
     skill_dir = Path(skill_dir)
     skill_content = _read_skill_context(skill_dir)
@@ -167,6 +187,7 @@ def generate_rubric(
     rubric["skill_md_hash"] = _skill_md_hash(skill_dir)
     cache_file.write_text(json.dumps(rubric, indent=2, ensure_ascii=False))
     _log.info("rubric saved: %d criteria", len(rubric.get("criteria", [])))
+    _cleanup_old_rubrics(cache_root, skill_name, keep=keep_recent)
     return rubric
 
 

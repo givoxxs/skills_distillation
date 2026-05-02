@@ -46,7 +46,9 @@ env:
 # ── Rubric ───────────────────────────────────────────────────────────────────
 rubric:
   cache_dir: "./rubrics"
-  watch_skill_hash: false        # true → auto-regenerate rubric when SKILL.md changes
+  regenerate_each_run: true  # force fresh rubric on every new run (default)
+  keep_recent: 5             # keep N most recent rubric files per skill; older are deleted
+  watch_skill_hash: false    # true → auto-regenerate rubric when SKILL.md changes
 
 # ── Student (Claude Code CLI) ────────────────────────────────────────────────
 student:

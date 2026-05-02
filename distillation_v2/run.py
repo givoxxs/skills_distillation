@@ -144,6 +144,9 @@ def main(
     judge = judge or cfg.get("judge_model", "claude-haiku-4-5")
     ensemble_n = ensemble_n if ensemble_n is not None else cfg.get("ensemble_n", 1)
     rubric_cache_dir = rubric_cache_dir or rubric_cfg.get("cache_dir", "./rubrics")
+    # CLI flag --regenerate-rubric always wins; otherwise read from config (default: true)
+    regenerate_rubric = regenerate_rubric or rubric_cfg.get("regenerate_each_run", True)
+    keep_recent_rubrics = rubric_cfg.get("keep_recent", 5)
     rollback_threshold = cfg.get("rollback_threshold", 0.05)
     validation_tc_count = cfg.get("validation_tc_count", 3)
     max_retry_per_tc = cfg.get("max_retry_per_tc", 3)
@@ -198,6 +201,7 @@ def main(
         test_cases_dir=str(tc_path.parent),
         regenerate_rubric=regenerate_rubric,
         watch_skill_hash=watch_skill_hash,
+        keep_recent_rubrics=keep_recent_rubrics,
         ensemble_n=ensemble_n,
         sandbox_tmp_root=sandbox_cfg.get("tmp_root", "~/.cache/distill_v2"),
         sandbox_keep_on_fail=sandbox_cfg.get("keep_on_fail", True),

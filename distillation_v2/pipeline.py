@@ -59,8 +59,9 @@ def run_distillation(
     rubric_cache_dir: str = "./rubrics",
     skills_dir: str | None = None,
     test_cases_dir: str | None = None,
-    regenerate_rubric: bool = False,
+    regenerate_rubric: bool = True,
     watch_skill_hash: bool = False,
+    keep_recent_rubrics: int = 5,
     ensemble_n: int = 1,
     sandbox_tmp_root: str = "~/.cache/distill_v2",
     sandbox_keep_on_fail: bool = True,
@@ -98,6 +99,7 @@ def run_distillation(
         model=judge_model,
         regenerate=regenerate_rubric,
         watch_skill_hash=watch_skill_hash,
+        keep_recent=keep_recent_rubrics,
         anthropic_api_key=anthropic_key,
     )
     judge = Judge(
@@ -331,12 +333,14 @@ def run_distillation(
         "rubric_cache_key": rubric.get("cache_key"),
     }
     (results_path / "summary.json").write_text(json.dumps(summary, indent=2))
-    emit("")
-    emit("=" * 60)
-    emit(
-        f"DONE. Best round: {summary['best_round']}  score={summary['best_score']:.3f}"
-    )
-    run_log_file.close()
+    try:
+        emit("")
+        emit("=" * 60)
+        emit(
+            f"DONE. Best round: {summary['best_round']}  score={summary['best_score']:.3f}"
+        )
+    finally:
+        run_log_file.close()
     return summary
 
 
@@ -505,7 +509,13 @@ def _load_cached_batch(
     by_id = {e["test_case_id"]: e for e in data.get("eval_results", [])}
     results: list[EvalResult] = []
     for tc in batch:
-        entry = by_id.get(tc["id"], {})
+        entry = by_id.get(tc["id"])
+        if entry is None:
+            raise ValueError(
+                f"Cache miss for TC '{tc['id']}' in round {round_n} batch {batch_idx}. "
+                "Test cases may have changed since last run — delete cached results or "
+                "remove --resume to re-run from scratch."
+            )
         er = EvalResult(
             test_case_id=tc["id"],
             skill=skill,
