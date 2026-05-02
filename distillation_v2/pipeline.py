@@ -85,9 +85,22 @@ def run_distillation(
     if not skill_md_path.is_file():
         raise FileNotFoundError(f"SKILL.md not found: {skill_md_path}")
 
+    # ── Fresh-run cleanup (skip when resuming) ────────────────────────────────
+    # Without --resume, remove stale round dirs, reset the working SKILL copy,
+    # and clear the run log so each run starts with a clean slate.
+    if not resume:
+        for old_round in results_path.glob("round_*"):
+            if old_round.is_dir():
+                shutil.rmtree(old_round)
+        for old_val in results_path.glob("validation"):
+            if old_val.is_dir():
+                shutil.rmtree(old_val)
+        (results_path / "run.log").unlink(missing_ok=True)
+        (results_path / "SKILL_current.md").unlink(missing_ok=True)
+
     # working_md is the mutable copy; original skill_md_path is never modified.
     working_md = results_path / "SKILL_current.md"
-    if not working_md.exists():  # preserve on --resume
+    if not working_md.exists():
         shutil.copy2(skill_md_path, working_md)
 
     # ── Rubric (once per pipeline run) ───────────────────────────────────────
@@ -122,7 +135,9 @@ def run_distillation(
     )
 
     # ── Logging ───────────────────────────────────────────────────────────────
-    run_log_file = open(results_path / "run.log", "a", buffering=1)
+    run_log_file = open(
+        results_path / "run.log", "w" if not resume else "a", buffering=1
+    )
 
     def emit(msg: str) -> None:
         ts = datetime.now().strftime("%H:%M:%S")
