@@ -1,0 +1,253 @@
+"""Generate a shared evaluation rubric once per skill, cache and reuse.
+
+Teacher LLM reads SKILL.md + all test cases → produces 4-8 criteria (rubrics.json).
+Cache key = sha256(skill_dir_content) + sha256(sorted TC IDs).
+Regeneration triggers: explicit flag OR SKILL.md hash change (if watch_skill_hash=True).
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import os
+import time
+from pathlib import Path
+from typing import Any
+
+import anthropic
+
+from runner.anthropic_env import anthropic_env
+from utils import write_api_call
+
+_log = logging.getLogger("distillation.v2.rubric_gen")
+
+DEFAULT_MODEL = "claude-haiku-4-5"
+MAX_TOKENS = 4096
+
+_TEXT_EXTENSIONS = {
+    ".md",
+    ".txt",
+    ".py",
+    ".js",
+    ".ts",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".html",
+    ".css",
+    ".sh",
+    ".toml",
+    ".cfg",
+    ".ini",
+}
+_MAX_FILE_BYTES = 3000
+_SKIP_DIRS = {"__pycache__", ".git", "node_modules", ".npm"}
+
+_SYSTEM_PROMPT = """You design evaluation rubrics for AI agent skills executed \
+by small language models via Claude Code CLI.
+
+Given the full skill context (SKILL.md, helper scripts) and ALL test cases, \
+produce as many independent, objectively checkable criteria as needed to fully \
+cover the skill's requirements across all workflows (CREATE, READ, EDIT, CONVERT, EDGE). \
+Use your judgment — a simple skill may need 5 criteria, a complex one may need 15+.
+
+Rules:
+1. Each criterion must be independently checkable by a judge LLM viewing the output or its screenshots.
+2. Cover every distinct failure mode visible across the test cases.
+3. Weights must sum to exactly 1.0. Distribute weights proportionally to importance.
+4. pass_threshold is the per-criterion minimum (0.0-1.0) for "acceptable".
+5. MUST include at least one FILE VALIDITY criterion (file exists, non-empty, correct format).
+6. MUST include at least one TASK COMPLETION criterion (did it actually do what was asked?).
+7. MUST include criteria for each major workflow type that has test cases (create, read, edit, convert, edge).
+8. Write criterion descriptions in imperative form so a judge knows exactly what to check.
+9. Do NOT merge distinct requirements into one criterion — split them.
+
+Output ONLY valid JSON, no prose, no markdown fence:
+{
+  "criteria": [
+    {"name": "...", "description": "...", "weight": 0.0, "pass_threshold": 0.0},
+    ...
+  ],
+  "notes": "one-sentence rationale explaining coverage decisions"
+}"""
+
+
+# ── Cache helpers ─────────────────────────────────────────────────────────────
+
+
+def _read_skill_context(skill_dir: Path) -> str:
+    parts: list[str] = []
+    skill_md = skill_dir / "SKILL.md"
+    if skill_md.is_file():
+        parts.append(f"# SKILL.md\n\n{skill_md.read_text(encoding='utf-8')}")
+    for fpath in sorted(skill_dir.rglob("*")):
+        if fpath == skill_md:
+            continue
+        if any(p in _SKIP_DIRS for p in fpath.parts):
+            continue
+        if not fpath.is_file() or fpath.suffix.lower() not in _TEXT_EXTENSIONS:
+            continue
+        rel = fpath.relative_to(skill_dir)
+        try:
+            raw = fpath.read_text(encoding="utf-8", errors="replace")
+            if len(raw) > _MAX_FILE_BYTES:
+                raw = raw[:_MAX_FILE_BYTES] + f"\n... [truncated, {len(raw)} chars]"
+            parts.append(f"# {rel}\n\n{raw}")
+        except Exception:  # noqa: BLE001
+            pass
+    return "\n---\n".join(parts)
+
+
+def _cache_key(skill_content: str, tc_ids: list[str]) -> str:
+    h1 = hashlib.sha256(skill_content.encode()).hexdigest()[:12]
+    h2 = hashlib.sha256(",".join(sorted(tc_ids)).encode()).hexdigest()[:12]
+    return f"{h1}_{h2}"
+
+
+def _skill_md_hash(skill_dir: Path) -> str:
+    p = skill_dir / "SKILL.md"
+    return hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else ""
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+
+def generate_rubric(
+    skill_name: str,
+    skill_dir: str | Path,
+    test_cases: list[dict[str, Any]],
+    cache_dir: str | Path,
+    model: str = DEFAULT_MODEL,
+    regenerate: bool = False,
+    watch_skill_hash: bool = False,
+    anthropic_api_key: str | None = None,
+) -> dict[str, Any]:
+    """Return rubric dict, generating + caching if needed.
+
+    Args:
+        watch_skill_hash: If True, regenerate when SKILL.md content has changed
+                          since the cached rubric was produced (stored in cache).
+    """
+    skill_dir = Path(skill_dir)
+    skill_content = _read_skill_context(skill_dir)
+    tc_ids = [tc.get("id", "") for tc in test_cases]
+    key = _cache_key(skill_content, tc_ids)
+
+    cache_root = Path(cache_dir)
+    cache_root.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_root / f"{skill_name}_{key}.json"
+
+    # Determine if we must regenerate
+    must_regen = regenerate
+    if not must_regen and cache_file.is_file() and watch_skill_hash:
+        try:
+            cached = json.loads(cache_file.read_text())
+            current_hash = _skill_md_hash(skill_dir)
+            if cached.get("skill_md_hash") != current_hash:
+                _log.info("SKILL.md changed — regenerating rubric")
+                must_regen = True
+        except Exception:  # noqa: BLE001
+            must_regen = True
+
+    if cache_file.is_file() and not must_regen:
+        _log.info("rubric cache hit: %s", cache_file.name)
+        try:
+            return json.loads(cache_file.read_text())
+        except json.JSONDecodeError:
+            _log.warning("corrupt rubric cache, regenerating")
+
+    _log.info("generating rubric via %s (%d test cases)...", model, len(test_cases))
+    api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_KEY not set (rubric_gen requires it)")
+
+    rubric = _call_api(skill_name, skill_content, test_cases, model, api_key)
+    rubric["cache_key"] = key
+    rubric["skill_md_hash"] = _skill_md_hash(skill_dir)
+    cache_file.write_text(json.dumps(rubric, indent=2, ensure_ascii=False))
+    _log.info("rubric saved: %d criteria", len(rubric.get("criteria", [])))
+    return rubric
+
+
+# ── API call ──────────────────────────────────────────────────────────────────
+
+
+def _call_api(
+    skill_name: str,
+    skill_content: str,
+    test_cases: list[dict[str, Any]],
+    model: str,
+    api_key: str,
+) -> dict[str, Any]:
+    tc_lines = []
+    for tc in test_cases:
+        tc_id = tc.get("id", "tc_unknown")
+        prompt = (tc.get("prompt") or "")[:300]
+        expected = (tc.get("expected_behavior") or "")[:200]
+        tc_lines.append(f"**{tc_id}**\nPrompt: {prompt}\nExpected: {expected}")
+
+    user_prompt = (
+        f"Skill: {skill_name}\n\n## Skill Context\n\n{skill_content}\n\n"
+        f"---\n\n## All Test Cases ({len(test_cases)})\n\n"
+        + "\n\n".join(tc_lines)
+        + f"\n\n---\n\nProduce the rubric JSON for {skill_name} now."
+    )
+
+    with anthropic_env(api_key):
+        client = anthropic.Anthropic()
+        message = client.messages.create(
+            model=model,
+            max_tokens=MAX_TOKENS,
+            system=_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+    raw = message.content[0].text.strip()
+    usage = {
+        "prompt_tokens": message.usage.input_tokens,
+        "completion_tokens": message.usage.output_tokens,
+    }
+    write_api_call(
+        {
+            "type": "rubric_gen",
+            "model": model,
+            "skill": skill_name,
+            "n_test_cases": len(test_cases),
+            **usage,
+        }
+    )
+
+    rubric = _parse_and_validate(raw)
+    rubric["generated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    rubric["model"] = model
+    rubric["token_usage"] = usage
+    return rubric
+
+
+def _parse_and_validate(raw: str) -> dict[str, Any]:
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        text = "\n".join(
+            lines[1:-1] if lines[-1].startswith("```") else lines[1:]
+        ).strip()
+
+    data = json.loads(text)
+    if not isinstance(data, dict) or "criteria" not in data:
+        raise ValueError("missing 'criteria' key")
+    criteria = data["criteria"]
+    if not isinstance(criteria, list) or not criteria:
+        raise ValueError("'criteria' must be a non-empty list")
+    for c in criteria:
+        for k in ("name", "description", "weight", "pass_threshold"):
+            if k not in c:
+                raise ValueError(f"criterion missing '{k}'")
+
+    total = sum(float(c["weight"]) for c in criteria)
+    if total <= 0:
+        raise ValueError("weights sum to <= 0")
+    if abs(total - 1.0) > 1e-3:
+        for c in criteria:
+            c["weight"] = float(c["weight"]) / total
+    return data

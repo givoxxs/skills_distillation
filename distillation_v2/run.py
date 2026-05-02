@@ -118,7 +118,7 @@ def main(
     results_dir = str(Path(base_results) / datetime.now().strftime("%d_%m_%Y"))
 
     # Logging setup
-    import orchestrator
+    import pipeline
     from utils import setup_logging
 
     setup_logging(
@@ -139,11 +139,16 @@ def main(
     # Resolve CLI > config > default
     rounds = rounds if rounds is not None else cfg.get("max_rounds", 3)
     batch_size = batch_size if batch_size is not None else cfg.get("batch_size", 5)
-    student = student or cfg.get("student_model", "qwen/qwen3-8b")
+    student = student or cfg.get("student_model", "google/gemma-4-26b-a4b-it")
     teacher = teacher or cfg.get("teacher_model", "claude-haiku-4-5")
     judge = judge or cfg.get("judge_model", "claude-haiku-4-5")
     ensemble_n = ensemble_n if ensemble_n is not None else cfg.get("ensemble_n", 1)
     rubric_cache_dir = rubric_cache_dir or rubric_cfg.get("cache_dir", "./rubrics")
+    rollback_threshold = cfg.get("rollback_threshold", 0.05)
+    validation_tc_count = cfg.get("validation_tc_count", 3)
+    max_retry_per_tc = cfg.get("max_retry_per_tc", 3)
+    max_image_pages = cfg.get("max_image_pages", 10)
+    watch_skill_hash = rubric_cfg.get("watch_skill_hash", False)
 
     # Test cases file (default to v2 test_cases/)
     if test_cases_file is None:
@@ -171,7 +176,7 @@ def main(
     )
     click.echo(f"Rubric: cache_dir={rubric_cache_dir}  regenerate={regenerate_rubric}")
 
-    summary = orchestrator.run_distillation(
+    summary = pipeline.run_distillation(
         skill=skill,
         test_cases=selected,
         student_model=student,
@@ -183,11 +188,16 @@ def main(
         stop_threshold=cfg.get("stop_threshold", 0.7),
         converge_delta=cfg.get("converge_delta", 0.02),
         converge_k=cfg.get("converge_k", 3),
+        rollback_threshold=rollback_threshold,
+        validation_tc_count=validation_tc_count,
+        max_retry_per_tc=max_retry_per_tc,
+        max_image_pages=max_image_pages,
         results_dir=results_dir,
         rubric_cache_dir=rubric_cache_dir,
         skills_dir=skills_dir,
         test_cases_dir=str(tc_path.parent),
         regenerate_rubric=regenerate_rubric,
+        watch_skill_hash=watch_skill_hash,
         ensemble_n=ensemble_n,
         sandbox_tmp_root=sandbox_cfg.get("tmp_root", "~/.cache/distill_v2"),
         sandbox_keep_on_fail=sandbox_cfg.get("keep_on_fail", True),

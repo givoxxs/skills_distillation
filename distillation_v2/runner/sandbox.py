@@ -153,11 +153,12 @@ class Sandbox:
         out: list[Path] = []
         if self._cwd is None:
             return out
+        _SKIP = frozenset({"node_modules", ".npm", "__pycache__", ".git"})
         for path in self._cwd.rglob("*"):
             if not path.is_file():
                 continue
             parts = path.relative_to(self._cwd).parts
-            if any(p.startswith(".") for p in parts):
+            if any(p.startswith(".") or p in _SKIP for p in parts):
                 continue
             try:
                 if path.stat().st_mtime >= since_ts:
@@ -196,8 +197,9 @@ class Sandbox:
         }
         if self._base_url:
             env["ANTHROPIC_BASE_URL"] = self._base_url
-        # Preserve NODE_PATH / npm paths if present (Claude Code shells out to node)
-        for key in ("NODE_PATH", "NVM_DIR", "NVM_BIN", "SHELL"):
+        # Global node_modules so `require('docx')` works without per-run npm install
+        env["NODE_PATH"] = os.environ.get("NODE_PATH", "/usr/local/lib/node_modules")
+        for key in ("NVM_DIR", "NVM_BIN", "SHELL"):
             if key in os.environ:
                 env[key] = os.environ[key]
         return env
