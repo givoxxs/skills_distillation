@@ -69,6 +69,7 @@ tests
 
 distillation_v2/rubrics
 distillation_v2/results
+distillation_v2/skills/*
 
 skillsbench/
 # skillsbench_tasks/

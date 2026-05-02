@@ -77,12 +77,17 @@ def run_distillation(
     results_path = Path(results_dir) / skill
     results_path.mkdir(parents=True, exist_ok=True)
 
-    skills_dir = skills_dir or str(Path.home() / ".claude" / "skills")
+    skills_dir = skills_dir or str(v2_root / "skills")
     test_cases_dir = test_cases_dir or str(v2_root / "test_cases")
     skill_dir = Path(skills_dir) / skill
     skill_md_path = skill_dir / "SKILL.md"
     if not skill_md_path.is_file():
         raise FileNotFoundError(f"SKILL.md not found: {skill_md_path}")
+
+    # working_md is the mutable copy; original skill_md_path is never modified.
+    working_md = results_path / "SKILL_current.md"
+    if not working_md.exists():  # preserve on --resume
+        shutil.copy2(skill_md_path, working_md)
 
     # ── Rubric (once per pipeline run) ───────────────────────────────────────
     rubric = generate_rubric(
@@ -138,7 +143,7 @@ def run_distillation(
     )
     emit("=" * 60)
 
-    _save_skill_version(skill_md_path, results_path, round_n=0)
+    _save_skill_version(working_md, results_path, round_n=0)
 
     history: list[dict] = []
     prev_avg: float | None = None
@@ -180,6 +185,7 @@ def run_distillation(
                 round_n=round_n,
                 batch_idx=batch_idx,
                 max_retry_per_tc=max_retry_per_tc,
+                current_skill_md=working_md,
                 emit=emit,
             )
             all_results.extend(batch_results)
@@ -222,7 +228,7 @@ def run_distillation(
             teacher_start = time.time()
             try:
                 new_skill = teacher_rewrite(
-                    skill_md_path=skill_md_path,
+                    skill_md_path=working_md,
                     run_logs=run_logs,
                     model=teacher_model,
                     round_n=round_n,
@@ -250,12 +256,13 @@ def run_distillation(
                         round_n=round_n,
                         batch_idx=0,
                         max_retry_per_tc=max_retry_per_tc,
+                        current_skill_md=working_md,
                         emit=emit,
                     )
                     return results
 
                 val_score = run_validation(
-                    skill_md_path=skill_md_path,
+                    skill_md_path=working_md,
                     new_skill_content=new_skill,
                     validation_tcs=val_tcs,
                     run_batch_fn=_val_batch,
@@ -263,8 +270,8 @@ def run_distillation(
                 )
                 keep = decide(val_score, round_avg, rollback_threshold, emit)
                 if keep:
-                    skill_md_path.write_text(new_skill, encoding="utf-8")
-                # else: skill_md_path unchanged (old content stays)
+                    working_md.write_text(new_skill, encoding="utf-8")
+                # else: working_md unchanged (old content stays)
 
             except Exception as e:  # noqa: BLE001
                 emit(f"  Teacher FAILED: {e}. Skipping rewrite.")
@@ -273,7 +280,7 @@ def run_distillation(
             emit("  DRY RUN — skipping Teacher + rollback.")
 
         # ── Round summary ─────────────────────────────────────────────────────
-        _save_skill_version(skill_md_path, results_path, round_n)
+        _save_skill_version(working_md, results_path, round_n)
         duration = time.time() - round_start
         bar = "█" * int(round_avg * 20)
         emit(f"  Round {round_n} avg={round_avg:.3f} {bar}  ({duration:.1f}s)")
@@ -347,6 +354,7 @@ def _run_batch(
     round_n: int,
     batch_idx: int,
     max_retry_per_tc: int,
+    current_skill_md: Path,
     emit: Callable[[str], None],
 ) -> tuple[list[EvalResult], list[str]]:
     results: list[EvalResult] = []
@@ -393,6 +401,7 @@ def _run_batch(
             model=student_model,
             config=config,
             max_retries=max_retry_per_tc,
+            current_skill_md=current_skill_md,
         )
 
         if run.get("skipped"):

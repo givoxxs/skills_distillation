@@ -219,10 +219,7 @@ def main(
     click.echo("\nScore history:")
     for entry in summary["score_history"]:
         bar = "█" * int(entry["avg_score"] * 20)
-        click.echo(
-            f"  Round {entry['round']:2d} [{entry['n_batches']} batches]: "
-            f"{entry['avg_score']:.3f} {bar}"
-        )
+        click.echo(f"  Round {entry['round']:2d}: {entry['avg_score']:.3f} {bar}")
     click.echo(f"\nResults saved to: {Path(results_dir) / skill}")
 
 

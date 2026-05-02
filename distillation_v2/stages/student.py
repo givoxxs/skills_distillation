@@ -50,16 +50,18 @@ def run_student(
     model: str,
     config: RunConfigV2,
     max_retries: int = 3,
+    current_skill_md: Path | None = None,
 ) -> dict[str, Any]:
     """Run the student model on one task, with retry-then-skip on failure.
 
     Args:
-        user_prompt: The task description (may include fixture file notice).
-        skill_name:  Skill folder name, e.g. "docx". Used as slash command name.
-        skill_dir:   Path to skills/<skill_name>/ containing SKILL.md + scripts/.
-        model:       OpenRouter model ID routed via Claude Code CLI.
-        config:      RunConfigV2 with sandbox + path settings.
-        max_retries: Max consecutive attempts before skipping the TC.
+        user_prompt:      The task description (may include fixture file notice).
+        skill_name:       Skill folder name, e.g. "docx". Used as slash command name.
+        skill_dir:        Path to skills/<skill_name>/ containing SKILL.md + scripts/.
+        model:            OpenRouter model ID routed via Claude Code CLI.
+        config:           RunConfigV2 with sandbox + path settings.
+        max_retries:      Max consecutive attempts before skipping the TC.
+        current_skill_md: Working copy of SKILL.md to inject instead of skill_dir/SKILL.md.
     """
     prompt = _build_prompt(skill_name, user_prompt)
     logger = AgentLogger(log_dir=config.log_dir, skill_name=skill_name, model=model)
@@ -68,7 +70,14 @@ def run_student(
     last_result: dict[str, Any] = {}
     for attempt in range(1, max_retries + 1):
         result = _run_once(
-            prompt, skill_name, skill_dir, model, config, logger, attempt
+            prompt,
+            skill_name,
+            skill_dir,
+            model,
+            config,
+            logger,
+            attempt,
+            current_skill_md=current_skill_md,
         )
         last_result = result
         stop = result.get("stop_reason", "")
@@ -136,7 +145,11 @@ def _build_prompt(skill_name: str, user_prompt: str) -> str:
 
 
 def _install_skill_in_sandbox(
-    sandbox: Sandbox, skill_name: str, skill_dir: Path, model: str = ""
+    sandbox: Sandbox,
+    skill_name: str,
+    skill_dir: Path,
+    model: str = "",
+    current_skill_md: Path | None = None,
 ) -> None:
     """Install skill into the sandbox so the /<skill> slash command works.
 
@@ -146,16 +159,23 @@ def _install_skill_in_sandbox(
       2. skill_dir/ → sandbox_home/.claude/skills/<skill_name>/
          Copy the entire skill folder so Claude CLI resolves /skill_name correctly.
          Claude Code reads skills from ~/.claude/skills/<name>/, not commands/.
+      3. If current_skill_md is provided, override SKILL.md inside the sandbox
+         with the working copy (teacher-updated version), leaving the original
+         skill_dir/SKILL.md untouched.
     """
     claude_dir = sandbox.home / ".claude"
     claude_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Force model in settings
+    # 1. Force model in settings + disable auto-compaction
+    # autoCompactEnabled=false prevents the CLI from making a second API call
+    # (defaulting to claude-sonnet) to summarize context when it grows large.
+    # Without this, auto-compaction silently routes through OpenRouter as sonnet.
+    settings: dict[str, object] = {"autoCompactEnabled": False}
     if model:
-        settings = {"model": model}
-        (claude_dir / "settings.json").write_text(
-            json.dumps(settings, indent=2), encoding="utf-8"
-        )
+        settings["model"] = model
+    (claude_dir / "settings.json").write_text(
+        json.dumps(settings, indent=2), encoding="utf-8"
+    )
 
     # 2. Copy entire skill folder → sandbox_home/.claude/skills/<skill_name>/
     if not skill_dir.is_dir():
@@ -165,6 +185,12 @@ def _install_skill_in_sandbox(
         return
     skills_dst = claude_dir / "skills" / skill_name
     shutil.copytree(skill_dir, skills_dst, dirs_exist_ok=True)
+
+    # 3. Override SKILL.md with working copy (teacher-rewritten version)
+    if current_skill_md and Path(current_skill_md).is_file():
+        shutil.copy2(current_skill_md, skills_dst / "SKILL.md")
+        _log.debug("overrode SKILL.md from working copy: %s", current_skill_md)
+
     _log.debug("installed /%s from %s → %s", skill_name, skill_dir, skills_dst)
 
 
@@ -179,6 +205,7 @@ def _run_once(
     config: RunConfigV2,
     logger: AgentLogger,
     attempt: int,
+    current_skill_md: Path | None = None,
 ) -> dict[str, Any]:
     start_ts = time.time()
     stop_reason = "unknown"
@@ -196,7 +223,13 @@ def _run_once(
             claude_binary=config.claude_binary,
         ) as sandbox:
             # Install skill as /<skill_name> slash command + copy scripts
-            _install_skill_in_sandbox(sandbox, skill_name, skill_dir, model=model)
+            _install_skill_in_sandbox(
+                sandbox,
+                skill_name,
+                skill_dir,
+                model=model,
+                current_skill_md=current_skill_md,
+            )
 
             # Copy input fixtures into sandbox cwd
             for f in config.input_files:
