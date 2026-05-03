@@ -86,6 +86,12 @@ def _load_config() -> dict:
     default=False,
     help="Resume from last completed batch in the results dir.",
 )
+@click.option(
+    "--no-rollback",
+    is_flag=True,
+    default=False,
+    help="Always keep new SKILL.md after Teacher rewrite, skipping validation.",
+)
 def main(
     skill,
     rounds,
@@ -103,6 +109,7 @@ def main(
     verbose,
     dry_run,
     resume,
+    no_rollback,
 ):
     """Run Skill Distillation v2 for one skill."""
     full_cfg = _load_config()
@@ -147,8 +154,8 @@ def main(
     # CLI flag --regenerate-rubric always wins; otherwise read from config (default: true)
     regenerate_rubric = regenerate_rubric or rubric_cfg.get("regenerate_each_run", True)
     keep_recent_rubrics = rubric_cfg.get("keep_recent", 5)
-    rollback_threshold = cfg.get("rollback_threshold", 0.05)
-    validation_tc_count = cfg.get("validation_tc_count", 3)
+    rollback_threshold = -999.0 if no_rollback else cfg.get("rollback_threshold", 0.05)
+    validation_tc_count = 0 if no_rollback else cfg.get("validation_tc_count", 3)
     max_retry_per_tc = cfg.get("max_retry_per_tc", 3)
     max_image_pages = cfg.get("max_image_pages", 10)
     watch_skill_hash = rubric_cfg.get("watch_skill_hash", False)

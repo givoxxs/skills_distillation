@@ -1,12 +1,13 @@
 """Student runner: execute one task via Claude Code CLI inside a Sandbox.
 
 Skill injection strategy:
-  - SKILL.md  → sandbox_home/.claude/commands/<skill>.md   (slash command /<skill>)
-  - scripts/  → sandbox_cwd/scripts/                        (accessible in working dir)
-  Prompt format: "/<skill_name> <user_task_prompt>"
+  - skills/<skill_name>/  → sandbox_home/.claude/skills/<skill_name>/
+    (toàn bộ folder skill được copy vào đây, Claude Code tự nhận diện)
+  Prompt format: "Use skill <skill_name> to: <user_task_prompt>"
 
 Key behaviors:
-  - Runs `claude --bare --model <model> -p "/<skill> <prompt>" ...` inside Sandbox.
+  - Runs `claude --bare --model <model> -p "Use skill <skill> to: <prompt>" ...`
+    inside Sandbox.
   - Retries up to max_retries on transient failures; skips TC after all attempts fail.
 """
 
@@ -141,8 +142,8 @@ def make_skip_result(
 
 
 def _build_prompt(skill_name: str, user_prompt: str) -> str:
-    """Build the slash-command prompt: /<skill> <task>."""
-    return f"/{skill_name} {user_prompt}"
+    """Build natural-language prompt that references the installed skill."""
+    return f"Use skill {skill_name} to: {user_prompt}"
 
 
 def _install_skill_in_sandbox(
@@ -152,25 +153,24 @@ def _install_skill_in_sandbox(
     model: str = "",
     current_skill_md: Path | None = None,
 ) -> None:
-    """Install skill into the sandbox so the /<skill> slash command works.
+    """Install skill into the sandbox.
 
-    Two things are set up:
+    Three things are set up:
       1. settings.json → sandbox_home/.claude/settings.json
          Forces the CLI to use the student model for ALL internal calls.
+         autoCompactEnabled=false prevents silent sonnet API calls on context growth.
       2. skill_dir/ → sandbox_home/.claude/skills/<skill_name>/
-         Copy the entire skill folder so Claude CLI resolves /skill_name correctly.
-         Claude Code reads skills from ~/.claude/skills/<name>/, not commands/.
-      3. If current_skill_md is provided, override SKILL.md inside the sandbox
-         with the working copy (teacher-updated version), leaving the original
-         skill_dir/SKILL.md untouched.
+         Copy the entire skill folder so Claude-native models can load it.
+      3. SKILL.md → sandbox.cwd/CLAUDE.md   ← KEY for non-Claude models
+         Claude Code CLI always injects CLAUDE.md from the project cwd into the
+         system prompt regardless of which underlying model is used. Without this,
+         models routed via OpenRouter (gemma, qwen, etc.) never receive the skill
+         instructions and respond with "I don't have a skill for that."
     """
     claude_dir = sandbox.home / ".claude"
     claude_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Force model in settings + disable auto-compaction
-    # autoCompactEnabled=false prevents the CLI from making a second API call
-    # (defaulting to claude-sonnet) to summarize context when it grows large.
-    # Without this, auto-compaction silently routes through OpenRouter as sonnet.
     settings: dict[str, object] = {"autoCompactEnabled": False}
     if model:
         settings["model"] = model
@@ -178,21 +178,30 @@ def _install_skill_in_sandbox(
         json.dumps(settings, indent=2), encoding="utf-8"
     )
 
-    # 2. Copy entire skill folder → sandbox_home/.claude/skills/<skill_name>/
     if not skill_dir.is_dir():
         _log.warning(
-            "skill_dir not found: %s — /%s will not work", skill_dir, skill_name
+            "skill_dir not found: %s — skill %s will be missing", skill_dir, skill_name
         )
         return
+
+    # Resolve which SKILL.md to use (teacher working copy takes priority)
+    effective_skill_md: Path
+    if current_skill_md and Path(current_skill_md).is_file():
+        effective_skill_md = Path(current_skill_md)
+        _log.debug("using teacher working copy: %s", effective_skill_md)
+    else:
+        effective_skill_md = skill_dir / "SKILL.md"
+
+    # 2. Copy entire skill folder → sandbox_home/.claude/skills/<skill_name>/
     skills_dst = claude_dir / "skills" / skill_name
     shutil.copytree(skill_dir, skills_dst, dirs_exist_ok=True)
+    if effective_skill_md != skill_dir / "SKILL.md":
+        shutil.copy2(effective_skill_md, skills_dst / "SKILL.md")
 
-    # 3. Override SKILL.md with working copy (teacher-rewritten version)
-    if current_skill_md and Path(current_skill_md).is_file():
-        shutil.copy2(current_skill_md, skills_dst / "SKILL.md")
-        _log.debug("overrode SKILL.md from working copy: %s", current_skill_md)
-
-    _log.debug("installed /%s from %s → %s", skill_name, skill_dir, skills_dst)
+    # 3. Write SKILL.md to cwd/CLAUDE.md so ALL models receive skill instructions
+    #    via Claude Code CLI's automatic project-context injection.
+    shutil.copy2(effective_skill_md, sandbox.cwd / "CLAUDE.md")
+    _log.debug("installed skill %s → %s + cwd/CLAUDE.md", skill_name, skills_dst)
 
 
 # ── Single attempt ────────────────────────────────────────────────────────────

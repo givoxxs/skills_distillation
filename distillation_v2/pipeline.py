@@ -150,9 +150,12 @@ def run_distillation(
     emit(f"V2 START  skill={skill}  student={student_model}  teacher={teacher_model}")
     emit(f"Rubric: {len(rubric['criteria'])} criteria")
     emit(f"TCs: {len(test_cases)}  batches/round={n_batches}  batch_size={eff_batch}")
-    emit(
-        f"Rollback threshold: {rollback_threshold}  validation_tcs: {validation_tc_count}"
-    )
+    if validation_tc_count == 0:
+        emit("Rollback: DISABLED (--no-rollback)")
+    else:
+        emit(
+            f"Rollback threshold: {rollback_threshold}  validation_tcs: {validation_tc_count}"
+        )
     emit("=" * 60)
 
     _save_skill_version(working_md, results_path, round_n=0)
@@ -252,38 +255,45 @@ def run_distillation(
                 )
 
                 # ── Validation + rollback ─────────────────────────────────────
-                val_tcs = choose_validation_tcs(
-                    test_cases, validation_tc_count, round_results=all_results
-                )
+                if validation_tc_count == 0:
+                    # --no-rollback: always keep new SKILL.md without validation
+                    emit("  [rollback] DISABLED — keeping new SKILL.md unconditionally")
+                    working_md.write_text(new_skill, encoding="utf-8")
+                else:
+                    val_tcs = choose_validation_tcs(
+                        test_cases, validation_tc_count, round_results=all_results
+                    )
 
-                def _val_batch(tcs: list[dict]) -> list[EvalResult]:
-                    results, _ = _run_batch(
-                        batch=tcs,
-                        skill=skill,
-                        student_model=student_model,
-                        judge=judge,
-                        results_path=results_path / "validation" / f"round_{round_n}",
-                        test_cases_dir=test_cases_dir,
-                        base_config=base_config,
-                        round_n=round_n,
-                        batch_idx=0,
-                        max_retry_per_tc=max_retry_per_tc,
-                        current_skill_md=working_md,
+                    def _val_batch(tcs: list[dict]) -> list[EvalResult]:
+                        results, _ = _run_batch(
+                            batch=tcs,
+                            skill=skill,
+                            student_model=student_model,
+                            judge=judge,
+                            results_path=results_path
+                            / "validation"
+                            / f"round_{round_n}",
+                            test_cases_dir=test_cases_dir,
+                            base_config=base_config,
+                            round_n=round_n,
+                            batch_idx=0,
+                            max_retry_per_tc=max_retry_per_tc,
+                            current_skill_md=working_md,
+                            emit=emit,
+                        )
+                        return results
+
+                    val_score = run_validation(
+                        skill_md_path=working_md,
+                        new_skill_content=new_skill,
+                        validation_tcs=val_tcs,
+                        run_batch_fn=_val_batch,
                         emit=emit,
                     )
-                    return results
-
-                val_score = run_validation(
-                    skill_md_path=working_md,
-                    new_skill_content=new_skill,
-                    validation_tcs=val_tcs,
-                    run_batch_fn=_val_batch,
-                    emit=emit,
-                )
-                keep = decide(val_score, round_avg, rollback_threshold, emit)
-                if keep:
-                    working_md.write_text(new_skill, encoding="utf-8")
-                # else: working_md unchanged (old content stays)
+                    keep = decide(val_score, round_avg, rollback_threshold, emit)
+                    if keep:
+                        working_md.write_text(new_skill, encoding="utf-8")
+                    # else: working_md unchanged (old content stays)
 
             except Exception as e:  # noqa: BLE001
                 emit(f"  Teacher FAILED: {e}. Skipping rewrite.")

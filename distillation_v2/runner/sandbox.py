@@ -90,7 +90,11 @@ class Sandbox:
         self._cwd.mkdir(parents=True, exist_ok=True)
 
         self._env = self._build_env()
-        self._claude_logout_best_effort()
+        # NOTE: _claude_logout_best_effort() intentionally removed.
+        # HOME is always a freshly created temp dir — there is no cached auth
+        # to clear. Calling `claude logout` on a fresh HOME caused Claude Code
+        # CLI v2.1+ to treat "logout" as a user prompt (no logout subcommand),
+        # triggering an accidental model call with the default sonnet model.
         _log.debug("Sandbox %s created at %s", self._name, self._dir)
         return self
 

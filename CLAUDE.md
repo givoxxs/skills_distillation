@@ -52,6 +52,11 @@ pre-commit run --all-files
 1. **Fixtures not injected**: Workflows B/C/D require input `.docx` fixtures but the orchestrator doesn't copy them into the workspace before calling `run_agent()`. See `agent-execution-rules.md` for the fix.
 2. **Missing fixture**: `tracked_deletion_review.docx` is needed for `tc_c08` but doesn't exist yet.
 
+## distillation_v2 Notes
+
+- **Skill installation**: SKILL.md must go to `.claude/commands/<skill>.md` (not `.claude/skills/<skill>/`) for `/skill` slash commands to work. Scripts go to `sandbox.cwd/scripts/`. Fixed in `stages/student.py:_install_skill_in_sandbox`.
+- **autoCompactEnabled**: Always inject `{"autoCompactEnabled": false}` in settings.json. Without it, Claude Code CLI auto-compacts context via OpenRouter routing to `claude-sonnet`, silently burning credits.
+
 ## Domain Rules
 
 See @.claude/rules/pipeline-rules.md for orchestration, batching, and round structure.

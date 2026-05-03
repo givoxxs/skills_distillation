@@ -64,31 +64,48 @@ Round N:
 
 ---
 
-## Skill injection (key design — đã fix)
+## Skill injection (key design — đã fix hoàn chỉnh)
 
-**Sai (cũ):** copy SKILL.md vào `.claude/commands/<skill>.md`
-**Đúng (hiện tại):** `shutil.copytree(skill_dir, ~/.claude/skills/<skill_name>/)` — copy cả folder
+**Sai ban đầu (v1):** copy SKILL.md vào `.claude/commands/<skill>.md`
+**Fix lần 1:** `shutil.copytree(skill_dir, ~/.claude/skills/<skill_name>/)` — copy cả folder
+**Fix lần 2 (session 2026-05-03):** ALSO write `effective_skill_md` → `sandbox.cwd/CLAUDE.md`
 
-Claude Code CLI đọc skills từ `~/.claude/skills/<name>/`, không phải `commands/`.
+**Lý do cần fix lần 2:**
+- `.claude/skills/` là feature riêng của Claude Code CLI cho Claude-native models
+- Khi routing qua OpenRouter (gemma, qwen), model KHÔNG nhận SKILL.md content từ path đó
+- Model trả lời: *"available tools do not include a skill to create Word documents"*
+- `cwd/CLAUDE.md` được inject vào system prompt cho **mọi model** bởi Claude Code CLI
 
 ```python
 # stages/student.py: _install_skill_in_sandbox()
+# 1. Copy skill folder → .claude/skills/
 skills_dst = claude_dir / "skills" / skill_name
 shutil.copytree(skill_dir, skills_dst, dirs_exist_ok=True)
+# 2. Write effective_skill_md → cwd/CLAUDE.md (universal injection)
+(sandbox.cwd / "CLAUDE.md").write_text(effective_skill_md)
 ```
+
+**Effective skill md priority:** `working_md` (teacher rewrite) > `skill_dir/SKILL.md` (original)
 
 **settings.json** inject để force model (tránh haiku/sonnet charges):
 ```json
-{"model": "<student_model>"}
+{"model": "<student_model>", "autoCompactEnabled": false}
 ```
-→ ghi vào `sandbox_home/.claude/settings.json`
+→ ghi vào `sandbox_home/.claude/settings.json` TRƯỚC khi gọi bất kỳ subprocess nào
 
 **Source skill:** `~/.claude/skills/` (default trong pipeline.py) — docx-js version.
 CLI flag `--skills-dir` override nếu cần.
 
 ---
 
-## Claude Code CLI flags dùng trong student
+## Prompt format (student)
+
+```python
+# stages/student.py: _build_prompt()
+f"Use skill {skill_name} to: {user_prompt}"
+```
+
+**Tiếng Anh** (đã đổi từ tiếng Việt session 2026-05-03). Không dùng `/docx` slash command.
 
 ```python
 ["claude", "--model", model, "-p", prompt, "--bare", "--verbose",
@@ -124,11 +141,18 @@ Sandbox.__enter__:
       PATH, HOME, TERM, LANG, ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL (if set)
       NODE_PATH = os.environ.get("NODE_PATH", "/usr/local/lib/node_modules")  ← hardcoded default
       NVM_DIR, NVM_BIN, SHELL (nếu có trong parent)
-  - Best-effort claude logout (timeout 10s)
+  - ⚠️ KHÔNG còn gọi _claude_logout_best_effort() — đã xóa (session 2026-05-03)
 
 list_outputs(): skip node_modules, .npm, __pycache__, .git, hidden dirs
 _copy_outputs(): chỉ copy extensions trong _OUTPUT_EXTENSIONS + skip _SKIP_NAMES
 ```
+
+**Lý do xóa `_claude_logout_best_effort()`:**
+- Claude Code CLI v2.1+ không có subcommand `logout`
+- `claude logout` bị treat như **user prompt** → gọi default model = `claude-sonnet-4-6`
+- Vào thời điểm `__enter__`, `settings.json` chưa được ghi (ghi trong `_install_skill_in_sandbox` sau)
+- → Không có model override → sonnet được gọi qua OpenRouter → **~$0.01/TC bị lãng phí**
+- Fresh HOME temp dir không có auth gì để clear → gọi logout là vô nghĩa
 
 `NODE_PATH=/usr/local/lib/node_modules` → `require('docx')` hoạt động không cần `npm install` per run. Package docx@9.6.1 đã cài globally.
 
@@ -189,16 +213,20 @@ Token cost: ~68K base tokens/run = ~62K CLI system prompt + 6.5K SKILL.md.
 
 ---
 
-## Test coverage (63 passing, 1 skipped)
+## Test coverage (23 unit + 1 integration)
 
 - `test_sandbox.py` (16): env isolation, cleanup, preflight, NODE_PATH
 - `test_stream_parser.py` (12): fixtures + edge cases
 - `test_rubric_gen.py` (11 + 1 live skipped): cache, parse, normalize
-- `test_student.py` (7): build_prompt, skill install, retry/skip logic
+- `test_student.py` (7): build_prompt, skill install (CLAUDE.md injection), retry/skip logic
 - `test_rollback.py` (11): top-N selection, decide logic
 - `test_converter.py` (1)
+- `test_integration_student.py` *(mới — session 2026-05-03)*: chạy real Claude Code CLI end-to-end
 
-Run: `conda run -n skills pytest distillation_v2/tests/ -v`
+**Integration test**: model resolve via `INTEGRATION_MODEL` env, `INTEGRATION_USE_ANTHROPIC=1`, default `google/gemma-4-26b-a4b-it`. Copies output + JSONL logs → `tests/integration_results/<ts>/`.
+
+Run unit tests: `conda run -n skills pytest distillation_v2/tests/ -v`
+Run integration: `pytest tests/test_integration_student.py -v -s` (cần API key)
 
 ---
 
@@ -217,3 +245,4 @@ CLI flag → config.yaml → hardcoded default
 1. **Scripts copy**: SKILL.md có `python scripts/office/validate.py` — scripts chưa được copy vào `sandbox.cwd/`. Hiện tại bỏ qua (validate không chạy được trong sandbox).
 2. **Gemma variance**: cùng SKILL.md, round 1→2 score dao động 0.66→0.42. Cần nhiều rounds hơn để đánh giá trend thực tế.
 3. **So sánh v1 vs v2** cho thesis writeup: chạy cùng test set, report chênh lệch score.
+4. **Run full pipeline verification**: Chạy `python run.py --skill docx --rounds 3 --test-cases 5` để confirm end-to-end không còn sonnet charges, iterations > 0 mọi TC.

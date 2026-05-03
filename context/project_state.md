@@ -202,7 +202,7 @@ Pipeline song song, KHÔNG xoá v1. Xem chi tiết: [distillation_v2.md](distill
 **Bugs đã fix trong v2 (sessions 04-05/2026):**
 - `--sandbox` flag không tồn tại trong claude CLI → đã xóa
 - Skill injection sai path (commands/ → đúng là `.claude/skills/<name>/`) → đã fix
-- `settings.json` inject để force model (tránh haiku/sonnet qua OpenRouter)
+- `settings.json` inject để force model + `autoCompactEnabled: false` (tránh haiku/sonnet)
 - Output filter: node_modules, .json lock files không copy sang output
 - `list_outputs()` skip node_modules, .npm, hidden dirs
 - `end_turn` + no output files → `runner_error: no_output_files` (retriable, Gemma hallucination fix)
@@ -211,14 +211,19 @@ Pipeline song song, KHÔNG xoá v1. Xem chi tiết: [distillation_v2.md](distill
 - Validation TCs: top-N by hybrid_score thay vì random
 - 80% length guard xóa khỏi pipeline.py (teacher prompt mới cho phép shorter)
 - Teacher system prompt rewrite: markdown rõ ràng, MUST/MUST NOT rules
+- **[2026-05-03]** Prompt tiếng Việt → tiếng Anh: `f"Use skill {name} to: {prompt}"`
+- **[2026-05-03]** Skill injection fix 2: write `effective_skill_md` → `cwd/CLAUDE.md` để inject vào system prompt cho mọi model (OpenRouter gemma/qwen không đọc `.claude/skills/`)
+- **[2026-05-03]** Xóa `_claude_logout_best_effort()` khỏi `Sandbox.__enter__()` — gây gọi sonnet ($0.01/TC), CLI v2.1+ không có subcommand logout
+- **[2026-05-03]** Integration test `tests/test_integration_student.py` — verified PASSED (iterations=3, list.docx produced)
 
-**Tests**: 63 pass, 1 skipped (live API). Run: `conda run -n skills pytest distillation_v2/tests/ -v`
+**Tests**: 23 unit pass + 1 integration pass. Run: `conda run -n skills pytest distillation_v2/tests/ -v`
 
 ## Cần làm tiếp
 
 1. ✅ Fixture `tracked_deletion_review.docx` đã tạo
 2. ✅ Kết quả 11_04 đã phân tích, bugs đã fix
 3. ✅ v2 refactor complete — bugs fixed, tests green
-4. Chạy v2 distillation thực tế (vài rounds) để verify end-to-end với docx-js SKILL.md
-5. **v2**: so sánh v1 vs v2 trên cùng test set cho thesis writeup
-6. **v2 pending**: copy `scripts/` vào `sandbox.cwd/scripts/` để `validate.py` chạy được
+4. ✅ Skill injection fix (CLAUDE.md) + sonnet charge fix (remove logout) — session 2026-05-03
+5. Chạy v2 distillation thực tế (full `--rounds 3 --test-cases 5`) để verify end-to-end
+6. **v2**: so sánh v1 vs v2 trên cùng test set cho thesis writeup
+7. **v2 pending**: copy `scripts/` vào `sandbox.cwd/scripts/` để `validate.py` chạy được
