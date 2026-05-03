@@ -92,6 +92,12 @@ def _load_config() -> dict:
     default=False,
     help="Always keep new SKILL.md after Teacher rewrite, skipping validation.",
 )
+@click.option(
+    "--stop-threshold",
+    type=float,
+    default=None,
+    help="Stop early when avg score >= this value (default from config).",
+)
 def main(
     skill,
     rounds,
@@ -110,6 +116,7 @@ def main(
     dry_run,
     resume,
     no_rollback,
+    stop_threshold,
 ):
     """Run Skill Distillation v2 for one skill."""
     full_cfg = _load_config()
@@ -195,7 +202,9 @@ def main(
         anthropic_key=os.getenv(env_cfg.get("anthropic_key", "ANTHROPIC_KEY")),
         max_rounds=rounds,
         batch_size=batch_size,
-        stop_threshold=cfg.get("stop_threshold", 0.7),
+        stop_threshold=stop_threshold
+        if stop_threshold is not None
+        else cfg.get("stop_threshold", 0.7),
         converge_delta=cfg.get("converge_delta", 0.02),
         converge_k=cfg.get("converge_k", 3),
         rollback_threshold=rollback_threshold,
