@@ -123,9 +123,6 @@ def make_skip_result(
         round_n=round_n,
         output_dir=output_dir,
     )
-    er._rule_weight = 0.0
-    er._llm_weight = 1.0
-    er._human_weight = 0.0
     er.llm_judge_score = 0.0
     er.checks.append(
         CheckResult(

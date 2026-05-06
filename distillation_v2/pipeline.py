@@ -246,11 +246,12 @@ def run_distillation(
 
             elapsed = time.time() - batch_start
             avg = (
-                sum(r.hybrid_score for r in batch_results) / len(batch_results)
+                sum(r.llm_judge_score for r in batch_results if r.llm_judge_score >= 0)
+                / len(batch_results)
                 if batch_results
                 else 0.0
             )
-            passed = sum(1 for r in batch_results if r.hybrid_score >= 0.6)
+            passed = sum(1 for r in batch_results if r.llm_judge_score >= 0.8)
             emit(
                 f"  [R{round_n}.B{batch_idx}] {passed}/{len(batch_results)} passed  avg={avg:.3f}  ({elapsed:.1f}s)"
             )
@@ -259,7 +260,8 @@ def run_distillation(
                 write_eval_detail({"round": round_n, "batch": batch_idx, **asdict(r)})
 
         round_avg = (
-            sum(r.hybrid_score for r in all_results) / len(all_results)
+            sum(r.llm_judge_score for r in all_results if r.llm_judge_score >= 0)
+            / len(all_results)
             if all_results
             else 0.0
         )
@@ -485,8 +487,9 @@ def _run_batch(
             er = make_skip_result(tc, skill, student_model, round_n, str(output_dir))
 
         results.append(er)
-        status = "PASS" if er.hybrid_score >= 0.6 else "FAIL"
-        emit(f"      [{status}] score={er.hybrid_score:.2f}")
+        score = er.llm_judge_score if er.llm_judge_score >= 0 else 0.0
+        status = "PASS" if score >= 0.8 else "FAIL"
+        emit(f"      [{status}] score={score:.2f}")
 
     return results, log_paths
 
@@ -497,9 +500,7 @@ def _run_batch(
 def _serialize_result(r: EvalResult) -> dict[str, Any]:
     return {
         "test_case_id": r.test_case_id,
-        "rule_score": r.rule_score,
         "llm_score": r.llm_judge_score if r.llm_judge_score >= 0 else None,
-        "hybrid_score": r.hybrid_score,
         "checks": [
             {"name": c.name, "passed": c.passed, "score": c.score, "reason": c.reason}
             for c in r.checks
@@ -512,7 +513,11 @@ def _save_batch_scores(
 ) -> None:
     p = results_path / f"round_{round_n}" / f"batch_{batch_idx}" / "scores.json"
     p.parent.mkdir(parents=True, exist_ok=True)
-    avg = sum(r.hybrid_score for r in results) / len(results) if results else 0.0
+    avg = (
+        sum(r.llm_judge_score for r in results if r.llm_judge_score >= 0) / len(results)
+        if results
+        else 0.0
+    )
     p.write_text(
         json.dumps(
             {
@@ -573,10 +578,6 @@ def _load_cached_batch(
                 results_path / f"round_{round_n}" / f"batch_{batch_idx}" / tc["id"]
             ),
         )
-        er._rule_weight = 0.0
-        er._llm_weight = 1.0
-        er._human_weight = 0.0
-        er.rule_score = entry.get("rule_score", 0.0)
         er.llm_judge_score = entry.get("llm_score") or 0.0
         results.append(er)
     return results

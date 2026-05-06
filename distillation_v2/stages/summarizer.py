@@ -33,19 +33,20 @@ def make_run_log(
     lines.append("")
 
     avg = (
-        sum(r.hybrid_score for r in batch_results) / len(batch_results)
+        sum(r.llm_judge_score for r in batch_results if r.llm_judge_score >= 0)
+        / len(batch_results)
         if batch_results
         else 0.0
     )
-    passed = sum(1 for r in batch_results if r.hybrid_score >= 0.6)
+    passed = sum(1 for r in batch_results if r.llm_judge_score >= 0.8)
     lines.append("## Batch Score Summary")
     lines.append(f"- Test cases: {len(batch_results)}")
-    lines.append(f"- Passed (≥0.6): {passed}/{len(batch_results)}")
+    lines.append(f"- Passed (≥0.8): {passed}/{len(batch_results)}")
     lines.append(f"- Average score: {avg:.3f}")
     if prev_round_results:
-        prev_avg = sum(r.hybrid_score for r in prev_round_results) / len(
-            prev_round_results
-        )
+        prev_avg = sum(
+            r.llm_judge_score for r in prev_round_results if r.llm_judge_score >= 0
+        ) / len(prev_round_results)
         sign = "+" if avg >= prev_avg else ""
         lines.append(f"- Delta from prev round avg: {sign}{avg - prev_avg:.3f}")
     lines.append("")
@@ -73,11 +74,12 @@ def make_run_log(
     # Per-TC detail
     lines.append("## Per Test-Case Results")
     for r in batch_results:
-        status = "PASS" if r.hybrid_score >= 0.6 else "FAIL"
+        score = r.llm_judge_score if r.llm_judge_score >= 0 else 0.0
+        status = "PASS" if score >= 0.8 else "FAIL"
         fails = ", ".join(c.name for c in r.failed_checks) or "none"
         snippet = _get_output_snippet(r.output_dir)
         lines.append(
-            f"- [{status}] `{r.test_case_id}` score={r.hybrid_score:.2f} failed=[{fails}]"
+            f"- [{status}] `{r.test_case_id}` score={score:.2f} failed=[{fails}]"
         )
         if snippet:
             lines.append(f"  output: {snippet}")

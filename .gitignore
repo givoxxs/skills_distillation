@@ -78,3 +78,8 @@ skillsbench/
 ui/node_modules/
 ui/dist/
 ui/.pnpm-store/
+# Added by code-review-graph
+.code-review-graph/
+
+# MCP tool caches (large generated files)
+.token-savior-cache.json

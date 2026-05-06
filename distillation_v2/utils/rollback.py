@@ -25,7 +25,7 @@ def choose_validation_tcs(
     Falls back to random selection when round_results is absent or insufficient.
     """
     if round_results:
-        score_by_id = {r.test_case_id: r.hybrid_score for r in round_results}
+        score_by_id = {r.test_case_id: r.llm_judge_score for r in round_results}
         ranked = sorted(
             all_tcs, key=lambda tc: score_by_id.get(tc["id"], 0.0), reverse=True
         )
@@ -54,7 +54,9 @@ def run_validation(
         if not results:
             emit("  [validation] no results — treating as 0.0")
             return 0.0
-        avg = sum(r.hybrid_score for r in results) / len(results)
+        avg = sum(r.llm_judge_score for r in results if r.llm_judge_score >= 0) / len(
+            results
+        )
         emit(f"  [validation] avg_score={avg:.3f}")
         return avg
     finally:

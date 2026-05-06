@@ -52,7 +52,7 @@ Respond ONLY with valid JSON (no markdown, no prose):
 
 Rules:
 - "overall" MUST equal the weight-averaged sum of criterion scores.
-- "verdict" is PASS if overall >= 0.6, else FAIL.
+- "verdict" is PASS if overall >= 0.8, else FAIL.
 - If no output exists, score all criteria 0.0."""
 
 
@@ -98,11 +98,6 @@ class Judge:
             round_n=round_n,
             output_dir=str(output_dir),
         )
-        result._rule_weight = 0.0
-        result._llm_weight = 1.0
-        result._human_weight = 0.0
-        result.rule_score = 0.0
-
         image_paths = self._get_images(Path(output_dir))
         content_blocks = self._build_content(test_case, image_paths)
 
@@ -141,7 +136,7 @@ class Judge:
                 continue
             c_score = float(statistics.median(v[0] for v in votes))
             reason = votes[-1][1]
-            passed = c_score >= float(c.get("pass_threshold", 0.6))
+            passed = c_score >= float(c.get("pass_threshold", 0.8))
             result.checks.append(
                 CheckResult(name=name, passed=passed, score=c_score, reason=reason)
             )
