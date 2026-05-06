@@ -15,10 +15,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-import anthropic
 
-from runner.anthropic_env import anthropic_env
 from utils import write_api_call
+from utils.llm_call import call_llm
 
 _log = logging.getLogger("distillation.v2.rubric_gen")
 
@@ -140,6 +139,7 @@ def generate_rubric(
     watch_skill_hash: bool = False,
     keep_recent: int = 5,
     anthropic_api_key: str | None = None,
+    base_url: str | None = None,
 ) -> dict[str, Any]:
     """Return rubric dict, generating + caching if needed.
 
@@ -180,9 +180,11 @@ def generate_rubric(
     _log.info("generating rubric via %s (%d test cases)...", model, len(test_cases))
     api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
     if not api_key:
-        raise RuntimeError("ANTHROPIC_KEY not set (rubric_gen requires it)")
+        raise RuntimeError(
+            "No API key set for rubric_gen (ANTHROPIC_KEY or OpenRouter key required)"
+        )
 
-    rubric = _call_api(skill_name, skill_content, test_cases, model, api_key)
+    rubric = _call_api(skill_name, skill_content, test_cases, model, api_key, base_url)
     rubric["cache_key"] = key
     rubric["skill_md_hash"] = _skill_md_hash(skill_dir)
     cache_file.write_text(json.dumps(rubric, indent=2, ensure_ascii=False))
@@ -200,6 +202,7 @@ def _call_api(
     test_cases: list[dict[str, Any]],
     model: str,
     api_key: str,
+    base_url: str | None = None,
 ) -> dict[str, Any]:
     tc_lines = []
     for tc in test_cases:
@@ -215,20 +218,14 @@ def _call_api(
         + f"\n\n---\n\nProduce the rubric JSON for {skill_name} now."
     )
 
-    with anthropic_env(api_key):
-        client = anthropic.Anthropic()
-        message = client.messages.create(
-            model=model,
-            max_tokens=MAX_TOKENS,
-            system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-
-    raw = message.content[0].text.strip()
-    usage = {
-        "prompt_tokens": message.usage.input_tokens,
-        "completion_tokens": message.usage.output_tokens,
-    }
+    raw, usage = call_llm(
+        system=_SYSTEM_PROMPT,
+        user=user_prompt,
+        model=model,
+        api_key=api_key,
+        max_tokens=MAX_TOKENS,
+        base_url=base_url,
+    )
     write_api_call(
         {
             "type": "rubric_gen",

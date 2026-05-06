@@ -11,10 +11,9 @@ import os
 import time
 from pathlib import Path
 
-import anthropic
 
-from runner.anthropic_env import anthropic_env
 from utils import write_api_call
+from utils.llm_call import call_llm
 
 _log = logging.getLogger("distillation.v2.teacher")
 
@@ -72,6 +71,7 @@ def rewrite(
     round_n: int = 0,
     dry_run: bool = False,
     anthropic_api_key: str | None = None,
+    base_url: str | None = None,
 ) -> str:
     """Rewrite SKILL.md using all batch run_logs from the current round.
 
@@ -98,7 +98,7 @@ def rewrite(
         raise RuntimeError("ANTHROPIC_KEY not set (teacher requires it)")
 
     user_prompt = _build_prompt(current_md, run_logs, round_n)
-    return _call_api(user_prompt, model, api_key, round_n, len(run_logs))
+    return _call_api(user_prompt, model, api_key, round_n, len(run_logs), base_url)
 
 
 def _build_prompt(current_md: str, run_logs: list[str], round_n: int) -> str:
@@ -123,6 +123,7 @@ def _call_api(
     api_key: str,
     round_n: int,
     n_logs: int,
+    base_url: str | None = None,
 ) -> str:
     delays = [3, 6, 15]
     last_exc: Exception | None = None
@@ -131,19 +132,18 @@ def _call_api(
     for attempt, delay in enumerate([0] + delays):
         if delay:
             _log.warning(
-                "Anthropic overloaded, retry in %ds (attempt %d)", delay, attempt + 1
+                "LLM overloaded, retry in %ds (attempt %d)", delay, attempt + 1
             )
             time.sleep(delay)
         try:
-            with anthropic_env(api_key):
-                client = anthropic.Anthropic()
-                message = client.messages.create(
-                    model=model,
-                    max_tokens=MAX_TOKENS,
-                    system=_SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": user_prompt}],
-                )
-            output = message.content[0].text.strip()
+            output, usage = call_llm(
+                system=_SYSTEM_PROMPT,
+                user=user_prompt,
+                model=model,
+                api_key=api_key,
+                max_tokens=MAX_TOKENS,
+                base_url=base_url,
+            )
             if not output:
                 raise RuntimeError("Teacher returned empty response")
             write_api_call(
@@ -152,29 +152,26 @@ def _call_api(
                     "model": model,
                     "round": round_n,
                     "n_run_logs": n_logs,
-                    "prompt_tokens": message.usage.input_tokens,
-                    "completion_tokens": message.usage.output_tokens,
+                    **usage,
                     "elapsed_s": round(time.time() - start, 2),
                 }
             )
             return output
-        except anthropic.APIStatusError as e:
-            if e.status_code == 529:
+        except Exception as e:  # noqa: BLE001
+            if hasattr(e, "status_code") and getattr(e, "status_code", None) == 529:
                 last_exc = e
                 continue
-            # Log non-529 errors (e.g. 500, 503) so they appear in the audit trail
             write_api_call(
                 {
                     "type": "teacher",
                     "model": model,
                     "round": round_n,
                     "error": str(e),
-                    "status_code": e.status_code,
                     "elapsed_s": round(time.time() - start, 2),
                 }
             )
             raise
 
     raise RuntimeError(
-        f"Anthropic API still overloaded after {len(delays)} retries"
+        f"LLM API still overloaded after {len(delays)} retries"
     ) from last_exc

@@ -98,6 +98,12 @@ def _load_config() -> dict:
     default=None,
     help="Stop early when avg score >= this value (default from config).",
 )
+@click.option(
+    "--no-llm-judge",
+    is_flag=True,
+    default=False,
+    help="Skip LLM Judge; score using rule-based checks only (no Anthropic API for scoring).",
+)
 def main(
     skill,
     rounds,
@@ -117,12 +123,13 @@ def main(
     resume,
     no_rollback,
     stop_threshold,
+    no_llm_judge,
 ):
     """Run Skill Distillation v2 for one skill."""
     full_cfg = _load_config()
     cfg = full_cfg.get("distillation", {})
     sandbox_cfg = full_cfg.get("sandbox", {})
-    env_cfg = full_cfg.get("env", {})
+
     rubric_cfg = full_cfg.get("rubric", {})
     student_cfg = full_cfg.get("student", {})
     logging_cfg = full_cfg.get("logging", {})
@@ -147,7 +154,7 @@ def main(
     _log.info(
         "v2  OPENROUTER_API_KEY=%s  ANTHROPIC_KEY=%s",
         "SET" if os.environ.get("OPENROUTER_API_KEY") else "MISSING",
-        "SET" if os.environ.get("ANTHROPIC_KEY") else "MISSING",
+        "SET" if os.environ.get("ANTHROPIC_KEY") else "MISSING (not required)",
     )
 
     # Resolve CLI > config > default
@@ -199,7 +206,8 @@ def main(
         student_model=student,
         teacher_model=teacher,
         judge_model=judge,
-        anthropic_key=os.getenv(env_cfg.get("anthropic_key", "ANTHROPIC_KEY")),
+        llm_api_key=os.getenv("OPENROUTER_API_KEY"),
+        llm_base_url=pipeline.OPENROUTER_BASE_URL,
         max_rounds=rounds,
         batch_size=batch_size,
         stop_threshold=stop_threshold
@@ -225,6 +233,7 @@ def main(
         verbose=verbose,
         dry_run=dry_run,
         resume=resume,
+        no_llm_judge=no_llm_judge,
     )
 
     click.echo("\n" + "=" * 60)

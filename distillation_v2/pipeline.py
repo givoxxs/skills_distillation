@@ -35,6 +35,13 @@ from utils.rollback import choose_validation_tcs, decide, run_validation
 
 _log = get_logger("v2.pipeline")
 
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
+def _or_model(model: str) -> str:
+    """Prefix model with 'anthropic/' for OpenRouter if not already namespaced."""
+    return model if "/" in model else f"anthropic/{model}"
+
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
@@ -46,6 +53,8 @@ def run_distillation(
     teacher_model: str = "claude-haiku-4-5",
     judge_model: str = "claude-haiku-4-5",
     anthropic_key: str | None = None,
+    llm_api_key: str | None = None,
+    llm_base_url: str | None = OPENROUTER_BASE_URL,
     max_rounds: int = 3,
     batch_size: int = 5,
     stop_threshold: float = 0.7,
@@ -69,10 +78,26 @@ def run_distillation(
     verbose: bool = False,
     dry_run: bool = False,
     resume: bool = False,
+    no_llm_judge: bool = False,
 ) -> dict[str, Any]:
-    anthropic_key = anthropic_key or os.getenv("ANTHROPIC_KEY")
-    if not anthropic_key:
-        raise RuntimeError("ANTHROPIC_KEY not set")
+    # Resolve LLM backend key: prefer explicit llm_api_key, then OPENROUTER_API_KEY,
+    # then fall back to legacy anthropic_key for backward compatibility.
+    resolved_llm_key = (
+        llm_api_key
+        or os.getenv("OPENROUTER_API_KEY")
+        or anthropic_key
+        or os.getenv("ANTHROPIC_KEY")
+    )
+    if not resolved_llm_key:
+        raise RuntimeError(
+            "No LLM API key found. Set OPENROUTER_API_KEY or ANTHROPIC_KEY."
+        )
+
+    # When routing through OpenRouter, auto-prefix model names with 'anthropic/'
+    resolved_base_url = llm_base_url
+    if resolved_base_url and "openrouter" in resolved_base_url:
+        teacher_model = _or_model(teacher_model)
+        judge_model = _or_model(judge_model)
 
     v2_root = Path(__file__).resolve().parent
     results_path = Path(results_dir) / skill
@@ -108,14 +133,16 @@ def run_distillation(
         regenerate=regenerate_rubric,
         watch_skill_hash=watch_skill_hash,
         keep_recent=keep_recent_rubrics,
-        anthropic_api_key=anthropic_key,
+        anthropic_api_key=resolved_llm_key,
+        base_url=resolved_base_url,
     )
     judge = Judge(
         rubric=rubric,
         model=judge_model,
         ensemble_n=ensemble_n,
         max_image_pages=max_image_pages,
-        anthropic_api_key=anthropic_key,
+        anthropic_api_key=resolved_llm_key,
+        base_url=resolved_base_url,
     )
 
     # ── Run config for student ────────────────────────────────────────────────
@@ -247,7 +274,8 @@ def run_distillation(
                     run_logs=run_logs,
                     model=teacher_model,
                     round_n=round_n,
-                    anthropic_api_key=anthropic_key,
+                    anthropic_api_key=resolved_llm_key,
+                    base_url=resolved_base_url,
                 )
 
                 emit(

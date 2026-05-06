@@ -18,12 +18,11 @@ import statistics
 from pathlib import Path
 from typing import Any
 
-import anthropic
 
 from evaluator.base import CheckResult, EvalResult
-from runner.anthropic_env import anthropic_env
 from utils import write_api_call
 from utils.converter import docx_to_images, find_docx
+from utils.llm_call import call_llm
 
 _log = logging.getLogger("distillation.v2.judge")
 
@@ -67,6 +66,7 @@ class Judge:
         ensemble_n: int = 1,
         max_image_pages: int = MAX_IMAGE_PAGES,
         anthropic_api_key: str | None = None,
+        base_url: str | None = None,
     ) -> None:
         if not isinstance(rubric, dict) or "criteria" not in rubric:
             raise ValueError("rubric must have a 'criteria' list")
@@ -75,8 +75,11 @@ class Judge:
         self.ensemble_n = max(1, int(ensemble_n))
         self.max_image_pages = max_image_pages
         self._api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
+        self._base_url = base_url
         if not self._api_key:
-            raise RuntimeError("ANTHROPIC_KEY not set (Judge requires it)")
+            raise RuntimeError(
+                "No API key set for Judge (ANTHROPIC_KEY or OpenRouter key required)"
+            )
 
     def score(
         self,
@@ -228,15 +231,14 @@ class Judge:
         ensemble_idx: int,
     ) -> dict[str, Any] | None:
         try:
-            with anthropic_env(self._api_key):
-                client = anthropic.Anthropic()
-                message = client.messages.create(
-                    model=self.model,
-                    max_tokens=2048,
-                    system=_SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": content_blocks}],
-                )
-            raw = message.content[0].text.strip()
+            raw, usage = call_llm(
+                system=_SYSTEM_PROMPT,
+                user=content_blocks,
+                model=self.model,
+                api_key=self._api_key,
+                max_tokens=2048,
+                base_url=self._base_url,
+            )
             parsed = _parse_response(raw)
             write_api_call(
                 {
@@ -246,8 +248,7 @@ class Judge:
                     "ensemble_idx": ensemble_idx,
                     "overall": parsed["overall"],
                     "has_images": any(b.get("type") == "image" for b in content_blocks),
-                    "prompt_tokens": message.usage.input_tokens,
-                    "completion_tokens": message.usage.output_tokens,
+                    **usage,
                 }
             )
             return parsed
