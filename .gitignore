@@ -48,8 +48,7 @@ logs/
 # .claude/
 .antigravity/
 .cursor/
-.claude/settings.json
-.claude/settings.local.json
+.claude/
 # .github/
 # .claude
 
@@ -83,3 +82,4 @@ ui/.pnpm-store/
 
 # MCP tool caches (large generated files)
 .token-savior-cache.json
+CLAUDE.md
