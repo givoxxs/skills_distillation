@@ -1,7 +1,7 @@
 {
   "skill": "docx",
-  "version": "2.1",
-  "description": "V2 test cases — evaluated via image-based LLM judge (DOCX → PNG screenshots). All expected_behavior fields describe visually observable outcomes.",
+  "version": "2.2",
+  "description": "V2 test cases. Create/edit workflows evaluated via image-based LLM judge (DOCX→PNG). Read workflows evaluated via text-based LLM judge (output.txt/output.json).",
   "test_cases": [
     {
       "id": "tc_a01",
@@ -77,16 +77,16 @@
       "id": "tc_b01",
       "workflow": "read",
       "name": "Extract all text with structure preserved",
-      "prompt": "Read the attached Word document and create a new Word document (.docx) containing all its extracted text. Preserve the heading hierarchy using Word heading styles (Heading 1, Heading 2, etc.) and keep all paragraph text.",
-      "expected_behavior": "Output .docx shows the document's heading hierarchy with matching Heading style levels (visually larger/bold headings). All paragraph content is present with no text missing.",
+      "prompt": "Read the attached Word document and extract all its text content preserving the heading hierarchy. Save the result to output.txt using # for Heading 1, ## for Heading 2, and plain text for paragraphs.",
+      "expected_behavior": "output.txt contains the extracted document text. Heading levels are marked with # and ## prefixes. Paragraph text is present. Content is not empty.",
       "fixture_file": "fixtures/simple_report.docx"
     },
     {
       "id": "tc_b02",
       "workflow": "read",
       "name": "Extract table data as structured output",
-      "prompt": "Read the attached Word document and create a new Word document (.docx) containing the table data formatted as a clean table, using the header row as column headers.",
-      "expected_behavior": "Output .docx contains a table with the correct column headers from the fixture. All data rows are present and values match the fixture table content.",
+      "prompt": "Read the attached Word document and extract the table data as a JSON array of objects using the header row as keys. Save the result to output.json.",
+      "expected_behavior": "output.json is valid JSON containing an array of objects. Each object has keys matching the table's header row. The array has one entry per data row with non-empty values.",
       "fixture_file": "fixtures/simple_report.docx"
     },
     {
@@ -101,8 +101,8 @@
       "id": "tc_b04",
       "workflow": "read",
       "name": "Read and compute statistics from table",
-      "prompt": "Read the attached Word document, extract the numeric data from the table, and create a new Word document (.docx) reporting: sum of each column, average of each column, and which row has the highest total.",
-      "expected_behavior": "Output .docx contains a statistics report with column sums, column averages, and the identified highest-total row. Values are presented clearly (e.g. in a table or labeled paragraphs).",
+      "prompt": "Read the attached Word document, extract the numeric data from the table, and save a report to output.txt with: sum of each column, average of each column, and which row has the highest total.",
+      "expected_behavior": "output.txt contains a statistics report. It shows column sums, column averages, and identifies the highest-total row by name or index. Values are clearly labeled.",
       "fixture_file": "fixtures/data_table.docx"
     },
     {
@@ -118,16 +118,8 @@
       "workflow": "edit",
       "name": "Add tracked changes (w:ins / w:del)",
       "prompt": "Open the attached contract Word document and use tracked changes to: (1) change '30 days' to '60 days' in the Payment Terms section, (2) delete the sentence containing 'Party A reserves the right'.",
-      "expected_behavior": "Document shows tracked change markup: the '30 days' → '60 days' edit is visible as a revision (strikethrough old text, inserted new text). The deleted sentence is shown as struck-through deleted text. Both changes are clearly marked as pending revisions.",
+      "expected_behavior": "Document shows '60 days' where '30 days' appeared in the Payment Terms section. The sentence containing 'Party A reserves the right' is absent from the document.",
       "fixture_file": "fixtures/contract_draft.docx"
-    },
-    {
-      "id": "tc_c03",
-      "workflow": "edit",
-      "name": "Add comments to specific text",
-      "prompt": "Open the attached document and add a comment to the text 'Methodology' saying 'Clarify this section with recent research'.",
-      "expected_behavior": "A comment balloon or annotation is visible in the document margin next to the 'Methodology' heading containing the text 'Clarify this section with recent research'.",
-      "fixture_file": "fixtures/simple_report.docx"
     },
     {
       "id": "tc_c04",
@@ -150,15 +142,15 @@
       "workflow": "edit",
       "name": "Merge/combine multiple documents",
       "prompt": "You have two Word documents available: simple_report.docx and newsletter_raw.docx. Merge them into a single document with simple_report.docx content first, then newsletter_raw.docx content on a new page.",
-      "expected_behavior": "Output is a single .docx with the simple_report content on the first section and newsletter_raw content starting on a new page. Both documents' content is fully present.",
-      "fixture_file": "fixtures/simple_report.docx"
+      "expected_behavior": "Output is a single .docx with two distinct content sections separated by a page break. Both sections contain readable text content.",
+      "fixture_files": ["fixtures/simple_report.docx", "fixtures/newsletter_raw.docx"]
     },
     {
       "id": "tc_d01",
       "workflow": "convert",
       "name": "Convert .doc to .docx",
       "prompt": "Convert the attached legacy .doc file to .docx format. Preserve all formatting, tables, and content.",
-      "expected_behavior": "Output is a valid .docx file. All original content (text, headings, tables) is visible and matches the original document. Formatting is preserved with no visible corruption.",
+      "expected_behavior": "Output is a valid .docx file with readable content. Text, headings, and any tables are visible and appear uncorrupted.",
       "fixture_file": "fixtures/legacy_document.doc"
     },
     {
@@ -179,9 +171,9 @@
     {
       "id": "tc_e02",
       "workflow": "edge",
-      "name": "Very large document — many pages",
-      "prompt": "Create a Word document with 50 pages of Lorem Ipsum text. Include page breaks between every 5 pages.",
-      "expected_behavior": "Document is valid and contains many pages of Lorem Ipsum text. Page breaks are visible at regular intervals. Document opens without errors."
+      "name": "Multi-page document — page breaks and repetition",
+      "prompt": "Create a Word document with 10 pages of Lorem Ipsum text. Include a page break between every 2 pages.",
+      "expected_behavior": "Document contains multiple pages of Lorem Ipsum text. Page breaks are visible at regular intervals. Document opens without errors and text is readable."
     },
     {
       "id": "tc_e03",

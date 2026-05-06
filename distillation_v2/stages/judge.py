@@ -99,7 +99,10 @@ class Judge:
             output_dir=str(output_dir),
         )
         image_paths = self._get_images(Path(output_dir))
-        content_blocks = self._build_content(test_case, image_paths)
+        text_output = (
+            self._get_text_output(Path(output_dir)) if not image_paths else None
+        )
+        content_blocks = self._build_content(test_case, image_paths, text_output)
 
         overalls: list[float] = []
         per_criterion: dict[str, list[tuple[float, str]]] = {
@@ -145,7 +148,7 @@ class Judge:
         result.llm_judge_reasoning = " | ".join(reason_parts)[:1000]
         return result
 
-    # ── Image handling ────────────────────────────────────────────────────────
+    # ── Image / text handling ─────────────────────────────────────────────────
 
     def _get_images(self, output_dir: Path) -> list[Path]:
         docx = find_docx(output_dir)
@@ -157,10 +160,23 @@ class Judge:
             _log.debug("judge: image conversion failed for %s", docx)
         return images
 
+    def _get_text_output(self, output_dir: Path) -> str | None:
+        """Return text content from .txt/.json/.md when no .docx exists."""
+        for ext in (".txt", ".json", ".md"):
+            for f in sorted(output_dir.glob(f"*{ext}")):
+                try:
+                    text = f.read_text(encoding="utf-8", errors="replace").strip()
+                    if text:
+                        return text[:8000]
+                except Exception:  # noqa: BLE001
+                    continue
+        return None
+
     def _build_content(
         self,
         test_case: dict[str, Any],
         image_paths: list[Path],
+        text_output: str | None = None,
     ) -> list[dict[str, Any]]:
         rubric_json = json.dumps(
             {
@@ -206,11 +222,18 @@ class Judge:
                     )
                 except Exception as e:  # noqa: BLE001
                     _log.warning("judge: failed to encode image %s: %s", img_path, e)
+        elif text_output is not None:
+            blocks.append(
+                {
+                    "type": "text",
+                    "text": f"## Agent Text Output\n\n{text_output}",
+                }
+            )
         else:
             blocks.append(
                 {
                     "type": "text",
-                    "text": "## Output Document\n\nNo output file was produced by the agent.",
+                    "text": "## Output\n\nNo output file was produced by the agent.",
                 }
             )
 

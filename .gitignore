@@ -83,3 +83,7 @@ ui/.pnpm-store/
 # MCP tool caches (large generated files)
 .token-savior-cache.json
 CLAUDE.md
+
+_bmad/
+_bmad-output/
+.agents/

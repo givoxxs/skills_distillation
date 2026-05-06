@@ -421,10 +421,13 @@ def _run_batch(
         emit(f"    [{tc_idx}/{len(batch)}] {tc['id']}  '{tc.get('name', '')}'")
         tc_start = time.time()
 
-        # Fixture handling
+        # Fixture handling — supports both fixture_file (str) and fixture_files (list)
         input_files: list[Path] = []
-        if tc.get("fixture_file"):
-            src = Path(test_cases_dir) / tc["fixture_file"]
+        raw = tc.get("fixture_files") or (
+            [tc["fixture_file"]] if tc.get("fixture_file") else []
+        )
+        for rel in raw:
+            src = Path(test_cases_dir) / rel
             if src.is_file():
                 input_files.append(src)
             else:
@@ -432,9 +435,8 @@ def _run_batch(
 
         user_prompt = tc.get("prompt", "")
         if input_files:
-            user_prompt = (
-                f"[File in your working dir: {input_files[0].name}]\n\n{user_prompt}"
-            )
+            names = ", ".join(f.name for f in input_files)
+            user_prompt = f"[Files in your working dir: {names}]\n\n{user_prompt}"
 
         config = RunConfigV2(
             openrouter_api_key=base_config.openrouter_api_key,
