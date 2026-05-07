@@ -123,27 +123,34 @@ def run_distillation(
     if not working_md.exists():
         shutil.copy2(skill_md_path, working_md)
 
-    # ── Rubric (once per pipeline run) ───────────────────────────────────────
-    rubric = generate_rubric(
-        skill_name=skill,
-        skill_dir=skill_dir,
-        test_cases=test_cases,
-        cache_dir=rubric_cache_dir,
-        model=judge_model,
-        regenerate=regenerate_rubric,
-        watch_skill_hash=watch_skill_hash,
-        keep_recent=keep_recent_rubrics,
-        anthropic_api_key=resolved_llm_key,
-        base_url=resolved_base_url,
-    )
-    judge = Judge(
-        rubric=rubric,
-        model=judge_model,
-        ensemble_n=ensemble_n,
-        max_image_pages=max_image_pages,
-        anthropic_api_key=resolved_llm_key,
-        base_url=resolved_base_url,
-    )
+    # ── Per-workflow rubrics (once per pipeline run) ──────────────────────────
+    workflows = sorted(set(tc.get("workflow", "create") for tc in test_cases))
+    judges: dict[str, Judge] = {}
+    rubric_keys: dict[str, str] = {}
+    for wf in workflows:
+        wf_tcs = [tc for tc in test_cases if tc.get("workflow", "create") == wf]
+        wf_rubric = generate_rubric(
+            skill_name=skill,
+            skill_dir=skill_dir,
+            test_cases=wf_tcs,
+            workflow=wf,
+            cache_dir=rubric_cache_dir,
+            model=judge_model,
+            regenerate=regenerate_rubric,
+            watch_skill_hash=watch_skill_hash,
+            keep_recent=keep_recent_rubrics,
+            anthropic_api_key=resolved_llm_key,
+            base_url=resolved_base_url,
+        )
+        judges[wf] = Judge(
+            rubric=wf_rubric,
+            model=judge_model,
+            ensemble_n=ensemble_n,
+            max_image_pages=max_image_pages,
+            anthropic_api_key=resolved_llm_key,
+            base_url=resolved_base_url,
+        )
+        rubric_keys[wf] = wf_rubric.get("cache_key", "")
 
     # ── Run config for student ────────────────────────────────────────────────
     base_config = RunConfigV2(
@@ -175,7 +182,8 @@ def run_distillation(
 
     emit("=" * 60)
     emit(f"V2 START  skill={skill}  student={student_model}  teacher={teacher_model}")
-    emit(f"Rubric: {len(rubric['criteria'])} criteria")
+    for wf, j in judges.items():
+        emit(f"Rubric [{wf}]: {len(j.rubric['criteria'])} criteria")
     emit(f"TCs: {len(test_cases)}  batches/round={n_batches}  batch_size={eff_batch}")
     if validation_tc_count == 0:
         emit("Rollback: DISABLED (--no-rollback)")
@@ -220,7 +228,7 @@ def run_distillation(
                 batch=batch,
                 skill=skill,
                 student_model=student_model,
-                judge=judge,
+                judges=judges,
                 results_path=results_path,
                 test_cases_dir=test_cases_dir,
                 base_config=base_config,
@@ -299,7 +307,7 @@ def run_distillation(
                             batch=tcs,
                             skill=skill,
                             student_model=student_model,
-                            judge=judge,
+                            judges=judges,
                             results_path=results_path
                             / "validation"
                             / f"round_{round_n}",
@@ -380,7 +388,7 @@ def run_distillation(
         "score_history": [
             {"round": h["round"], "avg_score": h["avg_score"]} for h in history
         ],
-        "rubric_cache_key": rubric.get("cache_key"),
+        "rubric_cache_keys": rubric_keys,
     }
     (results_path / "summary.json").write_text(json.dumps(summary, indent=2))
     try:
@@ -401,7 +409,7 @@ def _run_batch(
     batch: list[dict],
     skill: str,
     student_model: str,
-    judge: Judge,
+    judges: dict[str, Judge],
     results_path: Path,
     test_cases_dir: str,
     base_config: RunConfigV2,
@@ -476,8 +484,10 @@ def _run_batch(
             log_paths.append(run["log_file"])
 
         try:
+            wf = tc.get("workflow", "create")
+            tc_judge = judges.get(wf) or next(iter(judges.values()))
             tc_with_skill = {**tc, "skill": skill}
-            er = judge.score(
+            er = tc_judge.score(
                 output_dir=str(output_dir),
                 test_case=tc_with_skill,
                 model=student_model,

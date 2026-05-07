@@ -46,21 +46,21 @@ _SKIP_DIRS = {"__pycache__", ".git", "node_modules", ".npm"}
 _SYSTEM_PROMPT = """You design evaluation rubrics for AI agent skills executed \
 by small language models via Claude Code CLI.
 
-Given the full skill context (SKILL.md, helper scripts) and ALL test cases, \
-produce as many independent, objectively checkable criteria as needed to fully \
-cover the skill's requirements across all workflows (CREATE, READ, EDIT, CONVERT, EDGE). \
-Use your judgment — a simple skill may need 5 criteria, a complex one may need 15+.
+Given the full skill context (SKILL.md, helper scripts) and test cases for a \
+specific workflow, produce as many independent, objectively checkable criteria \
+as needed to fully cover that workflow's requirements. Use your judgment — \
+a simple workflow may need 3–5 criteria, a complex one may need 10+.
 
 Rules:
 1. Each criterion must be independently checkable by a judge LLM viewing the output or its screenshots.
-2. Cover every distinct failure mode visible across the test cases.
+2. Cover every distinct failure mode visible across the provided test cases.
 3. Weights must sum to exactly 1.0. Distribute weights proportionally to importance.
 4. pass_threshold is the per-criterion minimum (0.0-1.0) for "acceptable".
 5. MUST include at least one FILE VALIDITY criterion (file exists, non-empty, correct format).
 6. MUST include at least one TASK COMPLETION criterion (did it actually do what was asked?).
-7. MUST include criteria for each major workflow type that has test cases (create, read, edit, convert, edge).
-8. Write criterion descriptions in imperative form so a judge knows exactly what to check.
-9. Do NOT merge distinct requirements into one criterion — split them.
+7. Write criterion descriptions in imperative form so a judge knows exactly what to check.
+8. Do NOT merge distinct requirements into one criterion — split them.
+9. Do NOT include criteria for other workflow types — focus only on the given workflow.
 
 Output ONLY valid JSON, no prose, no markdown fence:
 {
@@ -98,10 +98,13 @@ def _read_skill_context(skill_dir: Path) -> str:
     return "\n---\n".join(parts)
 
 
-def _cache_key(skill_content: str, tc_ids: list[str]) -> str:
+def _cache_key(
+    skill_content: str, tc_ids: list[str], workflow: str | None = None
+) -> str:
     h1 = hashlib.sha256(skill_content.encode()).hexdigest()[:12]
     h2 = hashlib.sha256(",".join(sorted(tc_ids)).encode()).hexdigest()[:12]
-    return f"{h1}_{h2}"
+    base = f"{h1}_{h2}"
+    return f"{workflow}_{base}" if workflow else base
 
 
 def _skill_md_hash(skill_dir: Path) -> str:
@@ -109,12 +112,15 @@ def _skill_md_hash(skill_dir: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.is_file() else ""
 
 
-def _cleanup_old_rubrics(cache_dir: Path, skill_name: str, keep: int) -> None:
-    """Delete old rubric files for this skill, keeping the N most recent."""
+def _cleanup_old_rubrics(
+    cache_dir: Path, skill_name: str, workflow: str | None, keep: int
+) -> None:
+    """Delete old rubric files for this skill+workflow, keeping the N most recent."""
     if keep <= 0:
         return
+    prefix = f"{skill_name}_{workflow}_" if workflow else f"{skill_name}_"
     files = sorted(
-        cache_dir.glob(f"{skill_name}_*.json"),
+        cache_dir.glob(f"{prefix}*.json"),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
@@ -135,28 +141,36 @@ def generate_rubric(
     test_cases: list[dict[str, Any]],
     cache_dir: str | Path,
     model: str = DEFAULT_MODEL,
+    workflow: str | None = None,
     regenerate: bool = False,
     watch_skill_hash: bool = False,
     keep_recent: int = 5,
     anthropic_api_key: str | None = None,
     base_url: str | None = None,
 ) -> dict[str, Any]:
-    """Return rubric dict, generating + caching if needed.
+    """Return rubric dict for the given workflow, generating + caching if needed.
 
     Args:
+        workflow: Workflow type (create/read/edit/convert/edge). When provided,
+                  generates a focused rubric for that workflow only.
         watch_skill_hash: If True, regenerate when SKILL.md content has changed
                           since the cached rubric was produced (stored in cache).
-        keep_recent: Keep only the N most recent rubric files for this skill;
+        keep_recent: Keep only the N most recent rubric files for this skill+workflow;
                      older files are deleted after a new rubric is saved.
     """
     skill_dir = Path(skill_dir)
     skill_content = _read_skill_context(skill_dir)
     tc_ids = [tc.get("id", "") for tc in test_cases]
-    key = _cache_key(skill_content, tc_ids)
+    key = _cache_key(skill_content, tc_ids, workflow)
 
     cache_root = Path(cache_dir)
     cache_root.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_root / f"{skill_name}_{key}.json"
+    fname = (
+        f"{skill_name}_{workflow}_{key}.json"
+        if workflow
+        else f"{skill_name}_{key}.json"
+    )
+    cache_file = cache_root / fname
 
     # Determine if we must regenerate
     must_regen = regenerate
@@ -177,19 +191,25 @@ def generate_rubric(
         except json.JSONDecodeError:
             _log.warning("corrupt rubric cache, regenerating")
 
-    _log.info("generating rubric via %s (%d test cases)...", model, len(test_cases))
+    label = f"{skill_name}/{workflow}" if workflow else skill_name
+    _log.info(
+        "generating rubric via %s (%s, %d test cases)...", model, label, len(test_cases)
+    )
     api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
     if not api_key:
         raise RuntimeError(
             "No API key set for rubric_gen (ANTHROPIC_KEY or OpenRouter key required)"
         )
 
-    rubric = _call_api(skill_name, skill_content, test_cases, model, api_key, base_url)
+    rubric = _call_api(
+        skill_name, skill_content, test_cases, model, api_key, base_url, workflow
+    )
     rubric["cache_key"] = key
+    rubric["workflow"] = workflow
     rubric["skill_md_hash"] = _skill_md_hash(skill_dir)
     cache_file.write_text(json.dumps(rubric, indent=2, ensure_ascii=False))
-    _log.info("rubric saved: %d criteria", len(rubric.get("criteria", [])))
-    _cleanup_old_rubrics(cache_root, skill_name, keep=keep_recent)
+    _log.info("rubric saved [%s]: %d criteria", label, len(rubric.get("criteria", [])))
+    _cleanup_old_rubrics(cache_root, skill_name, workflow, keep=keep_recent)
     return rubric
 
 
@@ -203,6 +223,7 @@ def _call_api(
     model: str,
     api_key: str,
     base_url: str | None = None,
+    workflow: str | None = None,
 ) -> dict[str, Any]:
     tc_lines = []
     for tc in test_cases:
@@ -211,11 +232,19 @@ def _call_api(
         expected = (tc.get("expected_behavior") or "")[:200]
         tc_lines.append(f"**{tc_id}**\nPrompt: {prompt}\nExpected: {expected}")
 
+    workflow_line = (
+        f"Workflow: {workflow.upper()} (generate criteria for this workflow ONLY)\n\n"
+        if workflow
+        else ""
+    )
     user_prompt = (
-        f"Skill: {skill_name}\n\n## Skill Context\n\n{skill_content}\n\n"
-        f"---\n\n## All Test Cases ({len(test_cases)})\n\n"
+        f"Skill: {skill_name}\n\n{workflow_line}"
+        f"## Skill Context\n\n{skill_content}\n\n"
+        f"---\n\n## Test Cases ({len(test_cases)})\n\n"
         + "\n\n".join(tc_lines)
-        + f"\n\n---\n\nProduce the rubric JSON for {skill_name} now."
+        + f"\n\n---\n\nProduce the rubric JSON for {skill_name}"
+        + (f" [{workflow.upper()} workflow]" if workflow else "")
+        + " now."
     )
 
     raw, usage = call_llm(
@@ -231,6 +260,7 @@ def _call_api(
             "type": "rubric_gen",
             "model": model,
             "skill": skill_name,
+            "workflow": workflow,
             "n_test_cases": len(test_cases),
             **usage,
         }
