@@ -61,6 +61,7 @@ Rules:
 7. Write criterion descriptions in imperative form so a judge knows exactly what to check.
 8. Do NOT merge distinct requirements into one criterion — split them.
 9. Do NOT include criteria for other workflow types — focus only on the given workflow.
+10. CRITICAL: Every criterion MUST apply to ALL test cases in this workflow batch. Never create a criterion that only applies to one specific test case — if a requirement is TC-specific, express it as a general principle (e.g., "Output file exists in the format requested by the task" covers txt/json/docx/md outputs across all TCs).
 
 Output ONLY valid JSON, no prose, no markdown fence:
 {

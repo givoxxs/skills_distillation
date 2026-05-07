@@ -49,7 +49,8 @@ def _or_model(model: str) -> str:
 def run_distillation(
     skill: str,
     test_cases: list[dict[str, Any]],
-    student_model: str,
+    rubric_test_cases: list[dict[str, Any]] | None = None,
+    student_model: str = "google/gemma-4-26b-a4b-it",
     teacher_model: str = "claude-haiku-4-5",
     judge_model: str = "claude-haiku-4-5",
     anthropic_key: str | None = None,
@@ -124,11 +125,14 @@ def run_distillation(
         shutil.copy2(skill_md_path, working_md)
 
     # ── Per-workflow rubrics (once per pipeline run) ──────────────────────────
-    workflows = sorted(set(tc.get("workflow", "create") for tc in test_cases))
+    # Use rubric_test_cases (all TCs) for rubric generation when provided,
+    # so the rubric covers every workflow even if only a subset is being run.
+    _rubric_pool = rubric_test_cases if rubric_test_cases is not None else test_cases
+    workflows = sorted(set(tc.get("workflow", "create") for tc in _rubric_pool))
     judges: dict[str, Judge] = {}
     rubric_keys: dict[str, str] = {}
     for wf in workflows:
-        wf_tcs = [tc for tc in test_cases if tc.get("workflow", "create") == wf]
+        wf_tcs = [tc for tc in _rubric_pool if tc.get("workflow", "create") == wf]
         wf_rubric = generate_rubric(
             skill_name=skill,
             skill_dir=skill_dir,
@@ -442,6 +446,12 @@ def _run_batch(
                 emit(f"      WARNING: fixture missing: {src}")
 
         user_prompt = tc.get("prompt", "")
+        workflow = tc.get("workflow", "create")
+        if workflow == "read":
+            user_prompt = (
+                "[CRITICAL: You MUST save your output to a file on disk (e.g. output.txt, output.json). Do NOT just print to the terminal — the evaluator reads files only.]\n\n"
+                + user_prompt
+            )
         if input_files:
             names = ", ".join(f.name for f in input_files)
             user_prompt = f"[Files in your working dir: {names}]\n\n{user_prompt}"
@@ -492,6 +502,7 @@ def _run_batch(
                 test_case=tc_with_skill,
                 model=student_model,
                 round_n=round_n,
+                input_files=input_files if wf == "read" else None,
             )
         except Exception as e:  # noqa: BLE001
             _log.exception("judge.score() crashed for %s", tc["id"])

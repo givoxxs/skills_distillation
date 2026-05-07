@@ -104,6 +104,13 @@ def _load_config() -> dict:
     default=False,
     help="Skip LLM Judge; score using rule-based checks only (no Anthropic API for scoring).",
 )
+@click.option(
+    "--workflow",
+    default=None,
+    help="Comma-separated workflow letters to RUN (e.g. 'b,c,d,e'). "
+    "Rubric is still generated from all test cases. "
+    "Letters: a=create, b=read, c=edit, d=convert, e=edge.",
+)
 def main(
     skill,
     rounds,
@@ -124,6 +131,7 @@ def main(
     no_rollback,
     stop_threshold,
     no_llm_judge,
+    workflow,
 ):
     """Run Skill Distillation v2 for one skill."""
     full_cfg = _load_config()
@@ -191,8 +199,31 @@ def main(
         sys.exit(1)
     selected = all_cases[:test_cases] if test_cases else all_cases
 
+    # --workflow filter: restrict which TCs are RUN (rubric always uses all selected TCs)
+    _WORKFLOW_MAP = {
+        "a": "create",
+        "b": "read",
+        "c": "edit",
+        "d": "convert",
+        "e": "edge",
+    }
+    if workflow:
+        wf_names = {
+            _WORKFLOW_MAP.get(w.strip().lower(), w.strip().lower())
+            for w in workflow.split(",")
+        }
+        run_cases = [tc for tc in selected if tc.get("workflow", "create") in wf_names]
+        if not run_cases:
+            click.echo(
+                f"[ERROR] --workflow '{workflow}' matched 0 test cases", err=True
+            )
+            sys.exit(1)
+    else:
+        run_cases = selected
+
     click.echo(
         f"Loaded {len(selected)}/{len(all_cases)} test cases from {tc_path.name}"
+        + (f"  (running {len(run_cases)} after --workflow filter)" if workflow else "")
     )
     click.echo(
         f"Config: rounds={rounds}  batch={batch_size}  student={student}  "
@@ -202,7 +233,8 @@ def main(
 
     summary = pipeline.run_distillation(
         skill=skill,
-        test_cases=selected,
+        test_cases=run_cases,
+        rubric_test_cases=selected,
         student_model=student,
         teacher_model=teacher,
         judge_model=judge,

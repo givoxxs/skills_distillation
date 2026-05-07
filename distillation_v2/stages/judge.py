@@ -87,6 +87,7 @@ class Judge:
         test_case: dict[str, Any],
         model: str,
         round_n: int,
+        input_files: list[Path] | None = None,
     ) -> EvalResult:
         tc_id = test_case.get("id", "unknown")
         skill = test_case.get("skill", "unknown")
@@ -102,7 +103,9 @@ class Judge:
         text_output = (
             self._get_text_output(Path(output_dir)) if not image_paths else None
         )
-        content_blocks = self._build_content(test_case, image_paths, text_output)
+        content_blocks = self._build_content(
+            test_case, image_paths, text_output, input_files
+        )
 
         overalls: list[float] = []
         per_criterion: dict[str, list[tuple[float, str]]] = {
@@ -177,6 +180,7 @@ class Judge:
         test_case: dict[str, Any],
         image_paths: list[Path],
         text_output: str | None = None,
+        input_files: list[Path] | None = None,
     ) -> list[dict[str, Any]]:
         rubric_json = json.dumps(
             {
@@ -199,6 +203,36 @@ class Judge:
             f"Expected: {test_case.get('expected_behavior', '')[:300]}\n\n"
         )
         blocks: list[dict[str, Any]] = [{"type": "text", "text": intro}]
+
+        # Inject input fixture pages so judge can verify extraction correctness
+        if input_files:
+            for src in input_files:
+                if not src.is_file():
+                    continue
+                fixture_images = docx_to_images(src, max_pages=self.max_image_pages)
+                if fixture_images:
+                    blocks.append(
+                        {"type": "text", "text": f"## Input Document: {src.name}\n"}
+                    )
+                    for img_path in fixture_images:
+                        try:
+                            data = base64.standard_b64encode(
+                                img_path.read_bytes()
+                            ).decode()
+                            blocks.append(
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": "image/png",
+                                        "data": data,
+                                    },
+                                }
+                            )
+                        except Exception:  # noqa: BLE001
+                            _log.warning(
+                                "judge: failed to encode fixture image %s", img_path
+                            )
 
         if image_paths:
             blocks.append(
@@ -226,7 +260,7 @@ class Judge:
             blocks.append(
                 {
                     "type": "text",
-                    "text": f"## Agent Text Output\n\n{text_output}",
+                    "text": f"## Output File Content\n\n{text_output}",
                 }
             )
         else:

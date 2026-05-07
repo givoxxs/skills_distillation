@@ -127,7 +127,7 @@
       "name": "Change text formatting — bold, italic, underline",
       "prompt": "Open the attached document. Find all instances of the word 'important' and make them bold. Find all instances of 'Note:' and make them italic and underline.",
       "expected_behavior": "All occurrences of 'important' appear bold in the document. All occurrences of 'Note:' appear italic and underlined. No other text has been reformatted.",
-      "fixture_file": "fixtures/simple_report.docx"
+      "fixture_file": "fixtures/formatting_test.docx"
     },
     {
       "id": "tc_c05",
