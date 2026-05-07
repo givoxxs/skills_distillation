@@ -164,6 +164,8 @@ def _run_one(
 
         start_ts = time.time()
 
+        # For skill columns, explicitly point --add-dir at cwd so CLAUDE.md is
+        # loaded even under --bare (which skips auto-discovery).
         cmd = [
             "claude",
             "--model",
@@ -178,6 +180,8 @@ def _run_one(
             "--max-turns",
             str(CLAUDE_MAX_TURNS),
         ]
+        if skill_dir is not None:
+            cmd += ["--add-dir", str(sandbox.cwd)]
 
         proc = subprocess.Popen(
             cmd,
@@ -190,16 +194,31 @@ def _run_one(
         )
 
         state = ParserState()
-        stderr_chunks: list[str] = []
+        stderr_lines: list[str] = []
 
         def _drain_stderr() -> None:
+            """Stream stderr line-by-line so we don't miss output from crashes."""
             if proc.stderr:
-                data = proc.stderr.read()
-                if data:
-                    stderr_chunks.append(data)
+                for line in proc.stderr:
+                    line = line.strip()
+                    if line:
+                        stderr_lines.append(line)
 
         drainer = threading.Thread(target=_drain_stderr, daemon=True)
         drainer.start()
+
+        # Watchdog: kill process if it exceeds CLAUDE_TIMEOUT total seconds.
+        _killed_by_watchdog = threading.Event()
+
+        def _watchdog() -> None:
+            if not _killed_by_watchdog.wait(timeout=CLAUDE_TIMEOUT):
+                # Timeout expired — cancel was never called, so kill process.
+                if proc.poll() is None:
+                    proc.kill()
+                    _killed_by_watchdog.set()  # reuse as "was killed" flag
+
+        watchdog = threading.Thread(target=_watchdog, daemon=True)
+        watchdog.start()
 
         try:
             assert proc.stdout is not None
@@ -222,25 +241,23 @@ def _run_one(
                         stop_reason = event.data.get("stop_reason", stop_reason)
                         iterations = event.data.get("iterations", iterations)
                         tokens = event.data.get("tokens", tokens)
-
-            drainer.join(timeout=30)
-            proc.wait(timeout=CLAUDE_TIMEOUT)
-
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=10)
-            stop_reason = "timeout"
-            emit_line("[SYSTEM] Timeout reached — process killed")
         finally:
+            _killed_by_watchdog.set()  # signal watchdog to stop waiting
             if proc.poll() is None:
                 proc.kill()
-                proc.wait(timeout=5)
+            proc.wait(timeout=5)
+            drainer.join(timeout=10)
 
-        if proc.returncode not in (0, None) and stop_reason == "unknown":
-            stop_reason = f"cli_exit_{proc.returncode}"
-            stderr = stderr_chunks[0][:300] if stderr_chunks else ""
-            if stderr:
-                emit_line(f"[ERROR] {stderr}")
+        if _killed_by_watchdog.is_set() and stop_reason == "unknown":
+            stop_reason = "timeout"
+            emit_line(f"[SYSTEM] Timeout after {CLAUDE_TIMEOUT}s — process killed")
+
+        if proc.returncode not in (0, None):
+            if stop_reason == "unknown":
+                stop_reason = f"cli_exit_{proc.returncode}"
+            # Always surface stderr so the user sees API errors, auth failures, etc.
+            if stderr_lines:
+                emit_line(f"[STDERR] {' | '.join(stderr_lines[:5])[:400]}")
 
         # ── Copy output files out before sandbox is destroyed ─────────────────
         produced = sandbox.list_outputs(since_ts=start_ts)
