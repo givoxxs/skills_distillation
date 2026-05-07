@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Play,
@@ -66,123 +66,11 @@ const STUDENT_MODELS = [
   "mistral/mistral-7b"
 ];
 
-const SKILLS = ["docx", "xlsx", "pptx", "pdf", "frontend-design"];
+const DEFAULT_SKILLS = ["docx", "xlsx", "pptx", "pdf", "frontend-design"];
 
 const CEILING_MODELS = ["claude-haiku-4-5", "claude-sonnet-4-5"];
 
-// --- Mock Data ---
-
-const MOCK_RUNS: RunRecord[] = [
-  {
-    id: 'run-1',
-    model: STUDENT_MODELS[0],
-    badge: 'Baseline',
-    skill: 'docx',
-    status: 'fail',
-    score: 0.42,
-    stepsCount: 8,
-    duration: '3.1s',
-    trace: [
-      { type: 'assistant', content: "I need to list the files in the directory to find the document." },
-      { type: 'tool_call', toolName: 'bash', params: { command: 'ls' }, content: "Listing files..." },
-      { type: 'tool_result', content: "Found: report.txt, README.md", result: { files: ["report.txt", "README.md"] } },
-      { type: 'assistant', content: "The docx file is missing. I will try to create one." },
-      { type: 'tool_call', toolName: 'write_file', params: { path: 'test.docx', content: '...' }, content: "Creating file..." },
-      { type: 'tool_result', content: "Error: Permission denied", result: { error: "Permission denied" } },
-      { type: 'assistant', content: "I cannot proceed without file access." },
-      { type: 'end_turn', content: "Mission failed." }
-    ]
-  },
-  {
-    id: 'run-2',
-    model: STUDENT_MODELS[1],
-    badge: 'Default',
-    skill: 'docx',
-    status: 'pass',
-    score: 0.81,
-    stepsCount: 10,
-    duration: '5.2s',
-    trace: [
-      { type: 'assistant', content: "Initializing environment for docx processing." },
-      { type: 'tool_call', toolName: 'bash', params: { command: 'npm install mammoth' }, content: "Installing dependencies..." },
-      { type: 'tool_result', content: "mammoth@1.6.0 installed.", result: { status: "success" } },
-      { type: 'assistant', content: "Now I can read the docx file." },
-      { type: 'tool_call', toolName: 'read_file', params: { path: 'input.docx' }, content: "Reading file..." },
-      { type: 'tool_result', content: "[Binary Data Header: PK...]", result: { data: "..." } },
-      { type: 'assistant', content: "Processing content and generating summary." },
-      { type: 'tool_call', toolName: 'write_file', params: { path: 'summary.txt', content: '...' }, content: "Saving result..." },
-      { type: 'tool_result', content: "File saved.", result: { status: "ok" } },
-      { type: 'end_turn', content: "Processing complete." }
-    ]
-  },
-  {
-    id: 'run-3',
-    model: STUDENT_MODELS[2],
-    badge: 'Distilled',
-    skill: 'docx',
-    status: 'pass',
-    score: 0.94,
-    stepsCount: 12,
-    duration: '4.2s',
-    trace: [
-      { type: 'assistant', content: "Applying distilled heuristics for rapid docx extraction." },
-      { type: 'tool_call', toolName: 'bash', params: { command: 'ls -R' }, content: "Scanning directory tree..." },
-      { type: 'tool_result', content: "Found 2 docx files.", result: { files: ["a.docx", "b.docx"] } },
-      { type: 'assistant', content: "Batch processing documents." },
-      { type: 'tool_call', toolName: 'read_file', params: { path: 'a.docx' }, content: "Reading A..." },
-      { type: 'tool_result', content: "A content loaded.", result: { status: "ok" } },
-      { type: 'tool_call', toolName: 'read_file', params: { path: 'b.docx' }, content: "Reading B..." },
-      { type: 'tool_result', content: "B content loaded.", result: { status: "ok" } },
-      { type: 'assistant', content: "Concatenating data." },
-      { type: 'tool_call', toolName: 'write_file', params: { path: 'merged.docx', content: '...' }, content: "Merging products..." },
-      { type: 'tool_result', content: "Write successful.", result: { success: true } },
-      { type: 'end_turn', content: "Distillation successful." }
-    ]
-  },
-  {
-    id: 'run-4',
-    model: CEILING_MODELS[1],
-    badge: 'Ceiling',
-    skill: 'docx',
-    status: 'pass',
-    score: 0.98,
-    stepsCount: 9,
-    duration: '2.8s',
-    trace: [
-      { type: 'assistant', content: "High-compute mode active. Optimizing docx pipelines." },
-      { type: 'tool_call', toolName: 'bash', params: { command: 'npm install docx-templates' }, content: "Pre-fetching libraries..." },
-      { type: 'tool_result', content: "Ready.", result: { status: "ready" } },
-      { type: 'assistant', content: "Executing parallel read." },
-      { type: 'tool_call', toolName: 'read_file', params: { path: 'complex.docx' }, content: "Streaming input..." },
-      { type: 'tool_result', content: "Parsed 150 pages.", result: { pages: 150 } },
-      { type: 'assistant', content: "Formatting output." },
-      { type: 'tool_call', toolName: 'write_file', params: { path: 'final_report.pdf', content: '...' }, content: "Generating PDF..." },
-      { type: 'end_turn', content: "Finished successfully." }
-    ]
-  }
-];
-
 // ... existing code ...
-
-// --- Mock Data Helpers ---
-
-const MOCK_OUTPUTS = [
-  "[SYSTEM] Initializing agent context for skill distillation...",
-  "[AGENT] Received prompt. Analyzing instructions in SKILL.md...",
-  "[TOOL_CALL] search_files({ query: 'financial report' })",
-  "[TOOL_RESULT] Found 3 matching documents.",
-  "[AGENT] Reading first document content...",
-  "[TOOL_CALL] parse_docx({ path: '/docs/report1.docx' })",
-  "[TOOL_RESULT] Document parsed. Extracted 42 tables and 15 paragraphs.",
-  "[AGENT] Summarizing findings. Applying distilled heuristics...",
-  "[SYSTEM] Validation checks passed. Output generation complete."
-];
-
-const generateRandomStats = (): Stats => ({
-  score: parseFloat((Math.random() * (0.99 - 0.3) + 0.3).toFixed(2)),
-  tools: Math.floor(Math.random() * 8) + 2,
-  tokens: Math.floor(Math.random() * 650) + 150,
-});
 
 // --- Components ---
 
@@ -293,13 +181,15 @@ const TraceStep: React.FC<{ step: RunStep; initialExpanded: boolean }> = ({ step
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('live');
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(MOCK_RUNS[0].id);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [expandAll, setExpandAll] = useState(false);
 
   const [prompt, setPrompt] = useState("");
   const [studentModel, setStudentModel] = useState(STUDENT_MODELS[0]);
-  const [skill, setSkill] = useState(SKILLS[0]);
+  const [skill, setSkill] = useState(DEFAULT_SKILLS[0]);
   const [ceilingModel, setCeilingModel] = useState(CEILING_MODELS[1]);
+  const [skills, setSkills] = useState<string[]>(DEFAULT_SKILLS);
+  const [runs, setRuns] = useState<RunRecord[]>([]);
 
   const [columns, setColumns] = useState<Record<ColumnId, ColumnState>>({
     baseline: { enabled: true, status: 'idle', output: [], stats: { score: 0, tools: 0, tokens: 0 } },
@@ -308,6 +198,26 @@ export default function App() {
     ceiling: { enabled: true, status: 'idle', output: [], stats: { score: 0, tools: 0, tokens: 0 } },
   });
 
+  // Fetch skills from backend on mount
+  useEffect(() => {
+    fetch('/api/skills')
+      .then(r => r.json())
+      .then((data: string[]) => { if (data.length > 0) setSkills(data); })
+      .catch(() => {});
+  }, []);
+
+  // Fetch run history when trajectory tab is active
+  useEffect(() => {
+    if (activeTab !== 'trajectory') return;
+    fetch('/api/runs')
+      .then(r => r.json())
+      .then((data: RunRecord[]) => {
+        setRuns(data);
+        if (data.length > 0 && !selectedRunId) setSelectedRunId(data[0].id);
+      })
+      .catch(console.error);
+  }, [activeTab]);
+
   const toggleColumn = (id: ColumnId) => {
     setColumns(prev => ({
       ...prev,
@@ -315,37 +225,58 @@ export default function App() {
     }));
   };
 
-  const simulateColumnRun = async (id: ColumnId) => {
-    setColumns(prev => ({
-      ...prev,
-      [id]: { ...prev[id], status: 'running', output: [] }
-    }));
-
-    // Simulate streaming effect
-    for (let i = 0; i < MOCK_OUTPUTS.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 300 + 100));
-      setColumns(prev => ({
-        ...prev,
-        [id]: { ...prev[id], output: [...prev[id].output, MOCK_OUTPUTS[i]] }
-      }));
-    }
-
-    setColumns(prev => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        status: 'done',
-        stats: generateRandomStats()
-      }
-    }));
-  };
-
   const handleRun = useCallback(async () => {
     const activeIds = (Object.keys(columns) as ColumnId[]).filter(id => columns[id].enabled);
-    if (activeIds.length === 0) return;
+    if (activeIds.length === 0 || !prompt.trim()) return;
 
-    await Promise.all(activeIds.map(id => simulateColumnRun(id)));
-  }, [columns]);
+    // Reset active columns to running state
+    setColumns(prev => {
+      const next = { ...prev };
+      activeIds.forEach(id => {
+        next[id] = { ...next[id], status: 'running', output: [], stats: { score: 0, tools: 0, tokens: 0 } };
+      });
+      return next;
+    });
+
+    const ws = new WebSocket('/ws/run');
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ prompt, skill, studentModel, ceilingModel, columns: activeIds }));
+    };
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'line') {
+        setColumns(prev => ({
+          ...prev,
+          [msg.column]: {
+            ...prev[msg.column as ColumnId],
+            output: [...prev[msg.column as ColumnId].output, msg.data],
+          },
+        }));
+      } else if (msg.type === 'done') {
+        const d = msg.data;
+        setColumns(prev => ({
+          ...prev,
+          [msg.column]: {
+            ...prev[msg.column as ColumnId],
+            status: d.stop_reason === 'error' ? 'error' : 'done',
+            stats: { score: d.score, tools: d.tools, tokens: d.tokens },
+          },
+        }));
+      } else if (msg.type === 'all_done') {
+        ws.close();
+      } else if (msg.type === 'error') {
+        console.error('WS error:', msg.data);
+      }
+    };
+
+    ws.onerror = () => {
+      activeIds.forEach(id => {
+        setColumns(prev => ({ ...prev, [id]: { ...prev[id], status: 'error' } }));
+      });
+    };
+  }, [columns, prompt, skill, studentModel, ceilingModel]);
 
   const getScoreColor = (id: ColumnId, score: number) => {
     if (score === 0) return 'bg-gray-800';
@@ -444,7 +375,7 @@ export default function App() {
                   onChange={(e) => setSkill(e.target.value)}
                   className="w-full bg-[#0a0a0c] border border-border rounded px-2 py-2 text-xs appearance-none focus:outline-none focus:border-accent transition-colors cursor-pointer text-text-main"
                 >
-                  {SKILLS.map(s => <option key={s} value={s}>{s}</option>)}
+                  {skills.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-dim pointer-events-none" />
               </div>
@@ -636,7 +567,11 @@ export default function App() {
                 </h3>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                {MOCK_RUNS.map(run => (
+                {runs.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-text-dim opacity-30 text-[10px] font-mono italic">
+                    [NO_TRACES_FOUND]
+                  </div>
+                ) : runs.map(run => (
                   <button
                     key={run.id}
                     onClick={() => setSelectedRunId(run.id)}
@@ -685,7 +620,8 @@ export default function App() {
               <div className="absolute inset-0 scanline opacity-5 pointer-events-none" />
 
               {selectedRunId ? (() => {
-                const run = MOCK_RUNS.find(r => r.id === selectedRunId)!;
+                const run = runs.find(r => r.id === selectedRunId);
+                if (!run) return null;
                 return (
                   <>
                     <div className="p-4 border-b border-border bg-[#0a0a0c] flex items-center justify-between z-10">
