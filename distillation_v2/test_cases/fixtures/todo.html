@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Todo List</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 20px; background: #f9fafb; }
+    h1 { font-size: 1.6rem; margin-bottom: 20px; }
+    .add-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    #newItem { flex: 1; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; }
+    #addBtn { padding: 8px 18px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; }
+    #addBtn:hover { background: #1d4ed8; }
+    #todoList { list-style: none; padding: 0; margin: 0; }
+    #todoList li { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; }
+    #todoList li span { flex: 1; font-size: 1rem; }
+    .done-btn  { padding: 4px 10px; background: #16a34a; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    .delete-btn{ padding: 4px 10px; background: #dc2626; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    li.done span { text-decoration: line-through; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <h1>Todo List</h1>
+  <div class="add-row">
+    <input type="text" id="newItem" placeholder="Add new item...">
+    <button id="addBtn">Add</button>
+  </div>
+  <ul id="todoList"></ul>
+  <script>
+    document.getElementById('addBtn').addEventListener('click', addItem);
+    document.getElementById('newItem').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') addItem();
+    });
+
+    function addItem() {
+      const val = document.getElementById('newItem').value.trim();
+      if (!val) return;
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = val;
+      const doneBtn = document.createElement('button');
+      doneBtn.textContent = 'Done';
+      doneBtn.className = 'done-btn';
+      doneBtn.addEventListener('click', function() { li.classList.toggle('done'); });
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete';
+      delBtn.className = 'delete-btn';
+      delBtn.addEventListener('click', function() { li.remove(); });
+      li.appendChild(span);
+      li.appendChild(doneBtn);
+      li.appendChild(delBtn);
+      document.getElementById('todoList').appendChild(li);
+      document.getElementById('newItem').value = '';
+    }
+  </script>
+</body>
+</html>

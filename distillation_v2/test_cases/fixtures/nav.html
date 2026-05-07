@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sample Navigation Page</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f9fafb; }
+    nav { background: #1e293b; padding: 0 32px; display: flex; align-items: center; gap: 4px; height: 56px; }
+    nav a {
+      color: #cbd5e1; text-decoration: none; padding: 8px 16px; border-radius: 6px;
+      font-size: 0.95rem; transition: background 0.2s;
+    }
+    nav a:hover { background: #334155; color: #fff; }
+    nav a.active { background: #2563eb; color: #fff; }
+    .brand { color: #fff; font-weight: bold; font-size: 1.1rem; margin-right: 20px; }
+    main { max-width: 860px; margin: 0 auto; padding: 40px 20px; }
+    section { margin-bottom: 60px; scroll-margin-top: 70px; }
+    h2 { font-size: 1.8rem; margin-bottom: 12px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+    p { color: #4b5563; line-height: 1.7; margin-bottom: 12px; }
+    .tag { display: inline-block; background: #dbeafe; color: #1d4ed8; padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">MyApp</span>
+    <a href="#home"    class="active" id="link-home">Home</a>
+    <a href="#about"             id="link-about">About</a>
+    <a href="#services"          id="link-services">Services</a>
+    <a href="#contact"           id="link-contact">Contact</a>
+  </nav>
+  <main>
+    <section id="home">
+      <h2>Home</h2>
+      <p>Welcome to MyApp — a demonstration page for Playwright testing. This section is the landing area with general information about the application.</p>
+      <p>Use the navigation links above to explore each section of the page.</p>
+      <span class="tag">Featured</span><span class="tag">New</span>
+    </section>
+    <section id="about">
+      <h2>About</h2>
+      <p>MyApp was built to showcase multi-section navigation, smooth scrolling, and interactive Playwright test scenarios.</p>
+      <p>The team consists of engineers passionate about web quality assurance, automation, and developer tooling.</p>
+      <span class="tag">Team</span><span class="tag">Mission</span>
+    </section>
+    <section id="services">
+      <h2>Services</h2>
+      <p>We provide end-to-end testing solutions, UI automation frameworks, and browser testing infrastructure for modern web applications.</p>
+      <p>Our services cover unit testing, integration testing, visual regression, and accessibility audits.</p>
+      <span class="tag">Automation</span><span class="tag">Testing</span><span class="tag">QA</span>
+    </section>
+    <section id="contact">
+      <h2>Contact</h2>
+      <p>Reach out at <strong>hello@myapp.example</strong> or visit our office at 123 Web Street, Internet City.</p>
+      <p>Response time is typically within one business day.</p>
+      <span class="tag">Support</span>
+    </section>
+  </main>
+  <script>
+    // Highlight active nav link on click
+    document.querySelectorAll('nav a').forEach(function(link) {
+      link.addEventListener('click', function() {
+        document.querySelectorAll('nav a').forEach(function(l) { l.classList.remove('active'); });
+        this.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

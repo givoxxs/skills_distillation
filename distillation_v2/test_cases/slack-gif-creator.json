@@ -1,0 +1,217 @@
+{
+  "skill": "slack-gif-creator",
+  "version": "1.0",
+  "description": "Test cases for the slack-gif-creator skill. Create/compose/optimize/validate workflows evaluated via GIF frame inspection (LLM judge views sampled frames). Validate workflows additionally check stdout output.",
+  "test_cases": [
+    {
+      "id": "tc_a01",
+      "workflow": "create",
+      "name": "Bounce — ball falling with bounce_out easing",
+      "prompt": "Make me a Slack emoji GIF of a red ball bouncing up and down. Use smooth easing so it accelerates falling and decelerates near the top. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF (output.gif). A red circle moves vertically — it falls and slows toward the top, then falls again. Bounce easing is visible (not linear). Background is white or light. Animation loops."
+    },
+    {
+      "id": "tc_a02",
+      "workflow": "create",
+      "name": "Pulse — heartbeat scale animation",
+      "prompt": "Create a Slack emoji GIF of a red heart that pulses rhythmically like a heartbeat — it expands and contracts repeatedly. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A red shape (heart or circle) rhythmically grows and shrinks. The size oscillates visibly across frames. Animation loops continuously. Background is clean."
+    },
+    {
+      "id": "tc_a03",
+      "workflow": "create",
+      "name": "Spin — rotating star on dark gradient background",
+      "prompt": "Create a Slack emoji GIF of a yellow 5-pointed star rotating on a dark blue gradient background. Use draw_star from core.frame_composer and create_gradient_background. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A yellow 5-pointed star rotates continuously. Background is dark blue or a visible gradient. Animation loops smoothly. The rotation direction is consistent across frames."
+    },
+    {
+      "id": "tc_a04",
+      "workflow": "create",
+      "name": "Fade — text fading in and out on colored background",
+      "prompt": "Create a Slack emoji GIF where the word 'YES!' fades in then fades out repeatedly on a green background. Use RGBA alpha blending for the fade. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. 'YES!' text is visible at full opacity mid-animation, and invisible at the start/end of each cycle. Background is green. The fade transition is gradual, not a sudden cut."
+    },
+    {
+      "id": "tc_a05",
+      "workflow": "create",
+      "name": "Slide — shape sliding in with ease_out easing",
+      "prompt": "Make a Slack emoji GIF where a green circle slides in from the left edge of the frame and decelerates to rest at the center. Use interpolate() with easing='ease_out'. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A green circle enters from the left edge and smoothly slows down to stop at or near the center. The deceleration (ease_out) is visible — it moves fast at first and slow at the end."
+    },
+    {
+      "id": "tc_a06",
+      "workflow": "create",
+      "name": "Particle burst — explosion radiating outward",
+      "prompt": "Create a Slack emoji GIF of a colorful particle explosion: particles burst outward from the center in many directions and fade as they move to the edges. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. Multiple small colored dots/shapes radiate outward from the center of the frame. Particles spread toward the edges. The burst effect is clearly visible across frames. Background is dark."
+    },
+    {
+      "id": "tc_a07",
+      "workflow": "create",
+      "name": "Zoom — circle zooming in from tiny to full",
+      "prompt": "Create a Slack emoji GIF where a blue circle starts tiny at the center and zooms in to fill most of the frame. Make the zoom feel dramatic. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A blue circle starts very small and grows frame-by-frame until it fills most of the 128x128 area. The zoom is noticeably dramatic and the size change is large."
+    },
+    {
+      "id": "tc_a08",
+      "workflow": "create",
+      "name": "Loading spinner — rotating dots with trailing fade",
+      "prompt": "Make a Slack emoji GIF of a loading spinner: 8 dots arranged in a circle that appear to rotate, with trailing dots dimmer than the leading dot. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. Multiple small circles are arranged around a center point. They appear to rotate (like a classic loading indicator). Some dots are brighter and others dimmer, creating a tail/trail effect. Loops continuously."
+    },
+    {
+      "id": "tc_a09",
+      "workflow": "create",
+      "name": "Progress bar — horizontal fill on message-sized GIF",
+      "prompt": "Create a Slack message GIF (480x480, not emoji size) of a progress bar that fills from 0% to 100% left-to-right. Show a percentage number that updates as the bar fills. Save as output.gif.",
+      "expected_behavior": "Output is a 480x480 animated GIF. A horizontal bar starts empty and progressively fills to the right. A percentage number (0 to 100) is visible and increases as the bar fills. Animation ends at full/100%."
+    },
+    {
+      "id": "tc_a10",
+      "workflow": "create",
+      "name": "Color shift — background cycling through hues",
+      "prompt": "Create a Slack emoji GIF where the background smoothly cycles through blue → purple → pink → blue using create_gradient_background on each frame. No other objects needed. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. The background color visibly shifts across frames through blue, purple, and pink tones. The transition between colors is smooth (not a jump). No other shapes are required."
+    },
+    {
+      "id": "tc_a11",
+      "workflow": "create",
+      "name": "Combined — bouncing and spinning simultaneously",
+      "prompt": "Make a Slack emoji GIF of a gold coin (yellow circle) that both bounces vertically AND rotates as it bounces — both animations happen at the same time. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A yellow circle simultaneously moves up and down (bouncing) and shows a rotation effect (e.g. ellipse squashing to simulate perspective spin, or PIL rotate). Both motions are visible together."
+    },
+    {
+      "id": "tc_a12",
+      "workflow": "create",
+      "name": "Countdown — 3-2-1-GO! animated number sequence",
+      "prompt": "Create a Slack emoji GIF that shows a countdown: 3, then 2, then 1, then 'GO!'. Each number should pop in with a scale-up effect. Keep total duration under 3 seconds. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF lasting under 3 seconds. Numbers 3, 2, 1, and 'GO' appear in sequence, each with a pop/scale-in effect. Each number is clearly readable. The sequence plays through at least once."
+    },
+    {
+      "id": "tc_a13",
+      "workflow": "create",
+      "name": "Shake — vibrating alert icon oscillating side-to-side",
+      "prompt": "Create a Slack emoji GIF of a red circle (alert icon) that shakes rapidly from side to side using math.sin() oscillation. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A red circle rapidly oscillates left and right in a shaking/vibrating motion. The movement is fast and looks like a buzzing alert. Animation loops."
+    },
+    {
+      "id": "tc_a14",
+      "workflow": "create",
+      "name": "Snowfall — particles falling with varying speeds",
+      "prompt": "Create a Slack emoji GIF of snowflakes (small white circles or dots) falling from the top of the frame at different speeds and sizes. Background should be dark blue. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. Multiple small white or light-colored dots descend from the top of the frame. Particles move at different speeds. Background is dark blue or near-black. Scene looks like falling snow."
+    },
+    {
+      "id": "tc_a15",
+      "workflow": "create",
+      "name": "Elastic — spring overshoot then settle",
+      "prompt": "Create a Slack emoji GIF of a purple circle that drops from the top using elastic_out easing — it overshoots the center, bounces back, and settles. Use interpolate() with easing='elastic_out'. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A purple circle enters from above the frame. It passes the center (overshoot), bounces back beyond it, and oscillates several times before settling at rest. The elastic spring wobble is clearly visible."
+    },
+    {
+      "id": "tc_a16",
+      "workflow": "create",
+      "name": "Arc motion — ball following parabolic trajectory",
+      "prompt": "Create a Slack emoji GIF of an orange ball travelling in a parabolic arc from the bottom-left to the bottom-right, peaking in the upper center. Use calculate_arc_motion from core.easing. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. An orange circle follows a curved path — starting at lower-left, arcing upward through the top-center, and landing at lower-right. The curved path is visible and distinct from a straight diagonal line."
+    },
+    {
+      "id": "tc_b01",
+      "workflow": "validate",
+      "name": "Create then validate — emoji GIF passes Slack checks",
+      "prompt": "Create a simple 128x128 animated Slack emoji GIF (pulsing blue circle, 15fps, 12 frames). Then validate it using validate_gif from core.validators with is_emoji=True and verbose=True. Print the full validation report. Save the GIF as output.gif.",
+      "expected_behavior": "A 128x128 animated GIF (output.gif) is created and exists on disk. validate_gif is called and prints a report showing: dimensions (128x128), file size in KB, frame count, fps, duration. The 'passes' result is True. Report is printed to stdout."
+    },
+    {
+      "id": "tc_b02",
+      "workflow": "validate",
+      "name": "Create then validate — message GIF at 480x480",
+      "prompt": "Create a 480x480 Slack message GIF (rotating star, 20fps, 20 frames). Then validate it with validate_gif using is_emoji=False and verbose=True. Print results. Save as output.gif.",
+      "expected_behavior": "A 480x480 animated GIF (output.gif) is created. validate_gif is called with is_emoji=False. The printed report shows dimensions 480x480, frame count ~20, fps ~20, file size in KB. The validation output is visible in stdout."
+    },
+    {
+      "id": "tc_b03",
+      "workflow": "validate",
+      "name": "is_slack_ready — quick check and conditional print",
+      "prompt": "Create a simple 128x128 bouncing ball GIF (10 frames). Then use is_slack_ready() from core.validators to check it. If it returns True, print 'GIF is ready for Slack!', otherwise print 'GIF needs adjustment'. Save GIF as output.gif.",
+      "expected_behavior": "A 128x128 animated GIF (output.gif) is created. is_slack_ready() is called on it. Since dimensions are correct, it returns True. 'GIF is ready for Slack!' is printed to stdout. No crash or error occurs."
+    },
+    {
+      "id": "tc_c01",
+      "workflow": "optimize",
+      "name": "Optimize — compare file sizes with and without deduplication",
+      "prompt": "Create a 128x128 animated GIF of a slowly pulsing circle (30 frames, 15fps). Save it twice: once as original.gif (num_colors=128) and once as optimized.gif (num_colors=48, remove_duplicates=True). Print the file size of each in KB and state which is larger.",
+      "expected_behavior": "Two GIF files are created: original.gif and optimized.gif. Both are 128x128. File sizes in KB are printed for each. The optimized version (48 colors, duplicates removed) should be smaller. Output clearly names both files and their sizes."
+    },
+    {
+      "id": "tc_c02",
+      "workflow": "optimize",
+      "name": "Optimize — optimize_for_emoji auto-resizes a 480x480 GIF",
+      "prompt": "Create a 480x480 animated GIF of a spinning star (20 frames). Save it with optimize_for_emoji=True as emoji.gif. Print the final file info returned by builder.save().",
+      "expected_behavior": "The GIF is created at 480x480 internally. When saved with optimize_for_emoji=True, the builder prints a resize message and the final GIF is 128x128. The printed save() info dict shows dimensions 128x128 and num_colors ≤ 48."
+    },
+    {
+      "id": "tc_c03",
+      "workflow": "optimize",
+      "name": "Optimize — FPS tradeoff: 20fps vs 10fps file size comparison",
+      "prompt": "Create the same bouncing ball animation twice: fast.gif at 20fps (20 frames) and small.gif at 10fps (10 frames), both 128x128. Print both file sizes and state the percentage reduction.",
+      "expected_behavior": "Two animated GIFs are created and both are 128x128. File sizes in KB are printed for both fast.gif and small.gif. The 10fps version is smaller. A percentage reduction or comparison is printed to stdout."
+    },
+    {
+      "id": "tc_d01",
+      "workflow": "compose",
+      "name": "Compose — planet orbiting the sun",
+      "prompt": "Create a Slack emoji GIF of a small blue planet orbiting a larger yellow sun centered in the frame. The planet should complete one full circular orbit. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A large yellow circle sits at the center (sun). A smaller blue circle moves in a visible circular orbit around it. The orbital path is clearly circular. Animation loops one or more full orbits."
+    },
+    {
+      "id": "tc_d02",
+      "workflow": "compose",
+      "name": "Compose — clock face with rotating second hand",
+      "prompt": "Create a Slack emoji GIF of a clock face. Draw a circle for the clock, static hour and minute hands, and a red second hand that sweeps around the clock. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A circle (clock face) is drawn. A red line (second hand) rotates clockwise from center across frames. Static hour and minute hands are also drawn. The result looks like a ticking clock."
+    },
+    {
+      "id": "tc_d03",
+      "workflow": "compose",
+      "name": "Compose — star with orbiting sparkles",
+      "prompt": "Create a Slack emoji GIF of a central gold star with small sparkle dots that randomly appear and fade around it. Layer the sparkles on top of the star each frame. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A yellow/gold 5-pointed star is visible at the center. Small bright dots appear at varying random positions around the star and fade or blink across frames. The overall effect looks like a twinkling/sparkling star."
+    },
+    {
+      "id": "tc_d04",
+      "workflow": "compose",
+      "name": "Compose — back_out overshoot slide-in",
+      "prompt": "Create a Slack emoji GIF where a purple rectangle slides in from the right using back_out easing — it should visibly overshoot the center and then snap back to rest there. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A purple rectangle enters from the right. It moves past the center of the frame (overshoot is visible), then moves back to rest at center. The overshoot and snap-back motion is clearly visible and distinct from a simple ease_out."
+    },
+    {
+      "id": "tc_e01",
+      "workflow": "edge",
+      "name": "Edge — single frame GIF (no animation)",
+      "prompt": "Create a valid 128x128 GIF with exactly 1 frame: a smiley face (two eye circles and a curved mouth arc) on a yellow background. It doesn't need to animate. Save as output.gif.",
+      "expected_behavior": "Output is a valid 128x128 GIF file with 1 frame. A smiley face is drawn on a yellow background: two dark circles for eyes and an arc for a smile are all visible. File opens without errors despite being a single-frame GIF."
+    },
+    {
+      "id": "tc_e02",
+      "workflow": "edge",
+      "name": "Edge — high FPS at maximum 30fps",
+      "prompt": "Create a Slack emoji GIF of a spinning star at 30fps with exactly 30 frames (1 second). Initialize GIFBuilder with fps=30. After saving, print the fps and frame count from the returned info dict. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF with 30 frames. GIFBuilder is initialized with fps=30. The save() info dict is printed, showing fps=30 and frame_count=30 (or close to 30 after deduplication). Animation is smooth due to high frame rate."
+    },
+    {
+      "id": "tc_e03",
+      "workflow": "edge",
+      "name": "Edge — three effects simultaneously: bounce + fade + spin",
+      "prompt": "Create a Slack emoji GIF that applies three animation effects at the same time: a yellow star that bounces vertically, fades in-and-out using RGBA, AND rotates continuously — all simultaneously in each frame. Save as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. A star shape shows all three effects at once: position changes vertically (bounce), opacity changes across frames (fade), and the shape rotates. All three effects are visible simultaneously. The animation is visually complex."
+    },
+    {
+      "id": "tc_e04",
+      "workflow": "edge",
+      "name": "Edge — 3-frame blink at slow FPS",
+      "prompt": "Create a minimal Slack emoji GIF with exactly 3 frames at 2fps: frame 1 fills solid red, frame 2 fills solid white, frame 3 fills solid red again. This creates a slow blink. Save as output.gif.",
+      "expected_behavior": "Output is a valid 128x128 GIF with 3 frames. Frame 1 is solid red, frame 2 is solid white, frame 3 is solid red. At 2fps each frame is visible for ~0.5 seconds. The blink alternation between red and white is the only content. File loops."
+    }
+  ]
+}

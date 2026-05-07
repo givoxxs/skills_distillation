@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Registration Form</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f0f4f8; min-height: 100vh; padding: 40px 20px; }
+    .card { background: #fff; max-width: 480px; margin: 0 auto; padding: 36px; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+    h1 { margin: 0 0 24px; font-size: 1.5rem; }
+    label { display: block; margin-bottom: 4px; font-size: 0.9rem; color: #374151; font-weight: 500; }
+    input[type=text], input[type=email], select, textarea {
+      width: 100%; box-sizing: border-box; padding: 8px 12px;
+      border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; margin-bottom: 16px;
+    }
+    textarea { height: 80px; resize: vertical; }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .checkbox-row input { width: auto; margin: 0; }
+    button { width: 100%; padding: 10px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    #result { margin-top: 20px; padding: 14px; background: #d1fae5; border-radius: 6px; color: #065f46; font-size: 0.9rem; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Registration Form</h1>
+    <label for="name">Full Name</label>
+    <input type="text" id="name" placeholder="Jane Doe">
+
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="jane@example.com">
+
+    <label for="role">Role</label>
+    <select id="role">
+      <option value="">-- Select --</option>
+      <option value="admin">Admin</option>
+      <option value="user">User</option>
+      <option value="viewer">Viewer</option>
+    </select>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="agree">
+      <label for="agree" style="margin:0">I agree to the terms</label>
+    </div>
+
+    <label for="notes">Notes</label>
+    <textarea id="notes" placeholder="Optional notes..."></textarea>
+
+    <button type="button" id="submitBtn">Submit</button>
+    <div id="result"></div>
+  </div>
+  <script>
+    document.getElementById('submitBtn').addEventListener('click', function() {
+      const name  = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const role  = document.getElementById('role').value;
+      const agree = document.getElementById('agree').checked;
+      const notes = document.getElementById('notes').value.trim();
+      const result = document.getElementById('result');
+      result.style.display = 'block';
+      result.innerHTML =
+        '<strong>Submitted:</strong><br>' +
+        'Name: '  + (name  || '(empty)') + '<br>' +
+        'Email: ' + (email || '(empty)') + '<br>' +
+        'Role: '  + (role  || '(none selected)') + '<br>' +
+        'Agreed: ' + (agree ? 'Yes' : 'No') + '<br>' +
+        'Notes: ' + (notes || '(none)');
+    });
+  </script>
+</body>
+</html>

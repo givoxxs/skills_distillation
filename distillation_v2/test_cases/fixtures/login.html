@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <style>
+    body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f4f8; margin: 0; }
+    .card { background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); width: 320px; }
+    h1 { margin: 0 0 24px; font-size: 1.5rem; text-align: center; }
+    label { display: block; margin-bottom: 4px; font-size: 0.9rem; color: #374151; }
+    input { width: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; margin-bottom: 16px; }
+    button { width: 100%; padding: 10px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    #status { margin-top: 16px; padding: 10px; border-radius: 6px; font-size: 0.9rem; text-align: center; min-height: 20px; }
+    .success { background: #d1fae5; color: #065f46; }
+    .error   { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Login</h1>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="you@example.com">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="••••••••">
+      <button type="submit" id="loginBtn">Login</button>
+    </form>
+    <p id="status"></p>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const status = document.getElementById('status');
+      if (!email) {
+        status.textContent = 'Email required';
+        status.className = 'error';
+      } else {
+        status.textContent = 'Welcome, ' + email;
+        status.className = 'success';
+      }
+    });
+  </script>
+</body>
+</html>
