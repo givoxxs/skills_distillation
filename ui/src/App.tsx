@@ -57,6 +57,7 @@ interface RunRecord {
   stepsCount: number;
   duration: string;
   trace: RunStep[];
+  outputFiles?: string[];
 }
 
 const STUDENT_MODELS = [
@@ -172,6 +173,91 @@ const TraceStep: React.FC<{ step: RunStep; initialExpanded: boolean }> = ({ step
 
           {step.type === 'end_turn' && (
             <p className="text-[12px] font-bold text-emerald-500">{step.content}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- File Preview Component ---
+
+const TEXT_EXTS = new Set(['txt', 'md', 'json', 'csv', 'html', 'htm', 'xml', 'yaml', 'yml', 'log', 'py', 'js', 'ts', 'sh']);
+const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp']);
+
+const FilePreview: React.FC<{ runId: string; name: string }> = ({ runId, name }) => {
+  const [open, setOpen] = React.useState(false);
+  const [content, setContent] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  const isText = TEXT_EXTS.has(ext);
+  const isImage = IMAGE_EXTS.has(ext);
+  const canPreview = isText || isImage;
+  const url = `/api/runs/${runId}/files/${encodeURIComponent(name)}`;
+
+  const toggle = async () => {
+    if (!canPreview) return;
+    if (!open) {
+      if (isText && content === null) {
+        setLoading(true);
+        try {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          setContent(await r.text());
+        } catch (e: any) {
+          setError(e.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+      setOpen(true);
+    } else {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="border border-border rounded overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-bg-dark hover:bg-white/5 transition-colors">
+        <button
+          onClick={toggle}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left group"
+        >
+          <span className="text-base leading-none">{isImage ? '🖼️' : isText ? '📄' : '📦'}</span>
+          <span className="text-[12px] font-mono text-text-main group-hover:text-accent transition-colors truncate">
+            {name}
+          </span>
+          {canPreview && (
+            <ChevronDown className={`w-3 h-3 text-text-dim shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+          )}
+        </button>
+        <a
+          href={url}
+          download={name}
+          className="ml-3 shrink-0 text-[10px] text-text-dim hover:text-accent transition-colors px-2 py-0.5 border border-border hover:border-accent/50 rounded"
+          onClick={e => e.stopPropagation()}
+        >
+          ↓
+        </a>
+      </div>
+
+      {open && canPreview && (
+        <div className="border-t border-border bg-black/40">
+          {loading && (
+            <p className="text-[11px] text-text-dim p-3 animate-pulse">Loading…</p>
+          )}
+          {error && (
+            <p className="text-[11px] text-red-400 p-3">Error: {error}</p>
+          )}
+          {isImage && (
+            <img src={url} alt={name} className="max-w-full max-h-96 object-contain mx-auto p-2" />
+          )}
+          {isText && content !== null && (
+            <pre className="text-[11px] font-mono text-text-main/80 p-3 overflow-x-auto whitespace-pre-wrap max-h-96 overflow-y-auto custom-scrollbar">
+              {content}
+            </pre>
           )}
         </div>
       )}
@@ -652,6 +738,20 @@ export default function App() {
                         {run.trace.map((step, idx) => (
                           <TraceStep key={idx} step={step} initialExpanded={expandAll} />
                         ))}
+
+                        {/* Output files */}
+                        {run.outputFiles && run.outputFiles.length > 0 && (
+                          <div className="mt-6 border border-accent/20 rounded bg-accent/5 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-accent mb-3">
+                              📁 Output Files ({run.outputFiles.length})
+                            </p>
+                            <div className="space-y-1.5">
+                              {run.outputFiles.map(name => (
+                                <FilePreview key={name} runId={run.id} name={name} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </>

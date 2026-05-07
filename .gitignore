@@ -87,3 +87,5 @@ CLAUDE.md
 _bmad/
 _bmad-output/
 .agents/
+
+ui/backend/outputs

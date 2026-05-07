@@ -27,6 +27,7 @@ from runner.stream_parser import Event, ParserState, parse_line  # noqa: E402
 
 ANTHROPIC_SKILLS_DIR = _REPO_ROOT / "anthropic_skills" / "skills"
 LOGS_DIR = Path(__file__).parent / "logs"
+OUTPUTS_DIR = Path(__file__).parent / "outputs"
 
 BADGE_MAP: dict[str, str] = {
     "baseline": "Baseline",
@@ -66,16 +67,19 @@ def run_column(
         skill_dir: Path | None = ANTHROPIC_SKILLS_DIR / skill_name
         api_key = os.getenv("ANTHROPIC_KEY", "")
         base_url = None
+        prompt = f"Use skill {skill_name} to: {user_prompt}"
     elif column_id == "baseline":
         model = student_model
-        skill_dir = None
+        skill_dir = None  # no skill at all
         api_key = os.getenv("OPENROUTER_API_KEY", "")
         base_url = "https://openrouter.ai/api"
+        prompt = user_prompt  # raw prompt, nothing added
     else:  # "default" or "distilled"
         model = student_model
         skill_dir = ANTHROPIC_SKILLS_DIR / skill_name
         api_key = os.getenv("OPENROUTER_API_KEY", "")
         base_url = "https://openrouter.ai/api"
+        prompt = f"Use skill {skill_name} to: {user_prompt}"
 
     badge = BADGE_MAP.get(column_id, column_id.title())
     emit_line(f"[SYSTEM] Initializing {badge} | model: {model}")
@@ -83,7 +87,7 @@ def run_column(
     try:
         result = _run_one(
             column_id=column_id,
-            user_prompt=user_prompt,
+            prompt=prompt,
             skill_name=skill_name,
             skill_dir=skill_dir,
             model=model,
@@ -102,6 +106,7 @@ def run_column(
                     "score": score,
                     "tools": result.get("iterations", 0),
                     "tokens": result.get("token_usage", {}).get("completion", 0),
+                    "output_files": result.get("output_files", []),
                 },
             }
         )
@@ -121,29 +126,33 @@ def run_column(
 
 def _run_one(
     column_id: str,
-    user_prompt: str,
-    skill_name: str,
+    prompt: str,  # final prompt passed to claude — caller decides content
+    skill_name: str,  # for log filename only
     skill_dir: Path | None,
     model: str,
     api_key: str,
     base_url: str | None,
     emit_line,
 ) -> dict[str, Any]:
-    """Run Claude Code CLI in a sandbox; emit terminal lines; write JSONL log."""
+    """Run Claude Code CLI in a sandbox; emit terminal lines; write JSONL log.
 
-    full_prompt = (
-        f"Use skill {skill_name} to: {user_prompt}" if skill_dir else user_prompt
-    )
+    `prompt` is passed verbatim to `claude -p`.  For baseline (no skill) the
+    caller must pass the raw user prompt; for skill columns the caller should
+    already have constructed the skill-aware prompt.  This function never
+    injects skill context by itself.
+    """
 
     LOGS_DIR.mkdir(exist_ok=True)
     ts = time.strftime("%Y%m%dT%H%M%S")
     safe_model = model.replace("/", "_").replace(":", "_")
-    log_path = LOGS_DIR / f"{column_id}__{skill_name}__{safe_model}__{ts}.jsonl"
+    log_stem = f"{column_id}__{skill_name}__{safe_model}__{ts}"
+    log_path = LOGS_DIR / f"{log_stem}.jsonl"
 
     stop_reason = "unknown"
     iterations = 0
     tokens: dict[str, int] = {"prompt": 0, "completion": 0}
     log_records: list[dict] = []
+    output_files: list[str] = []
 
     with Sandbox(
         name=f"ui-{column_id}",
@@ -153,12 +162,14 @@ def _run_one(
     ) as sandbox:
         _setup_sandbox(sandbox, skill_name, skill_dir, model)
 
+        start_ts = time.time()
+
         cmd = [
             "claude",
             "--model",
             model,
             "-p",
-            full_prompt,
+            prompt,
             "--bare",
             "--verbose",
             "--output-format",
@@ -231,12 +242,35 @@ def _run_one(
             if stderr:
                 emit_line(f"[ERROR] {stderr}")
 
+        # ── Copy output files out before sandbox is destroyed ─────────────────
+        produced = sandbox.list_outputs(since_ts=start_ts)
+        if produced:
+            out_dir = OUTPUTS_DIR / log_stem
+            out_dir.mkdir(parents=True, exist_ok=True)
+            for src in produced:
+                dst = out_dir / src.name
+                shutil.copy2(src, dst)
+                output_files.append(src.name)
+                emit_line(f"[OUTPUT] {src.name} ({src.stat().st_size} bytes)")
+            log_records.append(
+                {
+                    "event": "output_files",
+                    "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "files": output_files,
+                }
+            )
+
     # Write JSONL log
     with open(log_path, "w", encoding="utf-8") as lf:
         for rec in log_records:
             lf.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
-    return {"stop_reason": stop_reason, "iterations": iterations, "token_usage": tokens}
+    return {
+        "stop_reason": stop_reason,
+        "iterations": iterations,
+        "token_usage": tokens,
+        "output_files": output_files,
+    }
 
 
 def _setup_sandbox(
@@ -245,10 +279,16 @@ def _setup_sandbox(
     skill_dir: Path | None,
     model: str,
 ) -> None:
-    """Install skill into sandbox, or just write settings.json for baseline."""
+    """Write settings.json, then install skill if skill_dir is provided."""
+    _write_settings(sandbox, model)
+    if skill_dir and skill_dir.is_dir():
+        _install_skill(sandbox, skill_name, skill_dir)
+
+
+def _write_settings(sandbox: Sandbox, model: str) -> None:
+    """Write ~/.claude/settings.json — the only thing baseline gets."""
     claude_dir = sandbox.home / ".claude"
     claude_dir.mkdir(parents=True, exist_ok=True)
-
     settings: dict[str, Any] = {"autoCompactEnabled": False}
     if model:
         settings["model"] = model
@@ -256,14 +296,15 @@ def _setup_sandbox(
         json.dumps(settings, indent=2), encoding="utf-8"
     )
 
-    if not skill_dir or not skill_dir.is_dir():
-        return  # baseline: no skill
 
-    # Copy entire skill folder → sandbox_home/.claude/skills/<name>/
+def _install_skill(sandbox: Sandbox, skill_name: str, skill_dir: Path) -> None:
+    """Copy skill files into sandbox and write CLAUDE.md to cwd."""
+    claude_dir = sandbox.home / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+
     skills_dst = claude_dir / "skills" / skill_name
     shutil.copytree(skill_dir, skills_dst, dirs_exist_ok=True)
 
-    # Write SKILL.md to cwd/CLAUDE.md so all models receive skill instructions
     skill_md = skill_dir / "SKILL.md"
     if skill_md.is_file():
         shutil.copy2(skill_md, sandbox.cwd / "CLAUDE.md")
@@ -375,6 +416,7 @@ def parse_log_file(path: Path) -> dict | None:
     iterations = 0
     duration = 0.0
     trace: list[dict] = []
+    output_files: list[str] = []
 
     for rec in records:
         evt = rec.get("event", "")
@@ -383,6 +425,8 @@ def parse_log_file(path: Path) -> dict | None:
             iterations = rec.get("iterations", 0)
             duration = rec.get("duration_seconds", 0.0)
             trace.append({"type": "end_turn", "content": stop_reason})
+        elif evt == "output_files":
+            output_files = rec.get("files", [])
         elif evt == "assistant_text":
             trace.append({"type": "assistant", "content": rec.get("text", "")[:500]})
         elif evt == "tool_call":
@@ -427,4 +471,5 @@ def parse_log_file(path: Path) -> dict | None:
         "stepsCount": iterations,
         "duration": f"{duration}s",
         "trace": trace,
+        "outputFiles": output_files,
     }

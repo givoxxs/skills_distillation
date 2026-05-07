@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import mimetypes
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # Load .env from repo root (OPENROUTER_API_KEY, ANTHROPIC_KEY)
@@ -18,7 +20,13 @@ load_dotenv(_REPO_ROOT / ".env")
 
 # Runner is in the same package
 sys.path.insert(0, str(Path(__file__).parent))
-from column_runner import ANTHROPIC_SKILLS_DIR, LOGS_DIR, parse_log_file, run_column  # noqa: E402
+from column_runner import (  # noqa: E402
+    ANTHROPIC_SKILLS_DIR,
+    LOGS_DIR,
+    OUTPUTS_DIR,
+    parse_log_file,
+    run_column,
+)
 
 app = FastAPI(title="Skill Distillation API")
 app.add_middleware(
@@ -50,6 +58,33 @@ async def list_runs() -> list[dict[str, Any]]:
         if record:
             runs.append(record)
     return runs
+
+
+@app.get("/api/runs/{run_id}/files")
+async def list_run_files(run_id: str) -> list[str]:
+    """List output files produced by a specific run."""
+    out_dir = OUTPUTS_DIR / run_id
+    if not out_dir.is_dir():
+        return []
+    return sorted(p.name for p in out_dir.iterdir() if p.is_file())
+
+
+@app.get("/api/runs/{run_id}/files/{filename}")
+async def get_run_file(run_id: str, filename: str) -> FileResponse:
+    """Download a single output file from a run."""
+    # Guard against path traversal
+    out_dir = (OUTPUTS_DIR / run_id).resolve()
+    file_path = (out_dir / filename).resolve()
+    if not str(file_path).startswith(str(out_dir)):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    media_type, _ = mimetypes.guess_type(filename)
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type=media_type or "application/octet-stream",
+    )
 
 
 # ── WebSocket live run ────────────────────────────────────────────────────────
