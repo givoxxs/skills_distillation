@@ -434,6 +434,7 @@ _OUTPUT_EXTENSIONS = frozenset(
         ".png",
         ".jpg",
         ".jpeg",
+        ".gif",
     }
 )
 _SKIP_NAMES = frozenset({"package.json", "package-lock.json", "yarn.lock"})

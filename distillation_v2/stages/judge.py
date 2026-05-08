@@ -100,6 +100,8 @@ class Judge:
             output_dir=str(output_dir),
         )
         image_paths = self._get_images(Path(output_dir))
+        if not image_paths:
+            image_paths = self._get_gif_frames(Path(output_dir))
         text_output = (
             self._get_text_output(Path(output_dir)) if not image_paths else None
         )
@@ -162,6 +164,54 @@ class Judge:
         if not images:
             _log.debug("judge: image conversion failed for %s", docx)
         return images
+
+    def _get_gif_frames(self, output_dir: Path) -> list[Path]:
+        """Sample frames from a .gif output evenly, save as PNGs for judge."""
+        gifs = sorted(output_dir.glob("*.gif"))
+        if not gifs:
+            return []
+        try:
+            from PIL import Image as PILImage
+        except ImportError:
+            _log.warning("Pillow not installed — cannot extract GIF frames")
+            return []
+
+        gif_path = gifs[0]
+        frames_dir = output_dir / "_gif_frames"
+        frames_dir.mkdir(exist_ok=True)
+
+        try:
+            img = PILImage.open(gif_path)
+            # Count total frames
+            total = 0
+            try:
+                while True:
+                    img.seek(total)
+                    total += 1
+            except EOFError:
+                pass
+
+            # Sample evenly up to max_image_pages frames
+            n = min(self.max_image_pages, total)
+            indices = [int(i * total / n) for i in range(n)] if n > 0 else []
+
+            frame_paths: list[Path] = []
+            for idx in indices:
+                img.seek(idx)
+                frame_path = frames_dir / f"frame_{idx:04d}.png"
+                img.convert("RGBA").save(frame_path)
+                frame_paths.append(frame_path)
+
+            _log.debug(
+                "gif: extracted %d/%d frames from %s",
+                len(frame_paths),
+                total,
+                gif_path.name,
+            )
+            return frame_paths
+        except Exception as e:  # noqa: BLE001
+            _log.warning("gif frame extraction failed for %s: %s", gif_path, e)
+            return []
 
     def _get_text_output(self, output_dir: Path) -> str | None:
         """Return text content from .txt/.json/.md when no .docx exists."""
