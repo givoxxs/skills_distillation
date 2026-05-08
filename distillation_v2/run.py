@@ -111,6 +111,14 @@ def _load_config() -> dict:
     "Rubric is still generated from all test cases. "
     "Letters: a=create, b=read, c=edit, d=convert, e=edge.",
 )
+@click.option(
+    "--parallel",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of test cases to run concurrently (default: 1 = sequential). "
+    "Use 3-5 to speed up; higher values may hit API rate limits.",
+)
 def main(
     skill,
     rounds,
@@ -132,6 +140,7 @@ def main(
     stop_threshold,
     no_llm_judge,
     workflow,
+    parallel,
 ):
     """Run Skill Distillation v2 for one skill."""
     full_cfg = _load_config()
@@ -227,7 +236,7 @@ def main(
     )
     click.echo(
         f"Config: rounds={rounds}  batch={batch_size}  student={student}  "
-        f"teacher={teacher}  judge={judge}  ensemble_n={ensemble_n}"
+        f"teacher={teacher}  judge={judge}  ensemble_n={ensemble_n}  parallel={parallel}"
     )
     click.echo(f"Rubric: cache_dir={rubric_cache_dir}  regenerate={regenerate_rubric}")
 
@@ -266,6 +275,7 @@ def main(
         dry_run=dry_run,
         resume=resume,
         no_llm_judge=no_llm_judge,
+        concurrent_tcs=max(1, parallel),
     )
 
     click.echo("\n" + "=" * 60)

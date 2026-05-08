@@ -15,7 +15,9 @@ import math
 import os
 import shutil
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -80,6 +82,7 @@ def run_distillation(
     dry_run: bool = False,
     resume: bool = False,
     no_llm_judge: bool = False,
+    concurrent_tcs: int = 1,
 ) -> dict[str, Any]:
     # Resolve LLM backend key: prefer explicit llm_api_key, then OPENROUTER_API_KEY,
     # then fall back to legacy anthropic_key for backward compatibility.
@@ -241,6 +244,7 @@ def run_distillation(
                 max_retry_per_tc=max_retry_per_tc,
                 current_skill_md=working_md,
                 emit=emit,
+                concurrent_tcs=concurrent_tcs,
             )
             all_results.extend(batch_results)
             batch_log_paths.append(batch_logs)
@@ -422,15 +426,23 @@ def _run_batch(
     max_retry_per_tc: int,
     current_skill_md: Path,
     emit: Callable[[str], None],
+    concurrent_tcs: int = 1,
 ) -> tuple[list[EvalResult], list[str]]:
-    results: list[EvalResult] = []
-    log_paths: list[str] = []
     skill_dir = Path(base_config.skills_dir) / skill
+    n = len(batch)
 
-    for tc_idx, tc in enumerate(batch, 1):
+    # Thread-safe emit wrapper (no-op lock when sequential)
+    _lock = threading.Lock()
+
+    def _emit(msg: str) -> None:
+        with _lock:
+            emit(msg)
+
+    def _run_one(tc_idx: int, tc: dict) -> tuple[EvalResult, list[str]]:
+        tc_log_paths: list[str] = []
         output_dir = results_path / f"round_{round_n}" / f"batch_{batch_idx}" / tc["id"]
         output_dir.mkdir(parents=True, exist_ok=True)
-        emit(f"    [{tc_idx}/{len(batch)}] {tc['id']}  '{tc.get('name', '')}'")
+        _emit(f"    [{tc_idx}/{n}] {tc['id']}  '{tc.get('name', '')}'")
         tc_start = time.time()
 
         # Fixture handling — supports both fixture_file (str) and fixture_files (list)
@@ -443,7 +455,7 @@ def _run_batch(
             if src.is_file():
                 input_files.append(src)
             else:
-                emit(f"      WARNING: fixture missing: {src}")
+                _emit(f"      WARNING: fixture missing: {src}")
 
         user_prompt = tc.get("prompt", "")
         workflow = tc.get("workflow", "create")
@@ -479,19 +491,17 @@ def _run_batch(
         )
 
         if run.get("skipped"):
-            emit(f"      SKIPPED (all {max_retry_per_tc} retries failed)")
-            results.append(
-                make_skip_result(tc, skill, student_model, round_n, str(output_dir))
-            )
+            _emit(f"      SKIPPED (all {max_retry_per_tc} retries failed)")
+            er = make_skip_result(tc, skill, student_model, round_n, str(output_dir))
             if run.get("log_file"):
-                log_paths.append(run["log_file"])
-            continue
+                tc_log_paths.append(run["log_file"])
+            return er, tc_log_paths
 
-        emit(
+        _emit(
             f"      stop={run.get('stop_reason')}  iters={run.get('iterations')}  ({time.time()-tc_start:.1f}s)"
         )
         if run.get("log_file"):
-            log_paths.append(run["log_file"])
+            tc_log_paths.append(run["log_file"])
 
         try:
             wf = tc.get("workflow", "create")
@@ -506,14 +516,29 @@ def _run_batch(
             )
         except Exception as e:  # noqa: BLE001
             _log.exception("judge.score() crashed for %s", tc["id"])
-            emit(f"      JUDGE ERROR: {e}")
+            _emit(f"      JUDGE ERROR: {e}")
             er = make_skip_result(tc, skill, student_model, round_n, str(output_dir))
 
-        results.append(er)
         score = er.llm_judge_score if er.llm_judge_score >= 0 else 0.0
         status = "PASS" if score >= 0.8 else "FAIL"
-        emit(f"      [{status}] score={score:.2f}")
+        _emit(f"      [{status}] score={score:.2f}")
+        return er, tc_log_paths
 
+    # ── Execute: sequential or parallel ──────────────────────────────────────
+    if concurrent_tcs <= 1:
+        pairs = [_run_one(i, tc) for i, tc in enumerate(batch, 1)]
+    else:
+        pairs: list[tuple[EvalResult, list[str]]] = [None] * n  # type: ignore[list-item]
+        with ThreadPoolExecutor(max_workers=concurrent_tcs) as pool:
+            future_to_pos = {
+                pool.submit(_run_one, i, tc): pos
+                for pos, (i, tc) in enumerate(enumerate(batch, 1))
+            }
+            for future in as_completed(future_to_pos):
+                pairs[future_to_pos[future]] = future.result()
+
+    results = [er for er, _ in pairs]
+    log_paths = [lp for _, lps in pairs for lp in lps]
     return results, log_paths
 
 

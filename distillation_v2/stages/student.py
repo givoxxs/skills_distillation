@@ -331,6 +331,26 @@ def _stream_claude(
     stderr_drainer = threading.Thread(target=_drain_stderr, daemon=True)
     stderr_drainer.start()
 
+    # Watchdog: kill the subprocess after timeout_seconds total wall-clock time.
+    # Without this, `for raw_line in proc.stdout` blocks forever when the process
+    # hangs with stdout still open — proc.wait(timeout=...) only runs AFTER stdout
+    # is exhausted, so it never fires in the hung case.
+    _cancel_watchdog = threading.Event()
+    _killed_by_watchdog = threading.Event()
+
+    def _watchdog() -> None:
+        if not _cancel_watchdog.wait(timeout=config.timeout_seconds):
+            if proc.poll() is None:
+                _log.warning(
+                    "Watchdog: killing hung subprocess after %ds",
+                    config.timeout_seconds,
+                )
+                _killed_by_watchdog.set()
+                proc.kill()
+
+    watchdog = threading.Thread(target=_watchdog, daemon=True)
+    watchdog.start()
+
     try:
         assert proc.stdout is not None
         for raw_line in proc.stdout:
@@ -349,21 +369,25 @@ def _stream_claude(
                     tokens = event.data.get("tokens", tokens)
                     final_text = event.data.get("final_text", "")
 
+        # stdout closed — cancel watchdog so it doesn't fire on an already-dead process
+        _cancel_watchdog.set()
+
         # stdout exhausted — wait for stderr drainer then for the process to exit
         stderr_drainer.join(timeout=30)
         stderr_text = stderr_chunks[0] if stderr_chunks else ""
 
         try:
-            proc.wait(timeout=config.timeout_seconds)
+            proc.wait(timeout=30)
         except subprocess.TimeoutExpired:
             proc.kill()
             try:
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 _log.warning("Process refused to die after SIGKILL")
-            stop_reason = "timeout"
 
-        if proc.returncode != 0 and stop_reason == "no_end_event":
+        if _killed_by_watchdog.is_set():
+            stop_reason = "timeout"
+        elif proc.returncode != 0 and stop_reason == "no_end_event":
             stop_reason = f"cli_exit_{proc.returncode}"
             if stderr_text:
                 logger.log_error(iterations, stderr_text.strip()[:500])
