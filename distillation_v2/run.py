@@ -192,6 +192,7 @@ def main(
     judge_temperature = cfg.get("judge_temperature", 0.2)
     max_retry_per_tc = cfg.get("max_retry_per_tc", 3)
     max_image_pages = cfg.get("max_image_pages", 10)
+    max_gif_frames = cfg.get("max_gif_frames", 3)
     watch_skill_hash = rubric_cfg.get("watch_skill_hash", False)
 
     # Test cases file (default to v2 test_cases/)
@@ -266,6 +267,7 @@ def main(
         judge_temperature=judge_temperature,
         max_retry_per_tc=max_retry_per_tc,
         max_image_pages=max_image_pages,
+        max_gif_frames=max_gif_frames,
         results_dir=results_dir,
         rubric_cache_dir=rubric_cache_dir,
         skills_dir=skills_dir,

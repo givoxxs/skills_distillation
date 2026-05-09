@@ -65,6 +65,7 @@ class Judge:
         model: str = DEFAULT_MODEL,
         ensemble_n: int = 1,
         max_image_pages: int = MAX_IMAGE_PAGES,
+        max_gif_frames: int = 3,
         anthropic_api_key: str | None = None,
         base_url: str | None = None,
         temperature: float = 0.2,
@@ -75,6 +76,7 @@ class Judge:
         self.model = model
         self.ensemble_n = max(1, int(ensemble_n))
         self.max_image_pages = max_image_pages
+        self.max_gif_frames = max(1, int(max_gif_frames))
         self._api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
         self._base_url = base_url
         self._temperature = temperature
@@ -193,8 +195,8 @@ class Judge:
             except EOFError:
                 pass
 
-            # Sample evenly up to max_image_pages frames
-            n = min(self.max_image_pages, total)
+            # Sample evenly up to max_gif_frames frames
+            n = min(self.max_gif_frames, total)
             indices = [int(i * total / n) for i in range(n)] if n > 0 else []
 
             # Resolve background color from GIF palette so transparency composites correctly.
