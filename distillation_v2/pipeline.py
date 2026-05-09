@@ -72,6 +72,7 @@ def run_distillation(
     judge_temperature: float = 0.2,
     max_retry_per_tc: int = 3,
     max_image_pages: int = 10,
+    max_gif_frames: int = 3,
     results_dir: str = "./results",
     rubric_cache_dir: str = "./rubrics",
     skills_dir: str | None = None,
@@ -159,6 +160,7 @@ def run_distillation(
             model=judge_model,
             ensemble_n=ensemble_n,
             max_image_pages=max_image_pages,
+            max_gif_frames=max_gif_frames,
             anthropic_api_key=resolved_llm_key,
             base_url=resolved_base_url,
             temperature=judge_temperature,
@@ -255,6 +257,7 @@ def run_distillation(
                 current_skill_md=working_md,
                 emit=emit,
                 concurrent_tcs=concurrent_tcs,
+                no_llm_judge=no_llm_judge,
             )
             all_results.extend(batch_results)
             batch_log_paths.append(batch_logs)
@@ -304,6 +307,10 @@ def run_distillation(
                 if best_skill_snapshot and best_skill_snapshot.exists():
                     shutil.copy2(best_skill_snapshot, working_md)
                     emit(f"  [gate2] restored {best_skill_snapshot.name}")
+                else:
+                    emit(
+                        "  [gate2] WARNING: no valid snapshot to restore — skipping Teacher only"
+                    )
                 gate2_triggered = True
 
         # ── Teacher rewrite (once per round) ─────────────────────────────────
@@ -355,6 +362,7 @@ def run_distillation(
                             max_retry_per_tc=max_retry_per_tc,
                             current_skill_md=working_md,
                             emit=emit,
+                            no_llm_judge=no_llm_judge,
                         )
                         return results
 
@@ -379,11 +387,13 @@ def run_distillation(
         # ── Round summary ─────────────────────────────────────────────────────
         _save_skill_version(working_md, results_path, round_n, skip_if_exists=resume)
 
-        # Track best round for Gate 2 hard rollback
+        # Track best round for Gate 2 hard rollback.
+        # SKILL_round_{N-1}.md is the version the current round's batches ran with —
+        # that is the proven-good snapshot to restore if future rounds regress.
         if round_avg > best_score:
             best_score = round_avg
             best_round_n = round_n
-            best_skill_snapshot = results_path / f"SKILL_round_{round_n}.md"
+            best_skill_snapshot = results_path / f"SKILL_round_{round_n - 1}.md"
 
         duration = time.time() - round_start
         bar = "█" * int(round_avg * 20)
@@ -463,6 +473,7 @@ def _run_batch(
     current_skill_md: Path,
     emit: Callable[[str], None],
     concurrent_tcs: int = 1,
+    no_llm_judge: bool = False,
 ) -> tuple[list[EvalResult], list[str]]:
     skill_dir = Path(base_config.skills_dir) / skill
     n = len(batch)
@@ -539,21 +550,34 @@ def _run_batch(
         if run.get("log_file"):
             tc_log_paths.append(run["log_file"])
 
-        try:
-            wf = tc.get("workflow", "create")
-            tc_judge = judges.get(wf) or next(iter(judges.values()))
-            tc_with_skill = {**tc, "skill": skill}
-            er = tc_judge.score(
-                output_dir=str(output_dir),
-                test_case=tc_with_skill,
+        if no_llm_judge:
+            er = EvalResult(
+                test_case_id=tc["id"],
+                skill=skill,
                 model=student_model,
                 round_n=round_n,
-                input_files=input_files if wf == "read" else None,
+                output_dir=str(output_dir),
             )
-        except Exception as e:  # noqa: BLE001
-            _log.exception("judge.score() crashed for %s", tc["id"])
-            _emit(f"      JUDGE ERROR: {e}")
-            er = make_skip_result(tc, skill, student_model, round_n, str(output_dir))
+            er.llm_judge_score = 0.0
+            er.llm_judge_reasoning = "skipped (--no-llm-judge)"
+        else:
+            try:
+                wf = tc.get("workflow", "create")
+                tc_judge = judges.get(wf) or next(iter(judges.values()))
+                tc_with_skill = {**tc, "skill": skill}
+                er = tc_judge.score(
+                    output_dir=str(output_dir),
+                    test_case=tc_with_skill,
+                    model=student_model,
+                    round_n=round_n,
+                    input_files=input_files if wf == "read" else None,
+                )
+            except Exception as e:  # noqa: BLE001
+                _log.exception("judge.score() crashed for %s", tc["id"])
+                _emit(f"      JUDGE ERROR: {e}")
+                er = make_skip_result(
+                    tc, skill, student_model, round_n, str(output_dir)
+                )
 
         score = er.llm_judge_score if er.llm_judge_score >= 0 else 0.0
         status = "PASS" if score >= 0.8 else "FAIL"
