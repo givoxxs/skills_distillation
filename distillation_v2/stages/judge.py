@@ -195,11 +195,25 @@ class Judge:
             n = min(self.max_image_pages, total)
             indices = [int(i * total / n) for i in range(n)] if n > 0 else []
 
+            # Resolve background color from GIF palette so transparency composites correctly.
+            # GIFs often mark their background index as transparent (e.g. black bg → index 0
+            # flagged as transparent). Without compositing, PIL's RGBA conversion makes that
+            # color fully transparent → PNG renders it white → judge sees blank frames.
+            palette = img.getpalette() or []
+            bg_idx = img.info.get("background", 0)
+            if palette and bg_idx * 3 + 2 < len(palette):
+                bg_rgb = tuple(palette[bg_idx * 3 : bg_idx * 3 + 3])
+            else:
+                bg_rgb = (255, 255, 255)
+
             frame_paths: list[Path] = []
             for idx in indices:
                 img.seek(idx)
                 frame_path = frames_dir / f"frame_{idx:04d}.png"
-                img.convert("RGBA").save(frame_path)
+                rgba = img.convert("RGBA")
+                bg = PILImage.new("RGBA", rgba.size, bg_rgb + (255,))
+                bg.alpha_composite(rgba)
+                bg.convert("RGB").save(frame_path)
                 frame_paths.append(frame_path)
 
             _log.debug(
