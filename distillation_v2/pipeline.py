@@ -200,7 +200,7 @@ def run_distillation(
         )
     emit("=" * 60)
 
-    _save_skill_version(working_md, results_path, round_n=0)
+    _save_skill_version(working_md, results_path, round_n=0, skip_if_exists=resume)
 
     history: list[dict] = []
     prev_avg: float | None = None
@@ -348,7 +348,7 @@ def run_distillation(
             emit("  DRY RUN — skipping Teacher + rollback.")
 
         # ── Round summary ─────────────────────────────────────────────────────
-        _save_skill_version(working_md, results_path, round_n)
+        _save_skill_version(working_md, results_path, round_n, skip_if_exists=resume)
         duration = time.time() - round_start
         bar = "█" * int(round_avg * 20)
         emit(f"  Round {round_n} avg={round_avg:.3f} {bar}  ({duration:.1f}s)")
@@ -585,8 +585,16 @@ def _save_round_scores(results_path: Path, round_n: int, data: dict) -> None:
     p.write_text(json.dumps(data, indent=2))
 
 
-def _save_skill_version(skill_md_path: Path, results_path: Path, round_n: int) -> None:
-    shutil.copy2(skill_md_path, results_path / f"SKILL_round_{round_n}.md")
+def _save_skill_version(
+    skill_md_path: Path,
+    results_path: Path,
+    round_n: int,
+    skip_if_exists: bool = False,
+) -> None:
+    dest = results_path / f"SKILL_round_{round_n}.md"
+    if skip_if_exists and dest.exists():
+        return
+    shutil.copy2(skill_md_path, dest)
 
 
 def _is_batch_complete(results_path: Path, round_n: int, batch_idx: int) -> bool:

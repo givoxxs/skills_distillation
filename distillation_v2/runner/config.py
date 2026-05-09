@@ -30,7 +30,7 @@ class RunConfigV2:
     # ── Claude Code CLI ──────────────────────────────────────────────────────
     claude_binary: str = "claude"
     max_turns: int = 30
-    timeout_seconds: int = 300  # 5 min per test case
+    timeout_seconds: int = 600  # 10 min per test case (GIF generation needs extra time)
 
     # ── Paths ────────────────────────────────────────────────────────────────
     skills_dir: str = _DEFAULT_SKILLS_DIR
