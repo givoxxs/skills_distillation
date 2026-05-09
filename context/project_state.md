@@ -188,42 +188,59 @@ Quyết định: **không implement** vì signal không giúp ích cho Teacher v
 41. **results_dir date bug** — compute dated `results_dir` TRƯỚC khi gọi `setup_logging()`.
     Trước: api_calls.jsonl/eval_detail.jsonl ghi vào `results/docx/`, không phải `results/DD_MM/docx/`.
 
-## distillation_v2/ (refactored — last updated 2026-05-02)
+## distillation_v2/ (refactored — last updated 2026-05-09)
 
 Pipeline song song, KHÔNG xoá v1. Xem chi tiết: [distillation_v2.md](distillation_v2.md).
 
-**Cấu trúc hiện tại** (sau refactor — không còn dùng importlib v1):
-- `pipeline.py` (thay `orchestrator.py`) — orchestration loop
-- `stages/` — student, teacher, judge, rubric_gen, summarizer
+**Cấu trúc hiện tại** (standalone, không dùng importlib v1):
+- `pipeline.py` — orchestration loop với Gate 1 + Gate 2 rollback
+- `stages/` — student, teacher (temp=0.3), judge (temp=0.2), rubric_gen, summarizer
 - `runner/` — sandbox, anthropic_env, stream_parser, config, logger
 - `evaluator/base.py` — EvalResult, CheckResult
-- `utils/rollback.py` — choose_validation_tcs (top-N by score), decide, run_validation
+- `utils/rollback.py` — `choose_validation_tcs` (rank 6-8 TCs), `decide`, `run_validation`
+- `utils/llm_call.py` — unified LLM caller với `temperature` param
+
+**Rollback strategy hiện tại (Gate 1 + Gate 2):**
+- **Gate 2** (trước Teacher): nếu `round_avg < prev_avg - 0.10` → restore best-ever SKILL.md (= `SKILL_round_{best_round - 1}.md`, version TCs đã chạy với), skip Teacher
+- **Gate 1** (sau Teacher): chạy rank 6-8 TCs với SKILL.md mới; keep nếu `val_score >= baseline - 0.10` (baseline = score TCs đó trong round hiện tại)
+- `best_skill_snapshot` trỏ đến `SKILL_round_{N-1}.md` (off-by-one đã fix 09/05)
 
 **Bugs đã fix trong v2 (sessions 04-05/2026):**
-- `--sandbox` flag không tồn tại trong claude CLI → đã xóa
-- Skill injection sai path (commands/ → đúng là `.claude/skills/<name>/`) → đã fix
-- `settings.json` inject để force model + `autoCompactEnabled: false` (tránh haiku/sonnet)
-- Output filter: node_modules, .json lock files không copy sang output
-- `list_outputs()` skip node_modules, .npm, hidden dirs
-- `end_turn` + no output files → `runner_error: no_output_files` (retriable, Gemma hallucination fix)
-- `NODE_PATH=/usr/local/lib/node_modules` hardcoded → `require('docx')` không cần npm install
-- `skills_dir` default → `~/.claude/skills` (docx-js version, không phải python-docx)
-- Validation TCs: top-N by hybrid_score thay vì random
-- 80% length guard xóa khỏi pipeline.py (teacher prompt mới cho phép shorter)
-- Teacher system prompt rewrite: markdown rõ ràng, MUST/MUST NOT rules
-- **[2026-05-03]** Prompt tiếng Việt → tiếng Anh: `f"Use skill {name} to: {prompt}"`
-- **[2026-05-03]** Skill injection fix 2: write `effective_skill_md` → `cwd/CLAUDE.md` để inject vào system prompt cho mọi model (OpenRouter gemma/qwen không đọc `.claude/skills/`)
-- **[2026-05-03]** Xóa `_claude_logout_best_effort()` khỏi `Sandbox.__enter__()` — gây gọi sonnet ($0.01/TC), CLI v2.1+ không có subcommand logout
-- **[2026-05-03]** Integration test `tests/test_integration_student.py` — verified PASSED (iterations=3, list.docx produced)
+- `--sandbox` flag không tồn tại → đã xóa
+- Skill injection sai path → fix: `.claude/skills/<name>/` + `cwd/CLAUDE.md`
+- `settings.json` inject: `{"model": ..., "autoCompactEnabled": false}`
+- Output filter, `list_outputs()` skip noise dirs
+- `end_turn` + no output → retriable `runner_error: no_output_files`
+- `NODE_PATH` hardcoded → `require('docx')` không cần `npm install`
+- Validation TCs: top-N → fix lại thành rank 6-8 (borderline TCs, 09/05)
+- Teacher/Judge temperature: Teacher=0.3, Judge=0.2 (09/05)
+- `max_gif_frames=3` tách riêng khỏi `max_image_pages` (09/05)
+- `no_llm_judge` implemented thực sự: skip judge, score=0.0, reasoning="skipped" (09/05)
+- Off-by-one `best_skill_snapshot`: `SKILL_round_{N-1}.md` thay vì `SKILL_round_N.md` (09/05)
+- Gate 2 log: thêm WARNING khi không có snapshot để restore (09/05)
+- `--parallel N`: `ThreadPoolExecutor` chạy N TCs đồng thời (đã có)
+- GIF frame extraction: sample evenly từ animation, composite lên background color
 
-**Tests**: 23 unit pass + 1 integration pass. Run: `conda run -n skills pytest distillation_v2/tests/ -v`
+**Test cases (09/05/2026):**
+| Skill | TCs |
+|---|---|
+| docx | 20 (từ 32, cắt redundant) |
+| slack-gif-creator | 20 (từ 30) |
+| xlsx | 20 (từ 30) |
+| webapp-testing | 20 (từ 30) |
+| internal-comms | 25 (từ 33) |
+
+**Kết quả runs (09/05/2026):**
+- **docx**: 10 rounds, best=0.810 (R1), final=0.714. Thấp hơn hôm qua (0.885) do compound non-determinism + SKILL.md khác (590L vs 534L hôm qua)
+- **slack-gif-creator**: đang chạy lại (R2, parallel=5) — lần trước crash ở B5/6 R3
 
 ## Cần làm tiếp
 
-1. ✅ Fixture `tracked_deletion_review.docx` đã tạo
-2. ✅ Kết quả 11_04 đã phân tích, bugs đã fix
-3. ✅ v2 refactor complete — bugs fixed, tests green
-4. ✅ Skill injection fix (CLAUDE.md) + sonnet charge fix (remove logout) — session 2026-05-03
-5. Chạy v2 distillation thực tế (full `--rounds 3 --test-cases 5`) để verify end-to-end
-6. **v2**: so sánh v1 vs v2 trên cùng test set cho thesis writeup
-7. **v2 pending**: copy `scripts/` vào `sandbox.cwd/scripts/` để `validate.py` chạy được
+1. ✅ v2 refactor + Gate 1/Gate 2 rollback complete (09/05)
+2. ✅ Temperature control: Teacher=0.3, Judge=0.2
+3. ✅ no_llm_judge implemented
+4. ✅ max_gif_frames=3 cho GIF skills
+5. Xem kết quả slack-gif-creator R2 (đang chạy)
+6. Chạy internal-comms, xlsx, webapp-testing distillation
+7. **v2**: so sánh v1 vs v2 trên cùng test set cho thesis writeup
+8. **v2 pending**: copy `scripts/` vào `sandbox.cwd/scripts/` để `validate.py` chạy được

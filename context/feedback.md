@@ -147,3 +147,34 @@ Không dùng "shorter by ±20%" hay guard 80% trong pipeline.
 Dùng `conda run -n skills pytest ...` để chạy tests trong project này.
 **Why:** python3 global là 3.14, không có pytest. Env `skills` có đầy đủ dependencies.
 **How to apply:** `conda run -n skills pytest distillation_v2/tests/ -v`
+
+## Temperature: không về 0, giữ chút creativity
+Teacher=0.3, Judge=0.2 — không dùng temperature=0.
+**Why:** Judge=0 ok về mặt determinism nhưng Anthropic API không accept 0 chính xác trên một số model. Teacher=0 làm mất khả năng explore fix mới (overfits vào pattern đã biết). 0.3 là điểm cân bằng.
+**How to apply:** `teacher_temperature=0.3`, `judge_temperature=0.2` trong config.yaml / run_distillation() params.
+
+## Parallel=5 là mặc định hợp lý cho production runs
+`--parallel 5` tốt cho API rate limit của OpenRouter với gemma-4-26b.
+**Why:** sequential (=1) quá chậm; parallel=10+ có thể hit rate limit. 5 là sweet spot.
+**How to apply:** `--parallel 5` khi chạy production. Default config giữ `parallel=1` để an toàn.
+
+## Test cases: cắt xuống 20-25 khi có redundancy
+Khi một skill có >25 TCs và nhiều cái test cùng pattern → cắt bớt.
+**Why:** token tốn kém, mỗi TC thêm ~68K base tokens. 20 TCs coverage tốt + tiết kiệm.
+**How to apply:** giữ TCs có workflow khác nhau và edge cases quan trọng. Xóa duplicates cùng workflow type.
+Đã cắt: internal-comms (33→25), slack-gif-creator/xlsx/webapp-testing (30→20).
+
+## Gate 1 rollback: dùng rank 6-8 TCs, không phải top-6
+Validation TCs phải là TCs THỨ 6, 7, 8 (index 5:8 sorted desc) — không phải top-6.
+**Why:** top-5 TCs thường ceiling ở 1.0 → baseline=1.0 → Gate 1 pass threshold quá cao → false negatives. Bottom TCs luôn fail → không sensitive. Rank 6-8 là "borderline" → nhạy cảm với SKILL.md quality.
+**How to apply:** `choose_validation_tcs` select `ranked[5:8]`, baseline từ cùng round (không phải round trước).
+
+## Gate 2: so sánh với round gần nhất, không phải round tốt nhất
+Gate 2 check `round_avg < prev_avg - threshold` — dùng round ngay trước, không phải best round.
+**Why:** so sánh với best round quá strict (score dao động tự nhiên). So sánh với prev round detect regression tức thời tốt hơn.
+**How to apply:** `gate2_delta = round_avg - prev_avg`. Threshold=0.10.
+
+## best_skill_snapshot là SKILL_round_{N-1}.md không phải SKILL_round_N.md
+Khi round N đạt best score, snapshot restore phải là `SKILL_round_{N-1}.md` (cái TCs đã chạy với), không phải `SKILL_round_N.md` (Teacher output của round N).
+**Why:** `SKILL_round_N.md` là Teacher rewrite chưa được verify bởi batches. `SKILL_round_{N-1}.md` là version đã produce best score thực tế.
+**How to apply:** `best_skill_snapshot = results_path / f"SKILL_round_{round_n - 1}.md"` (đã fix 09/05).
