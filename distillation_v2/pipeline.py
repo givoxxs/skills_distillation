@@ -2,9 +2,11 @@
 
 Flow per round:
   1. Run all batches (student → judge → run_log.md).
-  2. Teacher reads ALL run_logs → generates SKILL_candidate.md.
-  3. Validation: run 3 random TCs with SKILL_candidate.md.
-  4. Keep candidate if val_score >= round_avg - rollback_threshold, else rollback.
+  2. Gate 2: if round_avg dropped > gate2_threshold vs prev round → hard rollback
+     to best-ever SKILL.md, skip Teacher.
+  3. Teacher reads ALL run_logs → generates SKILL_candidate.md.
+  4. Gate 1: run rank-6/7/8 TCs with SKILL_candidate. Keep if val_score >=
+     baseline (those TCs' score in current round) - gate1_threshold.
   5. Check stopping criteria.
 """
 
@@ -63,8 +65,11 @@ def run_distillation(
     stop_threshold: float = 0.7,
     converge_delta: float = 0.02,
     converge_k: int = 3,
-    rollback_threshold: float = 0.05,
+    gate1_threshold: float = 0.10,
+    gate2_threshold: float = 0.10,
     validation_tc_count: int = 3,
+    teacher_temperature: float = 0.3,
+    judge_temperature: float = 0.2,
     max_retry_per_tc: int = 3,
     max_image_pages: int = 10,
     results_dir: str = "./results",
@@ -156,6 +161,7 @@ def run_distillation(
             max_image_pages=max_image_pages,
             anthropic_api_key=resolved_llm_key,
             base_url=resolved_base_url,
+            temperature=judge_temperature,
         )
         rubric_keys[wf] = wf_rubric.get("cache_key", "")
 
@@ -196,7 +202,8 @@ def run_distillation(
         emit("Rollback: DISABLED (--no-rollback)")
     else:
         emit(
-            f"Rollback threshold: {rollback_threshold}  validation_tcs: {validation_tc_count}"
+            f"Gate1 threshold: {gate1_threshold}  Gate2 threshold: {gate2_threshold}"
+            f"  validation_tcs: {validation_tc_count} (rank 6-8)"
         )
     emit("=" * 60)
 
@@ -205,6 +212,9 @@ def run_distillation(
     history: list[dict] = []
     prev_avg: float | None = None
     recent_deltas: list[float] = []
+    best_score: float = 0.0
+    best_round_n: int = 0
+    best_skill_snapshot: Path | None = None
 
     for round_n in range(1, max_rounds + 1):
         emit(f"\n--- Round {round_n}/{max_rounds} ---")
@@ -282,8 +292,22 @@ def run_distillation(
             else 0.0
         )
 
+        # ── Gate 2: hard rollback if round dropped too much vs prev ──────────
+        gate2_triggered = False
+        if not dry_run and validation_tc_count > 0 and prev_avg is not None:
+            gate2_delta = round_avg - prev_avg
+            if gate2_delta < -gate2_threshold:
+                emit(
+                    f"  [gate2] FAIL (Δ={gate2_delta:+.3f} < -{gate2_threshold})"
+                    f" → hard rollback to best R{best_round_n} ({best_score:.3f})"
+                )
+                if best_skill_snapshot and best_skill_snapshot.exists():
+                    shutil.copy2(best_skill_snapshot, working_md)
+                    emit(f"  [gate2] restored {best_skill_snapshot.name}")
+                gate2_triggered = True
+
         # ── Teacher rewrite (once per round) ─────────────────────────────────
-        if not dry_run and run_logs:
+        if not dry_run and run_logs and not gate2_triggered:
             emit(f"  Teacher rewriting SKILL.md from {len(run_logs)} run_log(s)...")
             teacher_start = time.time()
             try:
@@ -294,20 +318,25 @@ def run_distillation(
                     round_n=round_n,
                     anthropic_api_key=resolved_llm_key,
                     base_url=resolved_base_url,
+                    temperature=teacher_temperature,
                 )
 
                 emit(
                     f"  Teacher done ({len(new_skill)} chars, {time.time() - teacher_start:.1f}s)"
                 )
 
-                # ── Validation + rollback ─────────────────────────────────────
+                # ── Gate 1: validate rank-6/7/8 TCs with new SKILL.md ────────
                 if validation_tc_count == 0:
-                    # --no-rollback: always keep new SKILL.md without validation
-                    emit("  [rollback] DISABLED — keeping new SKILL.md unconditionally")
+                    emit("  [gate1] DISABLED — keeping new SKILL.md unconditionally")
                     working_md.write_text(new_skill, encoding="utf-8")
                 else:
-                    val_tcs = choose_validation_tcs(
+                    val_tcs, val_baseline = choose_validation_tcs(
                         test_cases, validation_tc_count, round_results=all_results
+                    )
+                    emit(
+                        "  [gate1] val TCs (rank 6-8): "
+                        + ", ".join(tc["id"] for tc in val_tcs)
+                        + f"  baseline={val_baseline:.3f}"
                     )
 
                     def _val_batch(tcs: list[dict]) -> list[EvalResult]:
@@ -336,7 +365,7 @@ def run_distillation(
                         run_batch_fn=_val_batch,
                         emit=emit,
                     )
-                    keep = decide(val_score, round_avg, rollback_threshold, emit)
+                    keep = decide(val_score, val_baseline, gate1_threshold, emit)
                     if keep:
                         working_md.write_text(new_skill, encoding="utf-8")
                     # else: working_md unchanged (old content stays)
@@ -349,6 +378,13 @@ def run_distillation(
 
         # ── Round summary ─────────────────────────────────────────────────────
         _save_skill_version(working_md, results_path, round_n, skip_if_exists=resume)
+
+        # Track best round for Gate 2 hard rollback
+        if round_avg > best_score:
+            best_score = round_avg
+            best_round_n = round_n
+            best_skill_snapshot = results_path / f"SKILL_round_{round_n}.md"
+
         duration = time.time() - round_start
         bar = "█" * int(round_avg * 20)
         emit(f"  Round {round_n} avg={round_avg:.3f} {bar}  ({duration:.1f}s)")

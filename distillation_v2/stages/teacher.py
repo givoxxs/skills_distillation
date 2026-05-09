@@ -72,6 +72,7 @@ def rewrite(
     dry_run: bool = False,
     anthropic_api_key: str | None = None,
     base_url: str | None = None,
+    temperature: float = 0.3,
 ) -> str:
     """Rewrite SKILL.md using all batch run_logs from the current round.
 
@@ -98,7 +99,9 @@ def rewrite(
         raise RuntimeError("ANTHROPIC_KEY not set (teacher requires it)")
 
     user_prompt = _build_prompt(current_md, run_logs, round_n)
-    return _call_api(user_prompt, model, api_key, round_n, len(run_logs), base_url)
+    return _call_api(
+        user_prompt, model, api_key, round_n, len(run_logs), base_url, temperature
+    )
 
 
 def _build_prompt(current_md: str, run_logs: list[str], round_n: int) -> str:
@@ -124,6 +127,7 @@ def _call_api(
     round_n: int,
     n_logs: int,
     base_url: str | None = None,
+    temperature: float = 0.3,
 ) -> str:
     delays = [3, 6, 15]
     last_exc: Exception | None = None
@@ -143,6 +147,7 @@ def _call_api(
                 api_key=api_key,
                 max_tokens=MAX_TOKENS,
                 base_url=base_url,
+                temperature=temperature,
             )
             if not output:
                 raise RuntimeError("Teacher returned empty response")

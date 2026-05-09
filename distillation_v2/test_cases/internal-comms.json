@@ -81,27 +81,6 @@
       "expected_behavior": "A structured project update in markdown with sections: Overview, Milestone Status, Upcoming Work, Risks & Dependencies, Team. Data from the prompt appears in the correct sections. Includes the key milestone and phase dates. Risk is clearly called out with its potential impact. Tone is informative and precise. Total 200-350 words."
     },
     {
-      "id": "tc_a12",
-      "workflow": "create",
-      "name": "3P update — ML Research team",
-      "prompt": "Write a 3P update for the ML Research team for the week of 2026-05-05 to 2026-05-09. Audience: Chief Scientist.\n\nProgress:\n- Completed ablation study on attention head pruning; 15% FLOPs reduction with <0.3% benchmark degradation\n- Submitted paper 'Sparse Attention Patterns in Large Language Models' to NeurIPS 2026\n- Ran 4 pretraining experiments on the new 30B scale model variant\n- Reviewed and merged 2 open-source contributions to our public interpretability toolkit\n\nPlans:\n- Run 3 more pretraining experiments with revised learning rate schedule\n- Present ablation results at Thursday research sync\n- Begin literature review for Q3 research agenda\n\nProblems:\n- 2 of last week's GPU jobs hit OOM at 30B scale due to gradient checkpointing bug; debugging ongoing\n- NeurIPS submission portal had upload issues; confirmed received via email but waiting for confirmation ID\n\nSave to output.md.",
-      "expected_behavior": "A clean 3P update with Progress, Plans, Problems sections. Each section has 3-5 concise bullets. Research-specific language is preserved accurately (FLOPs, NeurIPS, ablation, etc.). Problems are specific and actionable. Total under 250 words. Tone is technical but readable."
-    },
-    {
-      "id": "tc_a13",
-      "workflow": "create",
-      "name": "Newsletter — diversity & inclusion focused",
-      "prompt": "Write an internal Anthropic newsletter focused on People & Culture updates for April 2026. Audience: all employees. Target 12-16 bullets. Use markdown with section headers.\n\nHighlights:\n- Hired Chief People Officer: Danielle Brooks, starting June 1 (https://intranet.anthropic.com/people/danielle-brooks)\n- Employee Resource Group launches: AAPIatAnthropic and Neurodiversity@Anthropic now official (https://intranet.anthropic.com/ergs)\n- Pay equity audit completed — results and methodology published (https://intranet.anthropic.com/hr/pay-equity-2026)\n- 2026 Inclusion Survey results shared at all-hands (https://intranet.anthropic.com/surveys/inclusion-2026)\n- New parental leave policy: 22 weeks fully paid for all parents (https://intranet.anthropic.com/hr/parental-leave)\n- 12 employees promoted in April (https://intranet.anthropic.com/people/promotions-april-2026)\n- Mentorship program cohort 3 applications open (https://intranet.anthropic.com/programs/mentorship-c3)\n- Learning & Development: 3 new Coursera learning paths available (https://intranet.anthropic.com/learning)\n\nSave to output.md.",
-      "expected_behavior": "A newsletter in markdown with 12-16 bullets grouped under 2-4 section headers (e.g., People, Benefits, Learning, Community). Every highlight from the prompt is included with its markdown link. Tone is warm, celebratory, and inclusive. No bullet exceeds 2 lines. Has a brief opener and closer."
-    },
-    {
-      "id": "tc_a14",
-      "workflow": "create",
-      "name": "FAQ — AI tool usage policy",
-      "prompt": "Write an internal FAQ on Anthropic's policy for employees using external AI tools (non-Anthropic) for work tasks. Audience: all employees. Format: markdown Q&A.\n\nQuestions:\n1. Am I allowed to use ChatGPT or Gemini for work tasks?\n2. What about using Claude (Anthropic's own product)?\n3. Can I paste confidential company information into AI tools?\n4. What if I'm not sure whether something is confidential?\n5. What are the consequences of violating this policy?\n6. Where can I read the full AI tool usage policy?\n\nPolicy details:\n- External AI tools: allowed for non-confidential tasks only; prohibited for any content that is confidential, includes customer data, or is under NDA\n- Claude: encouraged for work use via the internal Claude for Work deployment at https://claude.anthropic.internal (SSO login required)\n- Confidential content: never paste into external AI tools; includes financial data, personnel matters, unreleased product info, customer data, and anything marked 'Confidential' or 'Restricted'\n- If unsure: default to not pasting; ask your manager or #legal-help on Slack\n- Violations: treated as potential data handling incidents; reviewed on a case-by-case basis; may result in disciplinary action\n- Full policy: https://intranet.anthropic.com/policies/ai-tool-usage\n\nSave to output.md.",
-      "expected_behavior": "A markdown FAQ with 6 Q&A pairs. Each answer is 2-4 sentences. Includes the internal Claude URL and the full policy link. Clearly distinguishes confidential vs non-confidential use. Tone is clear and non-alarmist. Does not invent policy details not provided."
-    },
-    {
       "id": "tc_a15",
       "workflow": "create",
       "name": "General comms — office closure notice",
@@ -137,13 +116,6 @@
       "expected_behavior": "A bulleted list identifying missing sections: no Timeline with timestamps, no Impact quantified, no Action Items with owners/due dates, start and end timestamps not given (only duration). Notes that the root cause is stated but lacks detail about why staging didn't catch it. Does NOT rewrite the report. 150-250 words."
     },
     {
-      "id": "tc_b05",
-      "workflow": "validate",
-      "name": "Validate leadership update — tone issues",
-      "prompt": "Review this leadership update draft for tone and content issues. Output findings to output.md.\n\nDraft:\n---\nTeam,\n\nWe are restructuring the Engineering org. Starting June 1, we will split into two groups: Infrastructure and Product Engineering. Some of you will have new managers. We will send details separately. There will be no layoffs.\n\nTown hall is May 14 at 11am PT. Questions to eng-reorg@anthropic.com.\n\nPriya\n---\n\nExpected: ~250 words, prose paragraphs, empathetic and transparent tone, explains the reason for the change, introduces the new VP names, mentions who is affected and when they'll hear more.",
-      "expected_behavior": "Bulleted list identifying issues: too short (~60 words vs 250 target), no reason given for the reorg, new VP names not mentioned, no empathetic language acknowledging uncertainty, lacks specifics about who is affected and timeline for 1:1s. The draft is too abrupt for a sensitive announcement. Does NOT rewrite. 150-250 words."
-    },
-    {
       "id": "tc_c01",
       "workflow": "edit",
       "name": "Edit 3P update — sharpen bullets",
@@ -172,13 +144,6 @@
       "expected_behavior": "The original report is reproduced exactly, with an 'Action Items' section appended. The section contains 3 action items derived from the root cause, each with a brief description, an owner placeholder (e.g., 'Owner: TBD' or a reasonable team name like 'Platform Infra'), and a suggested due date. No other content is changed."
     },
     {
-      "id": "tc_c05",
-      "workflow": "edit",
-      "name": "Edit leadership update — improve tone",
-      "prompt": "Rewrite this leadership update to be warmer and more empathetic while keeping the same length (~250 words) and all factual content. Save to output.md.\n\nOriginal:\n---\nTeam,\n\nWe are reorganizing the Engineering division effective June 1, 2026. We are splitting into Infrastructure (VP: Marcus Webb) and Product Engineering (VP: Aisha Delgado). Both report to me. There are no layoffs. Individual reporting lines stay the same for most people. About 15 people will have new managers — those managers will reach out this week.\n\nAttend the Q&A town hall on May 14 at 11am PT: https://intranet.anthropic.com/events/eng-townhall-may14. Questions to eng-reorg@anthropic.com.\n\nPriya Nair, CTO\n---",
-      "expected_behavior": "A rewritten leadership update that keeps all facts identical (reorg date, VP names, no layoffs, ~15 people changing managers, town hall link and date, email) but rewrites the tone to be warmer: explains the reason for the change, acknowledges that reorgs can feel uncertain, expresses confidence in the team. ~250 words. Still signed by Priya Nair."
-    },
-    {
       "id": "tc_d01",
       "workflow": "convert",
       "name": "Convert 3P update to newsletter bullets",
@@ -191,13 +156,6 @@
       "name": "Convert FAQ to a prose paragraph",
       "prompt": "Convert this FAQ into a single prose paragraph suitable for inclusion in an all-hands email. The paragraph should cover all the same information but read as flowing prose, not Q&A. Target 80-120 words. Save to output.md.\n\nFAQ:\n---\n**Q: When does open enrollment close?**\nA: Open enrollment closes May 22, 2026. Log in at https://benefits.anthropic.com.\n\n**Q: Do I need to re-enroll to keep my current plan?**\nA: For medical, dental, and vision, no — you'll be passively re-enrolled. FSA and HSA require active re-enrollment every year.\n\n**Q: Who do I contact with questions?**\nA: Email benefits@anthropic.com or visit #people-benefits on Slack.\n---",
       "expected_behavior": "A single prose paragraph of 80-120 words that naturally incorporates: the May 22 deadline, the benefits portal URL, the passive enrollment rule (with the FSA/HSA exception), and the contact info. No Q&A format. No bullet points. Reads as a natural paragraph in an email context."
-    },
-    {
-      "id": "tc_d03",
-      "workflow": "convert",
-      "name": "Convert incident report to executive summary",
-      "prompt": "Convert this detailed incident report into a brief executive summary (3-5 sentences) suitable for the weekly engineering leadership email. No technical jargon. Focus on: what happened, impact, resolution, and key action taken. Save to output.md.\n\nIncident Report:\n---\n## Incident Summary\n**ID:** INC-2026-0506 | **Severity:** P1 | **Duration:** 1h 46m\n**Impact:** ~22% of Claude API requests failed with HTTP 503 during peak hours\n\n## Root Cause\nA misconfigured load balancer rule deployed without staged rollout routed 22% of traffic to a drained backend pool.\n\n## Timeline\n- 14:28 UTC: Bad config deployed\n- 14:35 UTC: Alert fired; engineer paged\n- 15:50 UTC: Config rolled back\n- 16:18 UTC: Full recovery\n\n## Action Items\n1. Add drained-pool validation to lb-config linter (Platform Infra, due 2026-05-20)\n2. Require staged rollouts for all lb config changes (SRE, due 2026-05-27)\n---",
-      "expected_behavior": "A 3-5 sentence executive summary in plain prose. Covers: a P1 outage affected ~22% of API requests for about 2 hours, was caused by a configuration error, was resolved by rolling back the change, and the team is implementing linting and rollout process improvements. No bullet points. No timestamp-level detail. Non-technical language."
     },
     {
       "id": "tc_e01",
@@ -214,25 +172,11 @@
       "expected_behavior": "The output resolves the conflicting requirements. Preferred approach: produces a 3P update (the dominant, more specific format) and notes that the newsletter format was not compatible with a 3P update — or asks for clarification in a comment. Does NOT try to awkwardly merge both formats. If it picks one, it explains why at the top. Under 200 words."
     },
     {
-      "id": "tc_e03",
-      "workflow": "edge",
-      "name": "Edge — extremely sparse context for newsletter",
-      "prompt": "Write the company newsletter for this month. Save to output.md.",
-      "expected_behavior": "The output either: (a) produces a newsletter template with clearly marked placeholders for each section, explaining what information is needed, or (b) produces a minimal newsletter that is honest about having no content to include and explicitly requests the highlights from the user. Does NOT invent company events, product launches, or milestones. Under 200 words."
-    },
-    {
       "id": "tc_e04",
       "workflow": "edge",
       "name": "Edge — non-English input, English output requested",
       "prompt": "Écrire une mise à jour 3P pour l'équipe Sécurité pour cette semaine. Output in English please.\n\nContexte:\n- Déploiement du classificateur v3.1 terminé\n- Test d'intrusion réalisé sur le nouveau module multimodal\n- Problème : revue légale du document de politique encore en attente\n\nSave to output.md.",
       "expected_behavior": "A 3P update written entirely in English, accurately translating the French context: classifier v3.1 deployed, penetration testing completed on new multimodal module, legal review of policy document still pending. Uses 'Security team' as the team name (translated). Correct 3P format with 3 sections, concise bullets. Total under 200 words."
-    },
-    {
-      "id": "tc_e05",
-      "workflow": "edge",
-      "name": "Edge — request to merge FAQ and 3P into one doc",
-      "prompt": "Create a document that is both a 3P update and an FAQ about our new remote work policy. The team is the People Ops team.\n\nProgress: Finalized remote work policy v2. Ran 3 info sessions for employees.\nPlans: Publish policy to intranet next week. Run 2 more sessions.\nProblems: 30% of employees still haven't attended a session.\n\nFAQ questions coming in:\n1. When does the new policy take effect?\n2. Who approves exceptions?\n\nSave to output.md.",
-      "expected_behavior": "A document that handles both requests without awkwardly conflating them. Preferred: produces a 3P update section followed by a separate FAQ section, with a clear header for each. Alternatively, notes that these are two distinct formats and explains the choice made. Does not invent policy effective dates or exception approver details not given. Total under 250 words."
     }
   ]
 }

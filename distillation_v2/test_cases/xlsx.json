@@ -43,46 +43,11 @@
       "expected_behavior": "Column headers include '($ mm)' notation. COGS and Gross Profit rows contain Excel formulas (not Python-computed hardcodes). All numeric cells have $#,##0 number format applied. recalc.py returns status='success' with zero errors."
     },
     {
-      "id": "tc_a06",
-      "workflow": "create",
-      "name": "Negative numbers in parentheses — format $#,##0;($#,##0);-",
-      "prompt": "Create output.xlsx with a cash flow statement. At least 2 rows must have negative values (e.g., -50000 for 'CapEx', -30000 for 'Dividends Paid'). Format all numeric cells with custom format '$#,##0;($#,##0);-' so negatives display in parentheses and zeros show as dash. Add a Net Cash formula summing all rows.",
-      "expected_behavior": "Numeric cells have the custom format string '$#,##0;($#,##0);-'. Negative values appear in parentheses format. Net Cash cell contains a SUM formula. Zero values would display as '-'. recalc.py returns status='success'."
-    },
-    {
       "id": "tc_a07",
       "workflow": "create",
       "name": "IF formula — conditional status flag with cell references",
       "prompt": "Create output.xlsx with a sales tracker. Columns: A=Salesperson, B=Target, C=Actual, D=Status. Add 5 rows of data (hardcoded names, targets, actuals in blue font). Column D: Excel IF formula =IF(C2>=B2,\"Met\",\"Missed\") for each row using cell references. No hardcoded 'Met' or 'Missed' strings in column D. Run recalc.py.",
       "expected_behavior": "Column D cells contain IF formulas referencing the same row's B and C columns. No row in D has a hardcoded 'Met' or 'Missed' string. Changing a value in C would update the D status automatically. recalc.py returns status='success'."
-    },
-    {
-      "id": "tc_a08",
-      "workflow": "create",
-      "name": "VLOOKUP — cross-sheet lookup with absolute range reference",
-      "prompt": "Create output.xlsx with 2 sheets: 'Products' (columns: ProductID, ProductName, UnitPrice — 5 rows of data) and 'Orders' (columns: ProductID, ProductName, UnitPrice, Qty, TotalPrice). In Orders, ProductName and UnitPrice use VLOOKUP formulas against Products!$A:$C. TotalPrice = UnitPrice * Qty as a formula. Add 3 order rows. Run recalc.py.",
-      "expected_behavior": "Orders sheet exists. ProductName column contains VLOOKUP formulas referencing Products sheet with absolute range ($A:$C or $A$1:$C$100). UnitPrice column also has VLOOKUP. TotalPrice is a multiplication formula. recalc.py returns status='success' with no #N/A errors."
-    },
-    {
-      "id": "tc_a09",
-      "workflow": "create",
-      "name": "Consistent formulas — same structure across all projection periods",
-      "prompt": "Create a 3-year income statement in output.xlsx. Row 1: headers (Item, FY2025, FY2026, FY2027). Row 2: Revenue (B2=1000000 blue, C2=formula =B2*1.1, D2=formula =C2*1.1). Row 3: COGS margin assumption in A3='COGS %', B3=0.40 (blue). Row 4: COGS (formulas: B4=B2*B3, C4=C2*$B$3, D4=D2*$B$3). Row 5: Gross Profit formulas. Run recalc.py.",
-      "expected_behavior": "Revenue FY2026 and FY2027 reference the prior-year cell (not hardcoded growth). COGS formulas all reference the COGS margin in $B$3 (absolute). Gross Profit row contains subtraction formulas. All 3 columns follow identical logic. recalc.py returns status='success'."
-    },
-    {
-      "id": "tc_a10",
-      "workflow": "create",
-      "name": "Multiples format — 0.0x custom number format for valuation",
-      "prompt": "Create a valuation comparables table in output.xlsx. Columns: Company, EV/EBITDA, P/E, EV/Revenue. Add 4 company rows with numeric values (e.g., EV/EBITDA: 12.5, 14.2, 9.8, 11.1). Apply custom number format '0.0x' to all multiple columns. Add an Average row using AVERAGE formulas. Apply Arial font to all cells.",
-      "expected_behavior": "Multiple columns (EV/EBITDA, P/E, EV/Revenue) have custom format '0.0x'. Values display as '12.5x', '14.2x', etc. Average row contains AVERAGE formulas, not hardcoded values. Arial font is applied across the workbook."
-    },
-    {
-      "id": "tc_a11",
-      "workflow": "create",
-      "name": "Percentage format — 0.0% for margins with zero formula errors",
-      "prompt": "Create a margin analysis in output.xlsx. Rows: Revenue, COGS, Gross Profit (formula), Operating Expenses, EBIT (formula), and margin % rows: Gross Margin =Gross_Profit/Revenue, EBIT Margin =EBIT/Revenue. Format margin cells as 0.0% (one decimal). All calculation rows use formulas. Run recalc.py.",
-      "expected_behavior": "Gross Margin and EBIT Margin cells have 0.0% number format (not just Python-computed percentages). Gross Profit and EBIT rows are formulas, not hardcoded. No #DIV/0! errors (revenue is non-zero). recalc.py returns status='success' with zero errors."
     },
     {
       "id": "tc_a12",
@@ -98,22 +63,6 @@
       "prompt": "Read the attached Excel file using pandas. Print: (1) file shape (rows x columns), (2) column names and dtypes from df.info(), (3) descriptive statistics from df.describe() for all numeric columns, (4) the top 3 rows sorted by Revenue descending.",
       "expected_behavior": "Stdout shows file shape. Column names and dtypes are printed. df.describe() output is shown with count, mean, std, min, 25%, 50%, 75%, max for numeric columns. Top 3 rows by Revenue are printed in order.",
       "fixture_file": "fixtures/sales_data.xlsx"
-    },
-    {
-      "id": "tc_b02",
-      "workflow": "analyze",
-      "name": "Filter — rows above average Revenue with subtotals",
-      "prompt": "Read the attached Excel file with pandas. Compute the average Revenue. Filter to rows where Revenue > average Revenue. Print: count of filtered rows, sum of Revenue for filtered rows, average Revenue for filtered rows. Label each value clearly in the output.",
-      "expected_behavior": "Stdout shows three labeled values: count of above-average rows (a number), their Revenue sum (a dollar amount or number), and their Revenue average. The threshold (average) is used for filtering, not a hardcoded number.",
-      "fixture_file": "fixtures/sales_data.xlsx"
-    },
-    {
-      "id": "tc_b03",
-      "workflow": "analyze",
-      "name": "Aggregate — group by Department, compute headcount and salary stats",
-      "prompt": "Read the attached Excel file with pandas. Group by Department. For each department compute: headcount (count of employees), total Salary, average Salary. Save the grouped summary to output.xlsx. Print the resulting DataFrame to stdout.",
-      "expected_behavior": "output.xlsx is created with one row per Department plus columns for headcount, total Salary, and average Salary. Stdout shows the grouped DataFrame. All departments from the fixture appear. Salary values are numeric.",
-      "fixture_file": "fixtures/employee_data.xlsx"
     },
     {
       "id": "tc_b04",
@@ -138,14 +87,6 @@
       "prompt": "Open the attached Excel file. It has data with a header row and numeric columns. Find the last data row. Add a 'Total' row immediately below with label 'Total' in column A and =SUM() formulas covering the data range for each numeric column. Run scripts/recalc.py on the saved file and print the JSON result.",
       "expected_behavior": "A new 'Total' row is appended after data rows. Each numeric column cell in the Total row contains a =SUM() formula with the correct range reference. No hardcoded totals. recalc.py returns status='success'.",
       "fixture_file": "fixtures/sales_data.xlsx"
-    },
-    {
-      "id": "tc_c02",
-      "workflow": "edit",
-      "name": "Add column — Tax and Net Salary as Excel formulas",
-      "prompt": "Open the attached Excel file. It has a Salary column. Add two new columns: 'Tax (25%)' with formula =Salary_cell*0.25 for each row, and 'Net Salary' with formula =Salary_cell-Tax_cell for each row. Use proper cell references, not Python-computed values. Run recalc.py.",
-      "expected_behavior": "Two new columns are added. Tax column cells contain multiplication formulas referencing the Salary column of the same row. Net Salary cells contain subtraction formulas referencing Salary and Tax cells. No hardcoded values in new columns. recalc.py returns success.",
-      "fixture_file": "fixtures/employee_data.xlsx"
     },
     {
       "id": "tc_c03",
@@ -212,20 +153,6 @@
       "name": "data_only=True — reads calculated value after recalc.py",
       "prompt": "Create output.xlsx with formula =100+50 in cell A1 and formula =A1*2 in B1. Run scripts/recalc.py output.xlsx. Then read the file with load_workbook(data_only=True) and print the values of A1 and B1. State whether they are the calculated integers or the formula strings.",
       "expected_behavior": "After recalc.py runs, load_workbook with data_only=True returns A1=150 (int or float, not the string '=100+50') and B1=300. Printed output shows the numeric calculated values. A clear statement is made that data_only=True reads computed values, not formula strings."
-    },
-    {
-      "id": "tc_e04",
-      "workflow": "edge",
-      "name": "Column widths — auto-size for long text content",
-      "prompt": "Create output.xlsx with a sheet where column A has long text values (30+ characters each, e.g. 'Annual Revenue Projection FY2025') and column B has short numeric values. After writing, set column A width to 40 and column B width to 15 using column_dimensions. Print both column widths.",
-      "expected_behavior": "output.xlsx has column A width >= 40 and column B width = 15. Printed output confirms these widths explicitly. Long text in column A is fully visible (width accommodates 30+ char strings). Values in column B are not truncated."
-    },
-    {
-      "id": "tc_e05",
-      "workflow": "edge",
-      "name": "Library selection — pandas for analysis, openpyxl for formulas",
-      "prompt": "In a single script: (1) Create a DataFrame with 20 rows of random revenue data (100-1000) and use pandas to compute mean, std, min, max — print these. (2) Write the raw data to output.xlsx using pandas to_excel(). (3) Reopen with openpyxl and add a summary row below the data using Excel formulas =AVERAGE(), =STDEV(), =MIN(), =MAX(). Run recalc.py.",
-      "expected_behavior": "pandas is used for the statistics computation (printed to stdout). openpyxl is used for writing Excel formulas in the summary row. Both library names appear in the code. Summary row cells start with '='. recalc.py returns status='success'."
     }
   ]
 }

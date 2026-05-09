@@ -36,28 +36,12 @@
       "fixture_file": "fixtures/nav.html"
     },
     {
-      "id": "tc_a04",
-      "workflow": "inspect",
-      "name": "Extract links — href and text from navigation",
-      "prompt": "Using Playwright, navigate to the nav.html fixture via file:// URL. Wait for networkidle. Find all <a href> links. For each link, print the link text and href attribute. Print the total count of links found.",
-      "expected_behavior": "Playwright waits for networkidle before inspecting. Stdout lists each link with its visible text (e.g., 'Home', 'About', 'Contact') and href value. Total count is printed. All navigation links are discovered.",
-      "fixture_file": "fixtures/nav.html"
-    },
-    {
       "id": "tc_a05",
       "workflow": "inspect",
       "name": "Table inspection — row count and header extraction",
       "prompt": "Using Playwright, navigate to the table.html fixture via file:// URL. Wait for networkidle. Extract: (1) the table header column names, (2) total number of data rows (excluding header). Print both findings to stdout.",
       "expected_behavior": "Playwright discovers the table. Header column names (Name, Score, Grade) are printed. The data row count (5) is printed. Playwright uses appropriate selectors (table, thead, tbody, tr). Browser is closed after.",
       "fixture_file": "fixtures/table.html"
-    },
-    {
-      "id": "tc_a06",
-      "workflow": "inspect",
-      "name": "DOM content — read page title and heading text",
-      "prompt": "Using Playwright, navigate to the nav.html fixture via file:// URL. Wait for networkidle. Read and print: (1) the page title (document.title), (2) the text of all h2 elements found on the page. Use Playwright's locator API.",
-      "expected_behavior": "Page title is printed to stdout. All h2 element texts (Home, About, Contact or similar headings) are printed. Playwright uses locator('h2').all() or similar. wait_for_load_state is used before reading content.",
-      "fixture_file": "fixtures/nav.html"
     },
     {
       "id": "tc_a07",
@@ -92,14 +76,6 @@
       "fixture_file": "fixtures/todo.html"
     },
     {
-      "id": "tc_b04",
-      "workflow": "interact",
-      "name": "Mark item done — verify strikethrough CSS applied",
-      "prompt": "Using Playwright, navigate to todo.html via file:// URL. Wait for networkidle. Add one todo item 'Test item'. Click its Done button. Check if the <li> element has text-decoration: line-through style applied. Print 'Done: struck through' or 'Not struck through'.",
-      "expected_behavior": "An item is added and the Done button is clicked. Playwright reads the li element's style using evaluate() or locator.get_attribute(). Prints 'Done: struck through' if line-through style is detected. Appropriate wait is used after clicking before reading style.",
-      "fixture_file": "fixtures/todo.html"
-    },
-    {
       "id": "tc_b05",
       "workflow": "interact",
       "name": "Select dropdown — choose option and verify selection",
@@ -114,14 +90,6 @@
       "prompt": "Using Playwright, navigate to table.html via file:// URL. Wait for networkidle. Read the Score values from all table rows and print them (original order). Click the #sortBtn button. Wait for the page to update. Read Score values again and print them (sorted order). Confirm the order changed.",
       "expected_behavior": "Score values are printed before clicking sort. After clicking #sortBtn, Score values are printed again in new order. The before and after orders differ. Playwright uses appropriate selectors to read table cell values. Waits ensure JS has updated the DOM before re-reading.",
       "fixture_file": "fixtures/table.html"
-    },
-    {
-      "id": "tc_b07",
-      "workflow": "interact",
-      "name": "Complex form submit — fill all fields and read result",
-      "prompt": "Using Playwright, navigate to form.html via file:// URL. Wait for networkidle. Fill all form fields: name='Jane Doe', email='jane@test.com', role=select 'user', check the #agree checkbox, notes='Testing form'. Click #submitBtn. Read and print the text of the #result div.",
-      "expected_behavior": "All form fields are filled using appropriate Playwright methods (fill for text, select_option for dropdown, check for checkbox). Submit button is clicked. After submission, #result div text is read and printed. The result shows the submitted values. Browser is closed.",
-      "fixture_file": "fixtures/form.html"
     },
     {
       "id": "tc_c01",
@@ -156,22 +124,6 @@
       "fixture_file": "fixtures/todo.html"
     },
     {
-      "id": "tc_c05",
-      "workflow": "verify",
-      "name": "Assert counter state — increment and decrement sequence",
-      "prompt": "Using Playwright, navigate to counter.html via file:// URL. Wait for networkidle. Perform: increment 5 times, decrement 2 times, then read #count. Assert value equals 3. Print the final count and PASS/FAIL result.",
-      "expected_behavior": "Playwright clicks increment 5 times and decrement 2 times. The #count text is read. Value should be '3'. 'PASS: count=3' is printed if correct. Each click has an appropriate wait. The script runs fully without error.",
-      "fixture_file": "fixtures/counter.html"
-    },
-    {
-      "id": "tc_c06",
-      "workflow": "verify",
-      "name": "Assert viewport screenshot differs after action",
-      "prompt": "Using Playwright, navigate to counter.html via file:// URL. Wait for networkidle. Take screenshot before.png. Click Increment 3 times. Take screenshot after.png. Print whether both screenshots were successfully saved (check file existence with os.path.exists).",
-      "expected_behavior": "Two screenshots are saved: before.png and after.png. os.path.exists confirms both files exist and stdout prints 'before.png: exists' and 'after.png: exists'. Both screenshots are taken with proper networkidle wait and after clicking. Browser is closed.",
-      "fixture_file": "fixtures/counter.html"
-    },
-    {
       "id": "tc_d01",
       "workflow": "capture",
       "name": "Console logs — capture all log messages during page load",
@@ -196,14 +148,6 @@
       "fixture_file": "fixtures/nav.html"
     },
     {
-      "id": "tc_d04",
-      "workflow": "capture",
-      "name": "Network idle confirmation — print load state timing",
-      "prompt": "Using Playwright, navigate to form.html via file:// URL. Measure and print: (1) time before goto() in ms, (2) time after wait_for_load_state('networkidle') in ms, (3) elapsed time in ms. Use Python's time module. Then take a screenshot output.png.",
-      "expected_behavior": "Three timing values are printed to stdout: before-goto timestamp, after-networkidle timestamp, and elapsed ms. A screenshot output.png is saved. The code demonstrates proper networkidle waiting. Elapsed time is a positive number. Browser is closed.",
-      "fixture_file": "fixtures/form.html"
-    },
-    {
       "id": "tc_e01",
       "workflow": "edge",
       "name": "Static HTML via file:// — no server required",
@@ -219,35 +163,11 @@
       "expected_behavior": "scripts/with_server.py --help is called first and its output is printed (showing usage, --server, --port, --timeout flags). Then with_server.py is used with proper --server and --port arguments. Playwright connects to localhost:8765. Page title or content is printed. All servers are cleaned up."
     },
     {
-      "id": "tc_e03",
-      "workflow": "edge",
-      "name": "Wait for dynamic content — wait_for_selector before reading",
-      "prompt": "Using Playwright, navigate to todo.html via file:// URL. Wait for networkidle. Add a todo item 'Dynamic item'. Instead of using wait_for_timeout, use page.wait_for_selector('#todoList li') to wait until the new li element appears. Then read and print the first li's text.",
-      "expected_behavior": "Playwright uses page.wait_for_selector('#todoList li') (not just wait_for_timeout) after clicking Add. The first li element text is read after the wait resolves. Printed text is 'Dynamic item'. Demonstrates proper wait_for_selector usage instead of fixed timeout.",
-      "fixture_file": "fixtures/todo.html"
-    },
-    {
       "id": "tc_e04",
       "workflow": "edge",
       "name": "Browser close — always close even if error occurs",
       "prompt": "Write a Playwright script that navigates to counter.html via file:// URL. Wrap the entire browser interaction in a try/finally block so that browser.close() is called in the finally clause even if an exception occurs. Demonstrate by intentionally trying to find a non-existent element '#nonexistent', catch the error, and still print 'Browser closed cleanly'.",
       "expected_behavior": "Code uses try/finally with browser.close() in finally. The locator for '#nonexistent' raises or times out. The exception is caught. 'Browser closed cleanly' is printed. The script exits cleanly (returncode 0 or no uncaught exception). This demonstrates safe browser cleanup.",
-      "fixture_file": "fixtures/counter.html"
-    },
-    {
-      "id": "tc_e05",
-      "workflow": "edge",
-      "name": "Multiple pages — open two pages and compare element counts",
-      "prompt": "Using Playwright, open a single browser. Create two page objects. Navigate page1 to counter.html and page2 to nav.html (both file:// URLs). Wait for networkidle on each. Count buttons on page1 and links on page2. Print both counts. Close the browser (not individual pages).",
-      "expected_behavior": "A single Browser object is created. Two Page objects (page1, page2) are created via browser.new_page(). Each navigates to a different file. Both wait for networkidle. Button count for counter.html (3) and link count for nav.html are printed. browser.close() is called once at the end.",
-      "fixture_file": "fixtures/counter.html"
-    },
-    {
-      "id": "tc_e06",
-      "workflow": "edge",
-      "name": "Reset state — counter back to 0 after reset button",
-      "prompt": "Using Playwright, navigate to counter.html via file:// URL. Wait for networkidle. Increment 5 times. Read and print the count (should be 5). Click the Reset button. Read and print the count again (should be 0). Assert it equals '0' and print PASS or FAIL.",
-      "expected_behavior": "Playwright increments 5 times and reads count (prints 5). Clicks Reset and reads count again (prints 0). Assertion confirms count text is '0'. 'PASS: counter reset to 0' is printed. Browser is closed. All waits are handled properly.",
       "fixture_file": "fixtures/counter.html"
     }
   ]

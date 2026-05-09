@@ -23,18 +23,20 @@ def call_llm(
     api_key: str,
     max_tokens: int,
     base_url: str | None = None,
+    temperature: float | None = None,
 ) -> tuple[str, dict[str, int]]:
     """Call an LLM and return (text_response, usage_dict).
 
     Args:
-        system:     System prompt string.
-        user:       User message — either a plain string or a list of content
-                    blocks (text + image) in Anthropic format.
-        model:      Model ID (e.g. 'anthropic/claude-haiku-4-5').
-        api_key:    API key for the backend.
-        max_tokens: Max tokens to generate.
-        base_url:   If set to an OpenRouter URL, routes via openai SDK.
-                    If None, routes via Anthropic SDK directly.
+        system:      System prompt string.
+        user:        User message — either a plain string or a list of content
+                     blocks (text + image) in Anthropic format.
+        model:       Model ID (e.g. 'anthropic/claude-haiku-4-5').
+        api_key:     API key for the backend.
+        max_tokens:  Max tokens to generate.
+        base_url:    If set to an OpenRouter URL, routes via openai SDK.
+                     If None, routes via Anthropic SDK directly.
+        temperature: Sampling temperature (None = model default).
 
     Returns:
         (text, {"prompt_tokens": N, "completion_tokens": M})
@@ -47,6 +49,7 @@ def call_llm(
             api_key=api_key,
             max_tokens=max_tokens,
             base_url=base_url,
+            temperature=temperature,
         )
     return _call_anthropic(
         system=system,
@@ -54,6 +57,7 @@ def call_llm(
         model=model,
         api_key=api_key,
         max_tokens=max_tokens,
+        temperature=temperature,
     )
 
 
@@ -68,6 +72,7 @@ def _call_openrouter(
     api_key: str,
     max_tokens: int,
     base_url: str,
+    temperature: float | None = None,
 ) -> tuple[str, dict[str, int]]:
     from openai import OpenAI
 
@@ -77,11 +82,10 @@ def _call_openrouter(
         {"role": "system", "content": system},
         {"role": "user", "content": _to_openai_content(user)},
     ]
-    resp = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        max_tokens=max_tokens,
-    )
+    kwargs: dict = {"model": model, "messages": messages, "max_tokens": max_tokens}
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    resp = client.chat.completions.create(**kwargs)
     text = resp.choices[0].message.content or ""
     usage = {
         "prompt_tokens": resp.usage.prompt_tokens if resp.usage else 0,
@@ -125,17 +129,21 @@ def _call_anthropic(
     model: str,
     api_key: str,
     max_tokens: int,
+    temperature: float | None = None,
 ) -> tuple[str, dict[str, int]]:
     import anthropic
 
     content = user if isinstance(user, list) else [{"type": "text", "text": user}]
     client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": content}],
-    )
+    kwargs: dict = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": [{"role": "user", "content": content}],
+    }
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    message = client.messages.create(**kwargs)
     text = message.content[0].text.strip()
     usage = {
         "prompt_tokens": message.usage.input_tokens,

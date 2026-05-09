@@ -67,6 +67,7 @@ class Judge:
         max_image_pages: int = MAX_IMAGE_PAGES,
         anthropic_api_key: str | None = None,
         base_url: str | None = None,
+        temperature: float = 0.2,
     ) -> None:
         if not isinstance(rubric, dict) or "criteria" not in rubric:
             raise ValueError("rubric must have a 'criteria' list")
@@ -76,6 +77,7 @@ class Judge:
         self.max_image_pages = max_image_pages
         self._api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
         self._base_url = base_url
+        self._temperature = temperature
         if not self._api_key:
             raise RuntimeError(
                 "No API key set for Judge (ANTHROPIC_KEY or OpenRouter key required)"
@@ -354,6 +356,7 @@ class Judge:
                 api_key=self._api_key,
                 max_tokens=2048,
                 base_url=self._base_url,
+                temperature=self._temperature,
             )
             parsed = _parse_response(raw)
             write_api_call(

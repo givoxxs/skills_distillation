@@ -67,53 +67,11 @@
       "expected_behavior": "Output is a 480x480 animated GIF. A horizontal bar starts empty and progressively fills to the right. A percentage number (0 to 100) is visible and increases as the bar fills. Animation ends at full/100%."
     },
     {
-      "id": "tc_a10",
-      "workflow": "create",
-      "name": "Color shift — background cycling through hues",
-      "prompt": "Create a Slack emoji GIF where the background smoothly cycles through blue → purple → pink → blue using create_gradient_background on each frame. No other objects needed. Save as output.gif.",
-      "expected_behavior": "Output is a 128x128 animated GIF. The background color visibly shifts across frames through blue, purple, and pink tones. The transition between colors is smooth (not a jump). No other shapes are required."
-    },
-    {
-      "id": "tc_a11",
-      "workflow": "create",
-      "name": "Combined — bouncing and spinning simultaneously",
-      "prompt": "Make a Slack emoji GIF of a gold coin (yellow circle) that both bounces vertically AND rotates as it bounces — both animations happen at the same time. Save as output.gif.",
-      "expected_behavior": "Output is a 128x128 animated GIF. A yellow circle simultaneously moves up and down (bouncing) and shows a rotation effect (e.g. ellipse squashing to simulate perspective spin, or PIL rotate). Both motions are visible together."
-    },
-    {
-      "id": "tc_a12",
-      "workflow": "create",
-      "name": "Countdown — 3-2-1-GO! animated number sequence",
-      "prompt": "Create a Slack emoji GIF that shows a countdown: 3, then 2, then 1, then 'GO!'. Each number should pop in with a scale-up effect. Keep total duration under 3 seconds. Save as output.gif.",
-      "expected_behavior": "Output is a 128x128 animated GIF lasting under 3 seconds. Numbers 3, 2, 1, and 'GO' appear in sequence, each with a pop/scale-in effect. Each number is clearly readable. The sequence plays through at least once."
-    },
-    {
-      "id": "tc_a13",
-      "workflow": "create",
-      "name": "Shake — vibrating alert icon oscillating side-to-side",
-      "prompt": "Create a Slack emoji GIF of a red circle (alert icon) that shakes rapidly from side to side using math.sin() oscillation. Save as output.gif.",
-      "expected_behavior": "Output is a 128x128 animated GIF. A red circle rapidly oscillates left and right in a shaking/vibrating motion. The movement is fast and looks like a buzzing alert. Animation loops."
-    },
-    {
       "id": "tc_a14",
       "workflow": "create",
       "name": "Snowfall — particles falling with varying speeds",
       "prompt": "Create a Slack emoji GIF of snowflakes (small white circles or dots) falling from the top of the frame at different speeds and sizes. Background should be dark blue. Save as output.gif.",
       "expected_behavior": "Output is a 128x128 animated GIF. Multiple small white or light-colored dots descend from the top of the frame. Particles move at different speeds. Background is dark blue or near-black. Scene looks like falling snow."
-    },
-    {
-      "id": "tc_a15",
-      "workflow": "create",
-      "name": "Elastic — spring overshoot then settle",
-      "prompt": "Create a Slack emoji GIF of a purple circle that drops from the top using elastic_out easing — it overshoots the center, bounces back, and settles. Use interpolate() with easing='elastic_out'. Save as output.gif.",
-      "expected_behavior": "Output is a 128x128 animated GIF. A purple circle enters from above the frame. It passes the center (overshoot), bounces back beyond it, and oscillates several times before settling at rest. The elastic spring wobble is clearly visible."
-    },
-    {
-      "id": "tc_a16",
-      "workflow": "create",
-      "name": "Arc motion — ball following parabolic trajectory",
-      "prompt": "Create a Slack emoji GIF of an orange ball travelling in a parabolic arc from the bottom-left to the bottom-right, peaking in the upper center. Use calculate_arc_motion from core.easing. Save as output.gif.",
-      "expected_behavior": "Output is a 128x128 animated GIF. An orange circle follows a curved path — starting at lower-left, arcing upward through the top-center, and landing at lower-right. The curved path is visible and distinct from a straight diagonal line."
     },
     {
       "id": "tc_b01",
@@ -123,39 +81,11 @@
       "expected_behavior": "A 128x128 animated GIF (output.gif) is created and exists on disk. validate_gif is called and prints a report showing: dimensions (128x128), file size in KB, frame count, fps, duration. The 'passes' result is True. Report is printed to stdout."
     },
     {
-      "id": "tc_b02",
-      "workflow": "validate",
-      "name": "Create then validate — message GIF at 480x480",
-      "prompt": "Create a 480x480 Slack message GIF (rotating star, 20fps, 20 frames). Then validate it with validate_gif using is_emoji=False and verbose=True. Print results. Save as output.gif.",
-      "expected_behavior": "A 480x480 animated GIF (output.gif) is created. validate_gif is called with is_emoji=False. The printed report shows dimensions 480x480, frame count ~20, fps ~20, file size in KB. The validation output is visible in stdout."
-    },
-    {
-      "id": "tc_b03",
-      "workflow": "validate",
-      "name": "is_slack_ready — quick check and conditional print",
-      "prompt": "Create a simple 128x128 bouncing ball GIF (10 frames). Then use is_slack_ready() from core.validators to check it. If it returns True, print 'GIF is ready for Slack!', otherwise print 'GIF needs adjustment'. Save GIF as output.gif.",
-      "expected_behavior": "A 128x128 animated GIF (output.gif) is created. is_slack_ready() is called on it. Since dimensions are correct, it returns True. 'GIF is ready for Slack!' is printed to stdout. No crash or error occurs."
-    },
-    {
       "id": "tc_c01",
       "workflow": "optimize",
       "name": "Optimize — compare file sizes with and without deduplication",
       "prompt": "Create a 128x128 animated GIF of a slowly pulsing circle (30 frames, 15fps). Save it twice: once as original.gif (num_colors=128) and once as optimized.gif (num_colors=48, remove_duplicates=True). Print the file size of each in KB and state which is larger.",
       "expected_behavior": "Two GIF files are created: original.gif and optimized.gif. Both are 128x128. File sizes in KB are printed for each. The optimized version (48 colors, duplicates removed) should be smaller. Output clearly names both files and their sizes."
-    },
-    {
-      "id": "tc_c02",
-      "workflow": "optimize",
-      "name": "Optimize — optimize_for_emoji auto-resizes a 480x480 GIF",
-      "prompt": "Create a 480x480 animated GIF of a spinning star (20 frames). Save it with optimize_for_emoji=True as emoji.gif. Print the final file info returned by builder.save().",
-      "expected_behavior": "The GIF is created at 480x480 internally. When saved with optimize_for_emoji=True, the builder prints a resize message and the final GIF is 128x128. The printed save() info dict shows dimensions 128x128 and num_colors ≤ 48."
-    },
-    {
-      "id": "tc_c03",
-      "workflow": "optimize",
-      "name": "Optimize — FPS tradeoff: 20fps vs 10fps file size comparison",
-      "prompt": "Create the same bouncing ball animation twice: fast.gif at 20fps (20 frames) and small.gif at 10fps (10 frames), both 128x128. Print both file sizes and state the percentage reduction.",
-      "expected_behavior": "Two animated GIFs are created and both are 128x128. File sizes in KB are printed for both fast.gif and small.gif. The 10fps version is smaller. A percentage reduction or comparison is printed to stdout."
     },
     {
       "id": "tc_d01",

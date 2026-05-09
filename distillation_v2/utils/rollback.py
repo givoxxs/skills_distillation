@@ -18,20 +18,34 @@ def choose_validation_tcs(
     n: int,
     round_results: list["EvalResult"] | None = None,
     seed: int | None = None,
-) -> list[dict[str, Any]]:
-    """Select n test cases for post-Teacher validation.
+) -> tuple[list[dict[str, Any]], float]:
+    """Select TCs at rank 6-8 (by score) for post-Teacher validation.
 
-    When round_results is provided, picks the top-N scoring TCs from the round.
-    Falls back to random selection when round_results is absent or insufficient.
+    Returns (val_tcs, baseline_score) where baseline_score is the avg score
+    of those TCs in the current round (with the old SKILL.md).
+
+    Rank 6-8 are "borderline" TCs: not trivially easy (rank 1-5 ceiling at 1.0)
+    and not always-failing. Their scores are sensitive to SKILL.md quality.
+
+    Falls back to random selection when round_results is absent.
     """
     if round_results:
         score_by_id = {r.test_case_id: r.llm_judge_score for r in round_results}
         ranked = sorted(
             all_tcs, key=lambda tc: score_by_id.get(tc["id"], 0.0), reverse=True
         )
-        return ranked[: min(n, len(ranked))]
+        # Take rank 6-8 (0-indexed: 5,6,7). If fewer TCs available, shift start left.
+        start = min(5, max(0, len(ranked) - n))
+        val_tcs = ranked[start : start + n]
+        baseline = (
+            sum(score_by_id.get(tc["id"], 0.0) for tc in val_tcs) / len(val_tcs)
+            if val_tcs
+            else 0.0
+        )
+        return val_tcs, baseline
     rng = random.Random(seed)
-    return rng.sample(all_tcs, min(n, len(all_tcs)))
+    val_tcs = rng.sample(all_tcs, min(n, len(all_tcs)))
+    return val_tcs, 0.0
 
 
 def run_validation(
@@ -49,42 +63,44 @@ def run_validation(
     original = skill_md_path.read_text(encoding="utf-8")
     try:
         skill_md_path.write_text(new_skill_content, encoding="utf-8")
-        emit(f"  [validation] running {len(validation_tcs)} TC(s) with new SKILL.md...")
+        emit(f"  [gate1] running {len(validation_tcs)} TC(s) with new SKILL.md...")
         results = run_batch_fn(validation_tcs)
         if not results:
-            emit("  [validation] no results — treating as 0.0")
+            emit("  [gate1] no results — treating as 0.0")
             return 0.0
         avg = sum(r.llm_judge_score for r in results if r.llm_judge_score >= 0) / len(
             results
         )
-        emit(f"  [validation] avg_score={avg:.3f}")
+        emit(f"  [gate1] val_score={avg:.3f}")
         return avg
     finally:
         try:
             skill_md_path.write_text(original, encoding="utf-8")
         except Exception as exc:
-            emit(f"  [validation] CRITICAL: failed to restore SKILL.md: {exc}")
+            emit(f"  [gate1] CRITICAL: failed to restore SKILL.md: {exc}")
             _log.error("Failed to restore SKILL.md at %s: %s", skill_md_path, exc)
 
 
 def decide(
-    new_score: float,
+    val_score: float,
     baseline_score: float,
     threshold: float,
     emit: Callable[[str], None],
 ) -> bool:
     """Return True (keep new SKILL.md) or False (rollback).
 
-    Keep when: new_score >= baseline_score - threshold
-    Rollback when: new_score < baseline_score - threshold
-    Tie (equal): keep new.
+    Keep when: val_score >= baseline_score - threshold
+    baseline_score = avg score of val TCs in the previous round (old SKILL.md).
     """
-    delta = new_score - baseline_score
-    keep = new_score >= baseline_score - threshold
+    delta = val_score - baseline_score
+    keep = val_score >= baseline_score - threshold
     if keep:
-        emit(f"  [rollback] KEEP new SKILL.md (Δ={delta:+.3f}, threshold={threshold})")
+        emit(
+            f"  [gate1] KEEP new SKILL.md (val={val_score:.3f}, baseline={baseline_score:.3f}, Δ={delta:+.3f})"
+        )
     else:
         emit(
-            f"  [rollback] ROLLBACK to old SKILL.md " f"(Δ={delta:+.3f} < -{threshold})"
+            f"  [gate1] ROLLBACK to old SKILL.md "
+            f"(val={val_score:.3f} < baseline={baseline_score:.3f} - {threshold})"
         )
     return keep

@@ -185,8 +185,11 @@ def main(
     # CLI flag --regenerate-rubric always wins; otherwise read from config (default: true)
     regenerate_rubric = regenerate_rubric or rubric_cfg.get("regenerate_each_run", True)
     keep_recent_rubrics = rubric_cfg.get("keep_recent", 5)
-    rollback_threshold = -999.0 if no_rollback else cfg.get("rollback_threshold", 0.05)
+    gate1_threshold = cfg.get("gate1_threshold", 0.10)
+    gate2_threshold = cfg.get("gate2_threshold", 0.10)
     validation_tc_count = 0 if no_rollback else cfg.get("validation_tc_count", 3)
+    teacher_temperature = cfg.get("teacher_temperature", 0.3)
+    judge_temperature = cfg.get("judge_temperature", 0.2)
     max_retry_per_tc = cfg.get("max_retry_per_tc", 3)
     max_image_pages = cfg.get("max_image_pages", 10)
     watch_skill_hash = rubric_cfg.get("watch_skill_hash", False)
@@ -256,8 +259,11 @@ def main(
         else cfg.get("stop_threshold", 0.7),
         converge_delta=cfg.get("converge_delta", 0.02),
         converge_k=cfg.get("converge_k", 3),
-        rollback_threshold=rollback_threshold,
+        gate1_threshold=gate1_threshold,
+        gate2_threshold=gate2_threshold,
         validation_tc_count=validation_tc_count,
+        teacher_temperature=teacher_temperature,
+        judge_temperature=judge_temperature,
         max_retry_per_tc=max_retry_per_tc,
         max_image_pages=max_image_pages,
         results_dir=results_dir,
