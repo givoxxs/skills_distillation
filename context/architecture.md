@@ -121,17 +121,36 @@ Step 4: hybrid = rule_weight × rule_score + llm_weight × llm_judge_score
 ```
 _comment objects trong array → filter bằng `if "id" in tc`.
 
-## Distillation batch loop
+## Distillation batch loop (v1)
 ```
 Round N:
   Split test_cases → batches (batch_size từ config.yaml hoặc -b CLI)
   For each batch:
     Run student → Score → Summarize → Teacher → Update SKILL.md
-  avg_score = avg(hybrid_score) — dùng hybrid_score, KHÔNG phải rule_score
+  avg_score = avg(hybrid_score)
   Check stopping criteria
   round_key_notes_history tích lũy → Teacher nhận 2 rounds gần nhất
 ```
 SKILL.md cập nhật progressive trong round — batch sau hưởng lợi từ batch trước.
+
+## Distillation v2 loop (pipeline.py — Gate 1 + Gate 2)
+```
+Round N:
+  _run_batch() × all batches  [ThreadPoolExecutor, parallel=N]
+    → run_student() + Judge.score(temp=0.2, max_gif_frames=3) + make_run_log()
+  Gate 2: round_avg < prev_avg - 0.10
+    → restore SKILL_round_{best_N - 1}.md → working_md
+    → skip Teacher
+  teacher_rewrite(temp=0.3) — reads ALL run_logs
+  Gate 1: val_tcs = rank-6/7/8 TCs từ round hiện tại
+    → run_validation() với new SKILL.md
+    → baseline = avg(val_tcs scores trong current round, old SKILL.md)
+    → keep nếu val_score >= baseline - 0.10
+  _save_skill_version() → SKILL_round_N.md
+  if round_avg > best_score:
+    best_skill_snapshot = SKILL_round_{N-1}.md  ← version TCs đã chạy với
+  Check stopping: stop_threshold / converge / max_rounds
+```
 
 ## Config priority
 ```

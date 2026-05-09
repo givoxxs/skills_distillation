@@ -52,15 +52,24 @@ distillation_v2/
 
 ```
 Round N:
-  1. _run_batch() × all batches
+  1. _run_batch() × all batches  [parallel=N với ThreadPoolExecutor]
      ├── run_student() → _run_once() → _stream_claude()  [stages/student.py]
-     ├── Judge.score()                                    [stages/judge.py]
+     ├── Judge.score()  [temp=0.2, max_gif_frames=3]      [stages/judge.py]
      └── make_run_log()                                   [stages/summarizer.py]
-  2. teacher_rewrite() — once per round, reads ALL run_logs  [stages/teacher.py]
-  3. choose_validation_tcs() — top-N by score từ round_results
-  4. run_validation() + decide() → keep or rollback SKILL.md
-  5. Check stopping criteria
+  2. Gate 2: round_avg < prev_avg - 0.10
+     → hard rollback: restore SKILL_round_{best_N-1}.md (version TCs đã chạy với)
+     → skip Teacher
+  3. teacher_rewrite() — once per round, reads ALL run_logs  [temp=0.3]
+  4. Gate 1: choose rank-6/7/8 TCs (borderline scores, sensitive to SKILL.md)
+     → run_validation() với new SKILL.md
+     → decide(): keep nếu val_score >= baseline - 0.10
+     → baseline = avg score của TCs đó trong current round (old SKILL.md)
+  5. _save_skill_version() → SKILL_round_N.md
+  6. Track best: best_skill_snapshot = SKILL_round_{N-1}.md  ← fixed off-by-one
+  7. Check stopping criteria (stop_threshold / converge / max_rounds)
 ```
+
+**no_llm_judge mode:** khi `--no-llm-judge`, `_run_one` skip judge call hoàn toàn, set `llm_judge_score=0.0`. Student vẫn chạy — dùng để test infra không tốn Anthropic API.
 
 ---
 
@@ -173,11 +182,20 @@ Không còn sanity check "reject nếu new SKILL.md < 80% old length" trong pipe
 
 ---
 
-## Validation TC selection (H5)
+## Validation TC selection — rank 6-8 (updated 09/05)
 
-`choose_validation_tcs()` giờ nhận `round_results: list[EvalResult] | None`:
-- Có results → top-N by `hybrid_score` (stable, deterministic)
-- Không có results → random fallback
+`choose_validation_tcs()` nhận `round_results: list[EvalResult] | None`, trả về `tuple[list, float]`:
+- **`val_tcs`**: rank 6, 7, 8 (index 5:8 sau sort descending by `llm_judge_score`)
+  - Không phải top-6 mà là TCs THỨ 6, 7, 8 — "borderline": không trivially easy (top 5 ceiling=1.0) và không luôn fail (bottom)
+  - `start = min(5, max(0, len(ranked) - n))` — shift left nếu ít TCs
+- **`baseline`**: avg score của chính những TCs đó trong round hiện tại (với old SKILL.md)
+- Không có results → random fallback, baseline=0.0
+
+**Gate 1 decide logic:**
+```python
+keep = val_score >= baseline - gate1_threshold  # default threshold=0.10
+```
+Baseline được tính từ cùng TCs trong round hiện tại → so sánh apple-to-apple (không phải round trước).
 
 ---
 
@@ -240,9 +258,26 @@ CLI flag → config.yaml → hardcoded default
 
 ---
 
+## LLM temperature defaults (09/05)
+
+| Component | Default | Lý do |
+|---|---|---|
+| Judge | 0.2 | Near-deterministic scoring — consistency quan trọng hơn creativity |
+| Teacher | 0.3 | Một chút creativity để explore fixes, không quá random |
+
+Config override: `judge_temperature`, `teacher_temperature` trong `config.yaml` hoặc thêm param vào `run_distillation()`.
+
+## GIF frame handling (Judge)
+
+`Judge` có `max_gif_frames=3` (tách riêng khỏi `max_image_pages=10` dùng cho DOCX pages):
+- Sample evenly: start / middle / end frames
+- Composite lên background color từ GIF palette (tránh transparent → black frames)
+- 3 frames đủ cho judge assess "render đúng không" mà không tốn nhiều image tokens
+
 ## Known issues / Cần làm tiếp
 
-1. **Scripts copy**: SKILL.md có `python scripts/office/validate.py` — scripts chưa được copy vào `sandbox.cwd/`. Hiện tại bỏ qua (validate không chạy được trong sandbox).
-2. **Gemma variance**: cùng SKILL.md, round 1→2 score dao động 0.66→0.42. Cần nhiều rounds hơn để đánh giá trend thực tế.
-3. **So sánh v1 vs v2** cho thesis writeup: chạy cùng test set, report chênh lệch score.
-4. **Run full pipeline verification**: Chạy `python run.py --skill docx --rounds 3 --test-cases 5` để confirm end-to-end không còn sonnet charges, iterations > 0 mọi TC.
+1. **Scripts copy**: `validate.py` chưa được copy vào sandbox — validate check vẫn không chạy được.
+2. **Gemma variance**: score dao động đáng kể giữa các runs (compound non-determinism: Student + Judge + Teacher). Gate 2 giảm regression nhưng không loại bỏ hoàn toàn.
+3. **docx bimodal distribution**: nhiều TCs luôn score 1.0 hoặc 0.0 → rank 6-8 thường vẫn ở 1.0 → Gate 1 baseline=1.0 → validation phải đạt ≥0.9 để pass. Ít discriminating hơn so với skills có distribution mịn.
+4. **So sánh v1 vs v2** cho thesis writeup.
+5. **batch_log_paths** (dead code trong pipeline.py): accumulated nhưng không dùng — harmless.
