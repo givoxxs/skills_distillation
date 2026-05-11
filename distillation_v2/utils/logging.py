@@ -69,23 +69,23 @@ def get_api_calls_path() -> Path | None:
     return getattr(sys.modules[__name__], "_api_calls_path", None)
 
 
+def _append_jsonl(path: Path, record: dict[str, Any], kind: str) -> None:
+    try:
+        with path.open("a", buffering=1) as f:
+            f.write(json.dumps(record, default=str) + "\n")
+    except (OSError, TypeError, ValueError) as e:
+        logger.warning("%s write failed (%s): %s", kind, path, e)
+
+
 def write_eval_detail(record: dict[str, Any]) -> None:
     path = get_eval_detail_path()
     if path is None:
         return
-    try:
-        with path.open("a", buffering=1) as f:
-            f.write(json.dumps(record, default=str) + "\n")
-    except Exception:
-        pass
+    _append_jsonl(path, record, "eval_detail")
 
 
 def write_api_call(record: dict[str, Any]) -> None:
     path = get_api_calls_path()
     if path is None:
         return
-    try:
-        with path.open("a", buffering=1) as f:
-            f.write(json.dumps(record, default=str) + "\n")
-    except Exception:
-        pass
+    _append_jsonl(path, record, "api_call")
