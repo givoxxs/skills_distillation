@@ -41,12 +41,11 @@ sandbox:
 env:
   openrouter_key: "OPENROUTER_API_KEY"
   openrouter_base_url: "https://openrouter.ai/api"
-  anthropic_key: "ANTHROPIC_KEY"    # used by Teacher + Judge (normal Anthropic SDK)
 
 # ── Rubric ───────────────────────────────────────────────────────────────────
 rubric:
   cache_dir: "./rubrics"
-  regenerate_each_run: true  # force fresh rubric on every new run (default)
+  regenerate_each_run: false  # use cached rubric when SKILL.md hash matches
   keep_recent: 5             # keep N most recent rubric files per skill; older are deleted
   watch_skill_hash: false    # true → auto-regenerate rubric when SKILL.md changes
 

@@ -169,9 +169,8 @@ def main(
     )
     _log = logging.getLogger("distillation")
     _log.info(
-        "v2  OPENROUTER_API_KEY=%s  ANTHROPIC_KEY=%s",
+        "v2  OPENROUTER_API_KEY=%s",
         "SET" if os.environ.get("OPENROUTER_API_KEY") else "MISSING",
-        "SET" if os.environ.get("ANTHROPIC_KEY") else "MISSING (not required)",
     )
 
     # Resolve CLI > config > default
@@ -192,7 +191,7 @@ def main(
     judge_temperature = cfg.get("judge_temperature", 0.2)
     max_retry_per_tc = cfg.get("max_retry_per_tc", 3)
     max_image_pages = cfg.get("max_image_pages", 10)
-    max_gif_frames = cfg.get("max_gif_frames", 3)
+    max_gif_frames = cfg.get("max_gif_frames", 5)
     watch_skill_hash = rubric_cfg.get("watch_skill_hash", False)
 
     # Test cases file (default to v2 test_cases/)
@@ -212,7 +211,9 @@ def main(
         sys.exit(1)
     selected = all_cases[:test_cases] if test_cases else all_cases
 
-    # --workflow filter: restrict which TCs are RUN (rubric always uses all selected TCs)
+    # --workflow / --test-cases filter which TCs are RUN.
+    # Rubric uses the full TC pool (all_cases) so the grading yardstick is
+    # stable across runs and not skewed by an ad-hoc subset.
     _WORKFLOW_MAP = {
         "a": "create",
         "b": "read",
@@ -247,7 +248,7 @@ def main(
     summary = pipeline.run_distillation(
         skill=skill,
         test_cases=run_cases,
-        rubric_test_cases=selected,
+        rubric_test_cases=all_cases,
         student_model=student,
         teacher_model=teacher,
         judge_model=judge,
