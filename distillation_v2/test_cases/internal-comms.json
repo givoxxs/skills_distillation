@@ -11,13 +11,6 @@
       "expected_behavior": "A 3P update in markdown with three clearly labeled sections: Progress, Plans, Problems. Each section has 3-5 concise bullet points. Total length is under 250 words. Tone is direct, data-driven, no filler. Bullets lead with the outcome or action, not the process."
     },
     {
-      "id": "tc_a02",
-      "workflow": "create",
-      "name": "3P update — Trust & Safety team weekly",
-      "prompt": "Write a 3P update for the Trust & Safety team for the week of 2026-05-04 to 2026-05-08. Audience is the Head of Safety and the CTO. Be concise — leadership reads 20 of these.\n\nProgress this week:\n- Shipped classifier v3.1 reducing false-positive rate by 18% vs v3.0\n- Completed red-teaming sprint on Claude 4 Opus; filed 9 issues, 6 already closed\n- Reviewed and approved updated content policy for synthetic media\n- Onboarded 2 new safety researchers\n\nPlans:\n- Launch classifier v3.1 to 100% traffic on Monday\n- Start red-teaming sprint for the new multimodal endpoint (images)\n- Publish updated internal policy doc to Notion by Wednesday\n\nProblems:\n- Image classifier still underperforming on edge cases in 4 categories — need 3 more weeks of data\n- Pending legal review for the synthetic media policy update is on day 12; escalating\n\nSave to output.md.",
-      "expected_behavior": "A concise 3P update with Progress / Plans / Problems sections, each with 3-5 bullets. Total under 250 words. Bullets are specific and action-oriented, not vague. Problems section calls out blockers clearly and includes a status (e.g., escalating, waiting for X)."
-    },
-    {
       "id": "tc_a03",
       "workflow": "create",
       "name": "3P update — very sparse context",
@@ -44,13 +37,6 @@
       "name": "FAQ — return-to-office policy",
       "prompt": "Write an internal FAQ document answering common employee questions about Anthropic's updated return-to-office policy effective June 1, 2026. Format as Q&A in markdown. Keep each answer to 2-4 sentences max.\n\nQuestions employees are asking:\n1. How many days per week are we expected to be in office?\n2. Which roles are exempt from the in-office requirement?\n3. What if I live more than 50 miles from the nearest office?\n4. Can I still work fully remotely if my manager approves it?\n5. What happens if I don't comply — is this tied to performance reviews?\n6. When does the new policy start and where can I read the full policy?\n\nPolicy details to use in your answers:\n- Expectation: 3 days/week in-office for most roles (Tuesday, Wednesday, Thursday preferred)\n- Exempt roles: data center operations, field sales, roles in cities with no Anthropic office\n- Remote employees >50 miles away: expected to travel to SF or NYC office 2x per quarter for team weeks\n- Manager discretion: exceptions require VP approval, not just manager approval\n- Non-compliance: addressed through normal performance management process; not a separate disciplinary track\n- Policy effective June 1, 2026; full policy at https://intranet.anthropic.com/hr/rto-policy-2026\n\nSave to output.md.",
       "expected_behavior": "A markdown FAQ with 6 clearly labeled Q&A pairs. Each answer is 2-4 sentences and uses the policy details provided. Tone is clear, empathetic, and non-threatening. No invented policy details. Includes a link to the full policy doc in the last answer."
-    },
-    {
-      "id": "tc_a07",
-      "workflow": "create",
-      "name": "FAQ — benefits open enrollment",
-      "prompt": "Write an internal FAQ for Anthropic's 2026 benefits open enrollment period. Audience: all US employees. Format: markdown Q&A, short answers.\n\nQuestions being asked:\n1. When does open enrollment open and close?\n2. What's new or changed for 2026?\n3. Do I have to do anything if I want to keep the same plan?\n4. Where do I go to make my elections?\n5. Who do I contact if I have questions?\n\nFacts to use:\n- Open enrollment: May 12 – May 22, 2026\n- Changes for 2026: new dental network (Delta Dental), FSA contribution limit raised to $3,200, new pet insurance option\n- Passive enrollment: employees who do nothing keep their current medical/dental/vision; FSA and HSA require re-enrollment every year\n- Elections portal: https://benefits.anthropic.com (login with SSO)\n- Questions: benefits@anthropic.com or Slack #people-benefits\n\nSave to output.md.",
-      "expected_behavior": "A markdown FAQ with 5 Q&A pairs. Each answer is 2-4 sentences. Includes the enrollment dates, portal URL, and contact info. Notes the passive enrollment rule and FSA/HSA re-enrollment requirement. Tone is friendly and practical."
     },
     {
       "id": "tc_a08",
@@ -177,6 +163,34 @@
       "name": "Edge — non-English input, English output requested",
       "prompt": "Écrire une mise à jour 3P pour l'équipe Sécurité pour cette semaine. Output in English please.\n\nContexte:\n- Déploiement du classificateur v3.1 terminé\n- Test d'intrusion réalisé sur le nouveau module multimodal\n- Problème : revue légale du document de politique encore en attente\n\nSave to output.md.",
       "expected_behavior": "A 3P update written entirely in English, accurately translating the French context: classifier v3.1 deployed, penetration testing completed on new multimodal module, legal review of policy document still pending. Uses 'Security team' as the team name (translated). Correct 3P format with 3 sections, concise bullets. Total under 200 words."
+    },
+    {
+      "id": "tc_d03",
+      "workflow": "convert",
+      "name": "Convert incident report to exec one-pager",
+      "prompt": "Convert this incident report into a one-paragraph executive summary for VP-and-above leadership readout. Target 80-120 words (no bullets, no section headers). Cover: what failed, customer impact, root cause in one sentence, current status, top action item. Save to output.md.\n\nIncident report:\n---\n## Incident Summary\n**ID:** INC-2026-0506  \n**Severity:** P1  \n**Start:** 2026-05-06 14:32 UTC  \n**End:** 2026-05-06 15:48 UTC  \n**Duration:** 76 minutes\n\n## Timeline\n- 14:32 UTC: Error rate on /v1/messages spikes from 0.1% to 32%\n- 14:38 UTC: PagerDuty alert; on-call investigates\n- 14:55 UTC: Root cause identified (memory leak in router v2.3.1)\n- 15:10 UTC: Hotfix deployed to canary; error rate dropping\n- 15:48 UTC: Full rollout complete; error rate <0.1%\n\n## Impact\n- ~12,000 paying customer requests affected\n- Slack auto-credits issued\n\n## Root Cause\nRouter v2.3.1 leaked HTTP connections on stream timeout, exhausting the pool after ~90 min of normal traffic.\n\n## Action Items\n- Roll forward to router v2.3.2 with connection lifecycle test (@infra-team, due 2026-05-13)\n- Add memory-leak load test to release gate (@qa-team, due 2026-05-20)\n",
+      "expected_behavior": "A single paragraph of 80-120 words (no bullets, no headers) covering: P1 /v1/messages error spike (32%), 76-minute duration, ~12k requests affected, root cause (router v2.3.1 connection leak), status (resolved via hotfix to v2.3.2 rollout), and the top action item (release-gate memory-leak test). Tone is executive-direct, no jargon. No invented facts."
+    },
+    {
+      "id": "tc_d04",
+      "workflow": "convert",
+      "name": "Convert newsletter highlights to Slack announcement",
+      "prompt": "Convert these three newsletter highlights into a single Slack announcement post for the #announcements channel. Casual but professional tone, 60-100 words, use 1-2 emoji naturally, keep any provided links. Save to output.md.\n\nHighlights:\n- We hit 100M API calls in April — a 3x YoY milestone.\n- Claude 4 Opus is now generally available on the API. [Release notes](https://anthropic.com/news/c4-opus-ga)\n- New York office opens for tours June 15. RSVP by June 10: [link](https://intranet.anthropic.com/ny-tour)\n",
+      "expected_behavior": "A Slack announcement post (60-100 words). Covers all three highlights with their key facts (100M April calls / 3x YoY, Opus GA, NY office tour June 15 with June 10 RSVP). Markdown links preserved. Tone is casual-professional. 1-2 emoji used naturally (not stacked). No bullets — flows as a single post."
+    },
+    {
+      "id": "tc_e03",
+      "workflow": "edge",
+      "name": "Edge — bare prompt with no context",
+      "prompt": "Write a 3P update for the platform team. Save to output.md.",
+      "expected_behavior": "The output does NOT invent specific metrics, project names, dates, or blockers. Acceptable behaviors: (a) a 3P scaffold using placeholders like '[shipped: ...]' and noting that context was not provided; (b) a one-line note explaining that more information is needed before a useful 3P can be written. What MUST NOT happen: fabricated metrics or made-up project names presented as facts."
+    },
+    {
+      "id": "tc_e05",
+      "workflow": "edge",
+      "name": "Edge — user requests bullets in 3P (conflicts with rule)",
+      "prompt": "Write a 3P update for the SRE team this week using bullet points throughout — each Progress, Plans, Problems section should be a bulleted list. Save to output.md.\n\nContext:\n- Migrated 30% of services off the legacy load balancer\n- Reduced on-call paging volume by 22% with smarter alert grouping\n- Need approval to retire the v1 metrics pipeline next sprint\n",
+      "expected_behavior": "The output respects the 3P format rule (sentences, not bullets) — the SKILL.md format spec for 3P is 'Never use bullet points — only sentences'. Acceptable: produce a sentences-based 3P AND include a one-line note explaining the format constraint. NOT acceptable: silently follow the user request and emit bulleted 3P, violating the format rule."
     }
   ]
 }
