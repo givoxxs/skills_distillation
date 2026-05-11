@@ -142,6 +142,27 @@
       "name": "Edge — 3-frame blink at slow FPS",
       "prompt": "Create a minimal Slack emoji GIF with exactly 3 frames at 2fps: frame 1 fills solid red, frame 2 fills solid white, frame 3 fills solid red again. This creates a slow blink. Save as output.gif.",
       "expected_behavior": "Output is a valid 128x128 GIF with 3 frames. Frame 1 is solid red, frame 2 is solid white, frame 3 is solid red. At 2fps each frame is visible for ~0.5 seconds. The blink alternation between red and white is the only content. File loops."
+    },
+    {
+      "id": "tc_b02",
+      "workflow": "validate",
+      "name": "Validate message-size GIF (480x480, is_emoji=False)",
+      "prompt": "Create a 480x480 animated Slack message GIF (smoothly fading blue square, 20fps, 24 frames). Then validate it using validate_gif from core.validators with is_emoji=False and verbose=True. Print the full validation report. Save the GIF as output.gif.",
+      "expected_behavior": "A 480x480 animated GIF (output.gif) is created and exists on disk. validate_gif is called with is_emoji=False, and prints a report showing: dimensions (480x480), file size in KB, frame count, fps, duration. The 'passes' result reflects message-GIF thresholds (not emoji thresholds — 480x480 should not be flagged as wrong size)."
+    },
+    {
+      "id": "tc_b03",
+      "workflow": "validate",
+      "name": "Validate intentionally-invalid GIF — too many colors",
+      "prompt": "Create a 128x128 animated GIF with intentionally high color count (num_colors=256, 12 frames, 12fps — a smoothly hue-shifting square). Then validate it with validate_gif (is_emoji=True, verbose=True) and print the full report. The report should flag the color count as exceeding the Slack emoji guideline. Save the GIF as output.gif.",
+      "expected_behavior": "Output is a 128x128 animated GIF. validate_gif is called and prints a report. The printed report includes a warning or failure about num_colors exceeding the recommended emoji threshold (48-128). The student does NOT silently 'fix' the color count to make validation pass — the task is to demonstrate the validator catching the issue."
+    },
+    {
+      "id": "tc_c02",
+      "workflow": "optimize",
+      "name": "Optimize — compare palette sizes (32 vs 128 colors)",
+      "prompt": "Create the same 128x128 animated GIF twice: first as palette128.gif (num_colors=128) and then as palette32.gif (num_colors=32). Use 20 frames at 15fps of a smoothly rotating purple gradient square. After saving both, print the file size of each in KB and state which palette setting produces the smaller file. Both files must remain in the working directory.",
+      "expected_behavior": "Two files exist: palette128.gif and palette32.gif, both 128x128 animated. The agent prints both file sizes in KB and names palette32.gif as the smaller file (lower color count yields smaller GIF size given identical frames). The output explicitly states the size comparison."
     }
   ]
 }
