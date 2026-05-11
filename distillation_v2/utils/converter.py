@@ -8,7 +8,11 @@ Returns empty list on any failure — callers fall back to text-only scoring.
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
+import tempfile
+import time
+import uuid
 from pathlib import Path
 
 _log = logging.getLogger("distillation.v2.converter")
@@ -16,6 +20,7 @@ _log = logging.getLogger("distillation.v2.converter")
 _SOFFICE = "soffice"
 _DEFAULT_MAX_PAGES = 10
 _DPI = 150
+_SOFFICE_RETRIES = 2  # initial attempt + N retries on transient failures
 
 
 def docx_to_images(docx_path: Path, max_pages: int = _DEFAULT_MAX_PAGES) -> list[Path]:
@@ -27,7 +32,7 @@ def docx_to_images(docx_path: Path, max_pages: int = _DEFAULT_MAX_PAGES) -> list
         _log.warning("converter: file not found: %s", docx_path)
         return []
 
-    pdf_path = _convert_to_pdf(docx_path)
+    pdf_path = _convert_to_pdf_with_retry(docx_path)
     if pdf_path is None:
         return []
 
@@ -49,12 +54,38 @@ def find_docx(output_dir: Path) -> Path | None:
 # ── Internal ──────────────────────────────────────────────────────────────────
 
 
+def _convert_to_pdf_with_retry(docx_path: Path) -> Path | None:
+    """Wrap `_convert_to_pdf` with retries for transient parallel-soffice failures.
+
+    When multiple soffice processes run concurrently they can race on the shared
+    user profile; we isolate the profile per call and retry once on transient
+    "PDF not produced" outcomes.
+    """
+    for attempt in range(1, _SOFFICE_RETRIES + 1):
+        pdf_path = _convert_to_pdf(docx_path)
+        if pdf_path is not None:
+            return pdf_path
+        if attempt < _SOFFICE_RETRIES:
+            _log.info(
+                "soffice retry %d/%d for %s", attempt, _SOFFICE_RETRIES, docx_path.name
+            )
+            time.sleep(0.5 * attempt)
+    return None
+
+
 def _convert_to_pdf(docx_path: Path) -> Path | None:
-    """Use LibreOffice to convert .docx → .pdf in the same directory."""
+    """Use LibreOffice to convert .docx → .pdf in the same directory.
+
+    Uses a unique `-env:UserInstallation` profile dir per call so parallel
+    invocations don't collide on the shared ~/.config/libreoffice lockfile.
+    """
+    profile_dir: Path | None = None
     try:
+        profile_dir = Path(tempfile.mkdtemp(prefix=f"lo_{uuid.uuid4().hex[:8]}_"))
         result = subprocess.run(
             [
                 _SOFFICE,
+                f"-env:UserInstallation=file://{profile_dir}",
                 "--headless",
                 "--convert-to",
                 "pdf",
@@ -87,6 +118,9 @@ def _convert_to_pdf(docx_path: Path) -> Path | None:
     except Exception as e:  # noqa: BLE001
         _log.warning("soffice error: %s", e)
         return None
+    finally:
+        if profile_dir is not None and profile_dir.exists():
+            shutil.rmtree(profile_dir, ignore_errors=True)
 
 
 def _pdf_to_images(pdf_path: Path, max_pages: int) -> list[Path]:
