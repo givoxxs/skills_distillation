@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import threading
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -244,13 +245,15 @@ def _run_once(
                     sandbox.copy_input(Path(f))
 
             run_start = time.time()
-            stop_reason, iterations, tokens, _ = _stream_claude(
+            stop_reason, iterations, tokens, final_text = _stream_claude(
                 prompt=prompt,
                 model=model,
                 config=config,
                 sandbox=sandbox,
                 logger=logger,
             )
+            if final_text:
+                _write_agent_final(sandbox.cwd, final_text)
             if config.output_dir:
                 output_files = _copy_outputs(
                     sandbox, run_start, Path(config.output_dir)
@@ -279,14 +282,20 @@ def _run_once(
 # ── Claude CLI subprocess ─────────────────────────────────────────────────────
 
 
-def _stream_claude(
-    prompt: str,
-    model: str,
-    config: RunConfigV2,
-    sandbox: Sandbox,
-    logger: AgentLogger,
-) -> tuple[str, int, dict[str, int], str]:
-    cmd = [
+@dataclass
+class _StreamState:
+    """Mutable result of streaming a Claude CLI subprocess."""
+
+    stop_reason: str = "no_end_event"
+    iterations: int = 0
+    tokens: dict[str, int] = field(
+        default_factory=lambda: {"prompt": 0, "completion": 0}
+    )
+    final_text: str = ""
+
+
+def _build_claude_cmd(prompt: str, model: str, config: RunConfigV2) -> list[str]:
+    return [
         config.claude_binary,
         "--model",
         model,
@@ -301,8 +310,116 @@ def _stream_claude(
         str(config.max_turns),
     ]
 
+
+def _spawn_stderr_drainer(proc: subprocess.Popen) -> tuple[threading.Thread, list[str]]:
+    """Drain stderr in a background thread to prevent pipe deadlock.
+
+    If stderr buffer fills (>64 KB) while we're blocking on stdout reads,
+    the child process stalls writing stderr and we stall reading stdout.
+    """
+    chunks: list[str] = []
+
+    def _drain() -> None:
+        if proc.stderr:
+            data = proc.stderr.read()
+            if data:
+                chunks.append(data)
+
+    t = threading.Thread(target=_drain, daemon=True)
+    t.start()
+    return t, chunks
+
+
+def _spawn_watchdog(
+    proc: subprocess.Popen, timeout_seconds: float
+) -> tuple[threading.Event, threading.Event]:
+    """Kill the subprocess after timeout_seconds total wall-clock time.
+
+    Without this, `for raw_line in proc.stdout` blocks forever when the process
+    hangs with stdout still open — proc.wait(timeout=...) only runs AFTER stdout
+    is exhausted, so it never fires in the hung case.
+
+    Returns (cancel_event, killed_event). Set cancel_event to disarm the watchdog.
+    """
+    cancel = threading.Event()
+    killed = threading.Event()
+
+    def _watchdog() -> None:
+        if not cancel.wait(timeout=timeout_seconds):
+            if proc.poll() is None:
+                _log.warning(
+                    "Watchdog: killing hung subprocess after %ds", timeout_seconds
+                )
+                killed.set()
+                proc.kill()
+
+    threading.Thread(target=_watchdog, daemon=True).start()
+    return cancel, killed
+
+
+def _consume_events(
+    proc: subprocess.Popen,
+    state: _StreamState,
+    logger: AgentLogger,
+) -> None:
+    """Read stream-json events from stdout and fold them into `state`."""
+    assert proc.stdout is not None
+    parser_state = ParserState()
+    for raw_line in proc.stdout:
+        raw_line = raw_line.strip()
+        if not raw_line:
+            continue
+        try:
+            payload = json.loads(raw_line)
+        except json.JSONDecodeError:
+            continue
+        for event in parse_line(payload, parser_state):
+            _emit(logger, event)
+            if event.kind == "end":
+                state.stop_reason = event.data.get("stop_reason", state.stop_reason)
+                state.iterations = event.data.get("iterations", state.iterations)
+                state.tokens = event.data.get("tokens", state.tokens)
+                state.final_text = event.data.get("final_text", "")
+
+
+def _finalize_proc(
+    proc: subprocess.Popen,
+    stderr_drainer: threading.Thread,
+    stderr_chunks: list[str],
+    killed_by_watchdog: threading.Event,
+    state: _StreamState,
+    logger: AgentLogger,
+) -> None:
+    """Wait for proc + drainer, then set final stop_reason on `state`."""
+    stderr_drainer.join(timeout=30)
+    stderr_text = stderr_chunks[0] if stderr_chunks else ""
+
+    try:
+        proc.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            _log.warning("Process refused to die after SIGKILL")
+
+    if killed_by_watchdog.is_set():
+        state.stop_reason = "timeout"
+    elif proc.returncode != 0 and state.stop_reason == "no_end_event":
+        state.stop_reason = f"cli_exit_{proc.returncode}"
+        if stderr_text:
+            logger.log_error(state.iterations, stderr_text.strip()[:500])
+
+
+def _stream_claude(
+    prompt: str,
+    model: str,
+    config: RunConfigV2,
+    sandbox: Sandbox,
+    logger: AgentLogger,
+) -> tuple[str, int, dict[str, int], str]:
     proc = subprocess.Popen(
-        cmd,
+        _build_claude_cmd(prompt, model, config),
         env=sandbox.env,
         cwd=str(sandbox.cwd),
         stdout=subprocess.PIPE,
@@ -311,92 +428,22 @@ def _stream_claude(
         bufsize=1,
     )
 
-    state = ParserState()
-    stop_reason = "no_end_event"
-    iterations = 0
-    tokens: dict[str, int] = {"prompt": 0, "completion": 0}
-    final_text = ""
-
-    # Drain stderr in a background thread to prevent pipe deadlock.
-    # If stderr buffer fills (>64 KB) while we're blocking on stdout reads,
-    # the child process stalls writing stderr and we stall reading stdout.
-    stderr_chunks: list[str] = []
-
-    def _drain_stderr() -> None:
-        if proc.stderr:
-            data = proc.stderr.read()
-            if data:
-                stderr_chunks.append(data)
-
-    stderr_drainer = threading.Thread(target=_drain_stderr, daemon=True)
-    stderr_drainer.start()
-
-    # Watchdog: kill the subprocess after timeout_seconds total wall-clock time.
-    # Without this, `for raw_line in proc.stdout` blocks forever when the process
-    # hangs with stdout still open — proc.wait(timeout=...) only runs AFTER stdout
-    # is exhausted, so it never fires in the hung case.
-    _cancel_watchdog = threading.Event()
-    _killed_by_watchdog = threading.Event()
-
-    def _watchdog() -> None:
-        if not _cancel_watchdog.wait(timeout=config.timeout_seconds):
-            if proc.poll() is None:
-                _log.warning(
-                    "Watchdog: killing hung subprocess after %ds",
-                    config.timeout_seconds,
-                )
-                _killed_by_watchdog.set()
-                proc.kill()
-
-    watchdog = threading.Thread(target=_watchdog, daemon=True)
-    watchdog.start()
+    state = _StreamState()
+    stderr_drainer, stderr_chunks = _spawn_stderr_drainer(proc)
+    cancel_watchdog, killed_by_watchdog = _spawn_watchdog(proc, config.timeout_seconds)
 
     try:
-        assert proc.stdout is not None
-        for raw_line in proc.stdout:
-            raw_line = raw_line.strip()
-            if not raw_line:
-                continue
-            try:
-                payload = json.loads(raw_line)
-            except json.JSONDecodeError:
-                continue
-            for event in parse_line(payload, state):
-                _emit(logger, event)
-                if event.kind == "end":
-                    stop_reason = event.data.get("stop_reason", stop_reason)
-                    iterations = event.data.get("iterations", iterations)
-                    tokens = event.data.get("tokens", tokens)
-                    final_text = event.data.get("final_text", "")
-
-        # stdout closed — cancel watchdog so it doesn't fire on an already-dead process
-        _cancel_watchdog.set()
-
-        # stdout exhausted — wait for stderr drainer then for the process to exit
-        stderr_drainer.join(timeout=30)
-        stderr_text = stderr_chunks[0] if stderr_chunks else ""
-
-        try:
-            proc.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                _log.warning("Process refused to die after SIGKILL")
-
-        if _killed_by_watchdog.is_set():
-            stop_reason = "timeout"
-        elif proc.returncode != 0 and stop_reason == "no_end_event":
-            stop_reason = f"cli_exit_{proc.returncode}"
-            if stderr_text:
-                logger.log_error(iterations, stderr_text.strip()[:500])
+        _consume_events(proc, state, logger)
+        cancel_watchdog.set()
+        _finalize_proc(
+            proc, stderr_drainer, stderr_chunks, killed_by_watchdog, state, logger
+        )
     finally:
         if proc.poll() is None:
             proc.kill()
             proc.wait(timeout=5)
 
-    return stop_reason, iterations, tokens, final_text
+    return state.stop_reason, state.iterations, state.tokens, state.final_text
 
 
 def _emit(logger: AgentLogger, event: Event) -> None:
@@ -419,6 +466,16 @@ def _emit(logger: AgentLogger, event: Event) -> None:
         )
     elif event.kind == "start":
         logger.log_event(0, "cli_init", {"session_id": d.get("session_id")})
+
+
+def _write_agent_final(cwd: Path, text: str) -> None:
+    """Persist the agent's final assistant message to agent_final.md so the
+    judge can read prints/reports that don't live in produced output files
+    (e.g. validate/optimize workflows that print results to stdout)."""
+    try:
+        (cwd / "agent_final.md").write_text(text, encoding="utf-8")
+    except OSError as e:
+        _log.warning("failed to write agent_final.md: %s", e)
 
 
 _OUTPUT_EXTENSIONS = frozenset(

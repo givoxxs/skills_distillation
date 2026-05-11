@@ -13,7 +13,6 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import os
 import statistics
 from pathlib import Path
 from typing import Any
@@ -65,7 +64,7 @@ class Judge:
         model: str = DEFAULT_MODEL,
         ensemble_n: int = 1,
         max_image_pages: int = MAX_IMAGE_PAGES,
-        max_gif_frames: int = 3,
+        max_gif_frames: int = 5,
         anthropic_api_key: str | None = None,
         base_url: str | None = None,
         temperature: float = 0.2,
@@ -77,13 +76,11 @@ class Judge:
         self.ensemble_n = max(1, int(ensemble_n))
         self.max_image_pages = max_image_pages
         self.max_gif_frames = max(1, int(max_gif_frames))
-        self._api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
+        if not anthropic_api_key:
+            raise RuntimeError("Judge requires an OpenRouter API key")
+        self._api_key = anthropic_api_key
         self._base_url = base_url
         self._temperature = temperature
-        if not self._api_key:
-            raise RuntimeError(
-                "No API key set for Judge (ANTHROPIC_KEY or OpenRouter key required)"
-            )
 
     def score(
         self,
@@ -109,8 +106,10 @@ class Judge:
         text_output = (
             self._get_text_output(Path(output_dir)) if not image_paths else None
         )
+        agent_final = self._get_agent_final(Path(output_dir))
+        metadata = self._collect_output_metadata(Path(output_dir))
         content_blocks = self._build_content(
-            test_case, image_paths, text_output, input_files
+            test_case, image_paths, text_output, input_files, metadata, agent_final
         )
 
         overalls: list[float] = []
@@ -232,9 +231,14 @@ class Judge:
             return []
 
     def _get_text_output(self, output_dir: Path) -> str | None:
-        """Return text content from .txt/.json/.md when no .docx exists."""
+        """Return text content from .txt/.json/.md when no .docx exists.
+
+        Skips `agent_final.md` (injected separately as Agent Final Message).
+        """
         for ext in (".txt", ".json", ".md"):
             for f in sorted(output_dir.glob(f"*{ext}")):
+                if f.name == "agent_final.md":
+                    continue
                 try:
                     text = f.read_text(encoding="utf-8", errors="replace").strip()
                     if text:
@@ -243,12 +247,50 @@ class Judge:
                     continue
         return None
 
+    def _collect_output_metadata(self, output_dir: Path) -> str:
+        """Return a markdown block describing output-file metadata the judge
+        cannot infer from images alone (GIF dimensions/fps/n_frames, file size)."""
+        lines: list[str] = []
+        for gif_path in sorted(output_dir.glob("*.gif")):
+            try:
+                from PIL import Image as PILImage
+
+                with PILImage.open(gif_path) as img:
+                    n_frames = getattr(img, "n_frames", 1)
+                    duration_ms = img.info.get("duration", 0) or 0
+                    fps = round(1000 / duration_ms, 1) if duration_ms else "?"
+                    width, height = img.size
+                size_kb = round(gif_path.stat().st_size / 1024, 1)
+                lines.append(
+                    f"- `{gif_path.name}`: {width}×{height}, "
+                    f"{n_frames} frame(s), fps={fps}, {size_kb} KB"
+                )
+            except Exception as e:  # noqa: BLE001
+                _log.debug("metadata read failed for %s: %s", gif_path, e)
+        for docx_path in sorted(output_dir.glob("*.docx")):
+            size_kb = round(docx_path.stat().st_size / 1024, 1)
+            lines.append(f"- `{docx_path.name}`: docx, {size_kb} KB")
+        return "\n".join(lines)
+
+    def _get_agent_final(self, output_dir: Path) -> str | None:
+        """Return contents of `agent_final.md` (final assistant text persisted
+        by the student runner), or None if missing."""
+        f = output_dir / "agent_final.md"
+        if not f.is_file():
+            return None
+        try:
+            return f.read_text(encoding="utf-8", errors="replace").strip()[:6000]
+        except OSError:
+            return None
+
     def _build_content(
         self,
         test_case: dict[str, Any],
         image_paths: list[Path],
         text_output: str | None = None,
         input_files: list[Path] | None = None,
+        metadata: str | None = None,
+        agent_final: str | None = None,
     ) -> list[dict[str, Any]]:
         rubric_json = json.dumps(
             {
@@ -267,9 +309,13 @@ class Judge:
         )
         intro = (
             f"## Rubric\n\n{rubric_json}\n\n"
-            f"## Task\n\nPrompt: {test_case.get('prompt', '')[:500]}\n\n"
-            f"Expected: {test_case.get('expected_behavior', '')[:300]}\n\n"
+            f"## Task\n\nPrompt: {test_case.get('prompt', '')[:4000]}\n\n"
+            f"Expected: {test_case.get('expected_behavior', '')[:1500]}\n\n"
         )
+        if metadata:
+            intro += f"## Output File Metadata\n\n{metadata}\n\n"
+        if agent_final:
+            intro += f"## Agent Final Message\n\n{agent_final}\n\n"
         blocks: list[dict[str, Any]] = [{"type": "text", "text": intro}]
 
         # Inject input fixture pages so judge can verify extraction correctness
