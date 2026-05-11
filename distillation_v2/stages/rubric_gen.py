@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import time
 from pathlib import Path
 from typing import Any
@@ -196,11 +195,9 @@ def generate_rubric(
     _log.info(
         "generating rubric via %s (%s, %d test cases)...", model, label, len(test_cases)
     )
-    api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "No API key set for rubric_gen (ANTHROPIC_KEY or OpenRouter key required)"
-        )
+    if not anthropic_api_key:
+        raise RuntimeError("rubric_gen requires an OpenRouter API key")
+    api_key = anthropic_api_key
 
     rubric = _call_api(
         skill_name, skill_content, test_cases, model, api_key, base_url, workflow

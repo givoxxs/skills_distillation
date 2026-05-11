@@ -47,6 +47,235 @@ def _or_model(model: str) -> str:
     return model if "/" in model else f"anthropic/{model}"
 
 
+def _avg_judge_score(results: list[EvalResult]) -> float:
+    """Average llm_judge_score over a list, treating negatives as 0 in the sum
+    while dividing by the full count (preserves original inline semantics)."""
+    if not results:
+        return 0.0
+    return sum(r.llm_judge_score for r in results if r.llm_judge_score >= 0) / len(
+        results
+    )
+
+
+def _resolve_llm_setup(
+    llm_api_key: str | None,
+    llm_base_url: str | None,
+    teacher_model: str,
+    judge_model: str,
+) -> tuple[str, str | None, str, str]:
+    """Resolve LLM API key + auto-prefix teacher/judge models for OpenRouter."""
+    resolved_llm_key = llm_api_key or os.getenv("OPENROUTER_API_KEY")
+    if not resolved_llm_key:
+        raise RuntimeError("No LLM API key found. Set OPENROUTER_API_KEY.")
+    if llm_base_url and "openrouter" in llm_base_url:
+        teacher_model = _or_model(teacher_model)
+        judge_model = _or_model(judge_model)
+    return resolved_llm_key, llm_base_url, teacher_model, judge_model
+
+
+def _init_judges(
+    *,
+    skill: str,
+    skill_dir: Path,
+    rubric_pool: list[dict[str, Any]],
+    rubric_cache_dir: str,
+    judge_model: str,
+    regenerate_rubric: bool,
+    watch_skill_hash: bool,
+    keep_recent_rubrics: int,
+    ensemble_n: int,
+    max_image_pages: int,
+    max_gif_frames: int,
+    judge_temperature: float,
+    anthropic_api_key: str,
+    base_url: str | None,
+) -> tuple[dict[str, Judge], dict[str, str]]:
+    """Generate one rubric + Judge per workflow present in `rubric_pool`."""
+    workflows = sorted(set(tc.get("workflow", "create") for tc in rubric_pool))
+    judges: dict[str, Judge] = {}
+    rubric_keys: dict[str, str] = {}
+    for wf in workflows:
+        wf_tcs = [tc for tc in rubric_pool if tc.get("workflow", "create") == wf]
+        wf_rubric = generate_rubric(
+            skill_name=skill,
+            skill_dir=skill_dir,
+            test_cases=wf_tcs,
+            workflow=wf,
+            cache_dir=rubric_cache_dir,
+            model=judge_model,
+            regenerate=regenerate_rubric,
+            watch_skill_hash=watch_skill_hash,
+            keep_recent=keep_recent_rubrics,
+            anthropic_api_key=anthropic_api_key,
+            base_url=base_url,
+        )
+        judges[wf] = Judge(
+            rubric=wf_rubric,
+            model=judge_model,
+            ensemble_n=ensemble_n,
+            max_image_pages=max_image_pages,
+            max_gif_frames=max_gif_frames,
+            anthropic_api_key=anthropic_api_key,
+            base_url=base_url,
+            temperature=judge_temperature,
+        )
+        rubric_keys[wf] = wf_rubric.get("cache_key", "")
+    return judges, rubric_keys
+
+
+def _run_one_batch_persisted(
+    *,
+    batch: list[dict],
+    batch_idx: int,
+    n_batches: int,
+    round_n: int,
+    skill: str,
+    student_model: str,
+    judges: dict[str, Judge],
+    results_path: Path,
+    test_cases_dir: str,
+    base_config: RunConfigV2,
+    max_retry_per_tc: int,
+    working_md: Path,
+    concurrent_tcs: int,
+    no_llm_judge: bool,
+    emit: Callable[[str], None],
+) -> tuple[list[EvalResult], list[str], str]:
+    """Run one batch + persist run_log.md + scores.json + eval_detail.jsonl.
+
+    Returns (eval_results, log_paths, run_log_md_content).
+    """
+    emit(f"  [R{round_n}.B{batch_idx}/{n_batches}] running {len(batch)} TC(s)...")
+    batch_start = time.time()
+    batch_results, batch_logs = _run_batch(
+        batch=batch,
+        skill=skill,
+        student_model=student_model,
+        judges=judges,
+        results_path=results_path,
+        test_cases_dir=test_cases_dir,
+        base_config=base_config,
+        round_n=round_n,
+        batch_idx=batch_idx,
+        max_retry_per_tc=max_retry_per_tc,
+        current_skill_md=working_md,
+        emit=emit,
+        concurrent_tcs=concurrent_tcs,
+        no_llm_judge=no_llm_judge,
+    )
+
+    run_log_content = make_run_log(batch_results, round_n, batch_idx, batch_logs)
+    run_log_path = (
+        results_path / f"round_{round_n}" / f"batch_{batch_idx}" / "run_log.md"
+    )
+    run_log_path.parent.mkdir(parents=True, exist_ok=True)
+    run_log_path.write_text(run_log_content, encoding="utf-8")
+
+    elapsed = time.time() - batch_start
+    avg = _avg_judge_score(batch_results)
+    passed = sum(1 for r in batch_results if r.llm_judge_score >= 0.8)
+    emit(
+        f"  [R{round_n}.B{batch_idx}] {passed}/{len(batch_results)} passed"
+        f"  avg={avg:.3f}  ({elapsed:.1f}s)"
+    )
+    _save_batch_scores(results_path, round_n, batch_idx, batch_results)
+    for r in batch_results:
+        write_eval_detail({"round": round_n, "batch": batch_idx, **asdict(r)})
+    return batch_results, batch_logs, run_log_content
+
+
+def _apply_gate2(
+    *,
+    round_avg: float,
+    prev_avg: float,
+    gate2_threshold: float,
+    best_round_n: int,
+    best_score: float,
+    best_skill_snapshot: Path | None,
+    working_md: Path,
+    emit: Callable[[str], None],
+) -> bool:
+    """Hard-rollback to best snapshot if round dropped more than threshold.
+
+    Returns True if gate2 fired (caller should skip Teacher this round).
+    """
+    delta = round_avg - prev_avg
+    if delta >= -gate2_threshold:
+        return False
+    emit(
+        f"  [gate2] FAIL (Δ={delta:+.3f} < -{gate2_threshold})"
+        f" → hard rollback to best R{best_round_n} ({best_score:.3f})"
+    )
+    if best_skill_snapshot and best_skill_snapshot.exists():
+        shutil.copy2(best_skill_snapshot, working_md)
+        emit(f"  [gate2] restored {best_skill_snapshot.name}")
+    else:
+        emit("  [gate2] WARNING: no valid snapshot to restore — skipping Teacher only")
+    return True
+
+
+def _apply_teacher_step(
+    *,
+    working_md: Path,
+    run_logs: list[str],
+    teacher_model: str,
+    teacher_temperature: float,
+    anthropic_api_key: str,
+    base_url: str | None,
+    round_n: int,
+    test_cases: list[dict[str, Any]],
+    all_results: list[EvalResult],
+    validation_tc_count: int,
+    gate1_threshold: float,
+    val_batch_fn: Callable[[list[dict]], list[EvalResult]],
+    emit: Callable[[str], None],
+) -> None:
+    """Run Teacher rewrite + Gate 1 validation. Mutates working_md only on accept."""
+    emit(f"  Teacher rewriting SKILL.md from {len(run_logs)} run_log(s)...")
+    teacher_start = time.time()
+    try:
+        new_skill = teacher_rewrite(
+            skill_md_path=working_md,
+            run_logs=run_logs,
+            model=teacher_model,
+            round_n=round_n,
+            anthropic_api_key=anthropic_api_key,
+            base_url=base_url,
+            temperature=teacher_temperature,
+        )
+        emit(
+            f"  Teacher done ({len(new_skill)} chars,"
+            f" {time.time() - teacher_start:.1f}s)"
+        )
+
+        if validation_tc_count == 0:
+            emit("  [gate1] DISABLED — keeping new SKILL.md unconditionally")
+            working_md.write_text(new_skill, encoding="utf-8")
+            return
+
+        val_tcs, val_baseline = choose_validation_tcs(
+            test_cases, validation_tc_count, round_results=all_results
+        )
+        emit(
+            "  [gate1] val TCs (rank 6-8): "
+            + ", ".join(tc["id"] for tc in val_tcs)
+            + f"  baseline={val_baseline:.3f}"
+        )
+
+        val_score = run_validation(
+            skill_md_path=working_md,
+            new_skill_content=new_skill,
+            validation_tcs=val_tcs,
+            run_batch_fn=val_batch_fn,
+            emit=emit,
+        )
+        if decide(val_score, val_baseline, gate1_threshold, emit):
+            working_md.write_text(new_skill, encoding="utf-8")
+    except Exception as e:  # noqa: BLE001
+        emit(f"  Teacher FAILED: {e}. Skipping rewrite.")
+        write_api_call({"type": "teacher", "error": str(e), "round": round_n})
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 
@@ -57,7 +286,6 @@ def run_distillation(
     student_model: str = "google/gemma-4-26b-a4b-it",
     teacher_model: str = "claude-haiku-4-5",
     judge_model: str = "claude-haiku-4-5",
-    anthropic_key: str | None = None,
     llm_api_key: str | None = None,
     llm_base_url: str | None = OPENROUTER_BASE_URL,
     max_rounds: int = 3,
@@ -72,7 +300,7 @@ def run_distillation(
     judge_temperature: float = 0.2,
     max_retry_per_tc: int = 3,
     max_image_pages: int = 10,
-    max_gif_frames: int = 3,
+    max_gif_frames: int = 5,
     results_dir: str = "./results",
     rubric_cache_dir: str = "./rubrics",
     skills_dir: str | None = None,
@@ -90,24 +318,10 @@ def run_distillation(
     no_llm_judge: bool = False,
     concurrent_tcs: int = 1,
 ) -> dict[str, Any]:
-    # Resolve LLM backend key: prefer explicit llm_api_key, then OPENROUTER_API_KEY,
-    # then fall back to legacy anthropic_key for backward compatibility.
-    resolved_llm_key = (
-        llm_api_key
-        or os.getenv("OPENROUTER_API_KEY")
-        or anthropic_key
-        or os.getenv("ANTHROPIC_KEY")
+    # Resolve LLM credentials + auto-prefix models for OpenRouter
+    resolved_llm_key, resolved_base_url, teacher_model, judge_model = (
+        _resolve_llm_setup(llm_api_key, llm_base_url, teacher_model, judge_model)
     )
-    if not resolved_llm_key:
-        raise RuntimeError(
-            "No LLM API key found. Set OPENROUTER_API_KEY or ANTHROPIC_KEY."
-        )
-
-    # When routing through OpenRouter, auto-prefix model names with 'anthropic/'
-    resolved_base_url = llm_base_url
-    if resolved_base_url and "openrouter" in resolved_base_url:
-        teacher_model = _or_model(teacher_model)
-        judge_model = _or_model(judge_model)
 
     v2_root = Path(__file__).resolve().parent
     results_path = Path(results_dir) / skill
@@ -120,10 +334,8 @@ def run_distillation(
     if not skill_md_path.is_file():
         raise FileNotFoundError(f"SKILL.md not found: {skill_md_path}")
 
-    # ── Fresh-run cleanup (skip when resuming) ────────────────────────────────
-    # Without --resume, wipe the entire skill results dir so each run starts
-    # with a clean slate (no stale round dirs, logs, JSONL files, or SKILL
-    # snapshots from a previous run).
+    # Fresh-run cleanup: without --resume, wipe the skill results dir so each
+    # run starts clean (no stale round dirs, logs, JSONL files, snapshots).
     if not resume and results_path.exists():
         shutil.rmtree(results_path)
     results_path.mkdir(parents=True, exist_ok=True)
@@ -133,39 +345,25 @@ def run_distillation(
     if not working_md.exists():
         shutil.copy2(skill_md_path, working_md)
 
-    # ── Per-workflow rubrics (once per pipeline run) ──────────────────────────
-    # Use rubric_test_cases (all TCs) for rubric generation when provided,
-    # so the rubric covers every workflow even if only a subset is being run.
-    _rubric_pool = rubric_test_cases if rubric_test_cases is not None else test_cases
-    workflows = sorted(set(tc.get("workflow", "create") for tc in _rubric_pool))
-    judges: dict[str, Judge] = {}
-    rubric_keys: dict[str, str] = {}
-    for wf in workflows:
-        wf_tcs = [tc for tc in _rubric_pool if tc.get("workflow", "create") == wf]
-        wf_rubric = generate_rubric(
-            skill_name=skill,
-            skill_dir=skill_dir,
-            test_cases=wf_tcs,
-            workflow=wf,
-            cache_dir=rubric_cache_dir,
-            model=judge_model,
-            regenerate=regenerate_rubric,
-            watch_skill_hash=watch_skill_hash,
-            keep_recent=keep_recent_rubrics,
-            anthropic_api_key=resolved_llm_key,
-            base_url=resolved_base_url,
-        )
-        judges[wf] = Judge(
-            rubric=wf_rubric,
-            model=judge_model,
-            ensemble_n=ensemble_n,
-            max_image_pages=max_image_pages,
-            max_gif_frames=max_gif_frames,
-            anthropic_api_key=resolved_llm_key,
-            base_url=resolved_base_url,
-            temperature=judge_temperature,
-        )
-        rubric_keys[wf] = wf_rubric.get("cache_key", "")
+    # Per-workflow rubrics + judges. Use rubric_test_cases (full set) when
+    # provided so rubric covers every workflow even if subset is being run.
+    rubric_pool = rubric_test_cases if rubric_test_cases is not None else test_cases
+    judges, rubric_keys = _init_judges(
+        skill=skill,
+        skill_dir=skill_dir,
+        rubric_pool=rubric_pool,
+        rubric_cache_dir=rubric_cache_dir,
+        judge_model=judge_model,
+        regenerate_rubric=regenerate_rubric,
+        watch_skill_hash=watch_skill_hash,
+        keep_recent_rubrics=keep_recent_rubrics,
+        ensemble_n=ensemble_n,
+        max_image_pages=max_image_pages,
+        max_gif_frames=max_gif_frames,
+        judge_temperature=judge_temperature,
+        anthropic_api_key=resolved_llm_key,
+        base_url=resolved_base_url,
+    )
 
     # ── Run config for student ────────────────────────────────────────────────
     base_config = RunConfigV2(
@@ -239,148 +437,79 @@ def run_distillation(
                 emit(f"  [R{round_n}.B{batch_idx}] resumed ({len(cached)} tc)")
                 continue
 
-            emit(
-                f"  [R{round_n}.B{batch_idx}/{n_batches}] running {len(batch)} TC(s)..."
-            )
-            batch_start = time.time()
-            batch_results, batch_logs = _run_batch(
+            batch_results, batch_logs, run_log_content = _run_one_batch_persisted(
                 batch=batch,
+                batch_idx=batch_idx,
+                n_batches=n_batches,
+                round_n=round_n,
                 skill=skill,
                 student_model=student_model,
                 judges=judges,
                 results_path=results_path,
                 test_cases_dir=test_cases_dir,
                 base_config=base_config,
-                round_n=round_n,
-                batch_idx=batch_idx,
                 max_retry_per_tc=max_retry_per_tc,
-                current_skill_md=working_md,
-                emit=emit,
+                working_md=working_md,
                 concurrent_tcs=concurrent_tcs,
                 no_llm_judge=no_llm_judge,
+                emit=emit,
             )
             all_results.extend(batch_results)
             batch_log_paths.append(batch_logs)
-
-            # Generate run_log.md for this batch
-            run_log_content = make_run_log(
-                batch_results, round_n, batch_idx, batch_logs
-            )
-            run_log_path = (
-                results_path / f"round_{round_n}" / f"batch_{batch_idx}" / "run_log.md"
-            )
-            run_log_path.parent.mkdir(parents=True, exist_ok=True)
-            run_log_path.write_text(run_log_content, encoding="utf-8")
             run_logs.append(run_log_content)
 
-            elapsed = time.time() - batch_start
-            avg = (
-                sum(r.llm_judge_score for r in batch_results if r.llm_judge_score >= 0)
-                / len(batch_results)
-                if batch_results
-                else 0.0
-            )
-            passed = sum(1 for r in batch_results if r.llm_judge_score >= 0.8)
-            emit(
-                f"  [R{round_n}.B{batch_idx}] {passed}/{len(batch_results)} passed  avg={avg:.3f}  ({elapsed:.1f}s)"
-            )
-            _save_batch_scores(results_path, round_n, batch_idx, batch_results)
-            for r in batch_results:
-                write_eval_detail({"round": round_n, "batch": batch_idx, **asdict(r)})
-
-        round_avg = (
-            sum(r.llm_judge_score for r in all_results if r.llm_judge_score >= 0)
-            / len(all_results)
-            if all_results
-            else 0.0
-        )
+        round_avg = _avg_judge_score(all_results)
 
         # ── Gate 2: hard rollback if round dropped too much vs prev ──────────
         gate2_triggered = False
         if not dry_run and validation_tc_count > 0 and prev_avg is not None:
-            gate2_delta = round_avg - prev_avg
-            if gate2_delta < -gate2_threshold:
-                emit(
-                    f"  [gate2] FAIL (Δ={gate2_delta:+.3f} < -{gate2_threshold})"
-                    f" → hard rollback to best R{best_round_n} ({best_score:.3f})"
-                )
-                if best_skill_snapshot and best_skill_snapshot.exists():
-                    shutil.copy2(best_skill_snapshot, working_md)
-                    emit(f"  [gate2] restored {best_skill_snapshot.name}")
-                else:
-                    emit(
-                        "  [gate2] WARNING: no valid snapshot to restore — skipping Teacher only"
-                    )
-                gate2_triggered = True
+            gate2_triggered = _apply_gate2(
+                round_avg=round_avg,
+                prev_avg=prev_avg,
+                gate2_threshold=gate2_threshold,
+                best_round_n=best_round_n,
+                best_score=best_score,
+                best_skill_snapshot=best_skill_snapshot,
+                working_md=working_md,
+                emit=emit,
+            )
 
-        # ── Teacher rewrite (once per round) ─────────────────────────────────
+        # ── Teacher rewrite + Gate 1 validation ──────────────────────────────
         if not dry_run and run_logs and not gate2_triggered:
-            emit(f"  Teacher rewriting SKILL.md from {len(run_logs)} run_log(s)...")
-            teacher_start = time.time()
-            try:
-                new_skill = teacher_rewrite(
-                    skill_md_path=working_md,
-                    run_logs=run_logs,
-                    model=teacher_model,
+
+            def _val_batch(tcs: list[dict]) -> list[EvalResult]:
+                results, _ = _run_batch(
+                    batch=tcs,
+                    skill=skill,
+                    student_model=student_model,
+                    judges=judges,
+                    results_path=results_path / "validation" / f"round_{round_n}",
+                    test_cases_dir=test_cases_dir,
+                    base_config=base_config,
                     round_n=round_n,
-                    anthropic_api_key=resolved_llm_key,
-                    base_url=resolved_base_url,
-                    temperature=teacher_temperature,
+                    batch_idx=0,
+                    max_retry_per_tc=max_retry_per_tc,
+                    current_skill_md=working_md,
+                    emit=emit,
+                    no_llm_judge=no_llm_judge,
                 )
+                return results
 
-                emit(
-                    f"  Teacher done ({len(new_skill)} chars, {time.time() - teacher_start:.1f}s)"
-                )
-
-                # ── Gate 1: validate rank-6/7/8 TCs with new SKILL.md ────────
-                if validation_tc_count == 0:
-                    emit("  [gate1] DISABLED — keeping new SKILL.md unconditionally")
-                    working_md.write_text(new_skill, encoding="utf-8")
-                else:
-                    val_tcs, val_baseline = choose_validation_tcs(
-                        test_cases, validation_tc_count, round_results=all_results
-                    )
-                    emit(
-                        "  [gate1] val TCs (rank 6-8): "
-                        + ", ".join(tc["id"] for tc in val_tcs)
-                        + f"  baseline={val_baseline:.3f}"
-                    )
-
-                    def _val_batch(tcs: list[dict]) -> list[EvalResult]:
-                        results, _ = _run_batch(
-                            batch=tcs,
-                            skill=skill,
-                            student_model=student_model,
-                            judges=judges,
-                            results_path=results_path
-                            / "validation"
-                            / f"round_{round_n}",
-                            test_cases_dir=test_cases_dir,
-                            base_config=base_config,
-                            round_n=round_n,
-                            batch_idx=0,
-                            max_retry_per_tc=max_retry_per_tc,
-                            current_skill_md=working_md,
-                            emit=emit,
-                            no_llm_judge=no_llm_judge,
-                        )
-                        return results
-
-                    val_score = run_validation(
-                        skill_md_path=working_md,
-                        new_skill_content=new_skill,
-                        validation_tcs=val_tcs,
-                        run_batch_fn=_val_batch,
-                        emit=emit,
-                    )
-                    keep = decide(val_score, val_baseline, gate1_threshold, emit)
-                    if keep:
-                        working_md.write_text(new_skill, encoding="utf-8")
-                    # else: working_md unchanged (old content stays)
-
-            except Exception as e:  # noqa: BLE001
-                emit(f"  Teacher FAILED: {e}. Skipping rewrite.")
-                write_api_call({"type": "teacher", "error": str(e), "round": round_n})
+            _apply_teacher_step(
+                working_md=working_md,
+                run_logs=run_logs,
+                teacher_model=teacher_model,
+                teacher_temperature=teacher_temperature,
+                anthropic_api_key=resolved_llm_key,
+                base_url=resolved_base_url,
+                round_n=round_n,
+                test_cases=test_cases,
+                all_results=all_results,
+                validation_tc_count=validation_tc_count,
+                gate1_threshold=gate1_threshold,
+                val_batch_fn=_val_batch,
+                emit=emit,
+            )
         elif dry_run:
             emit("  DRY RUN — skipping Teacher + rollback.")
 
@@ -621,17 +750,12 @@ def _save_batch_scores(
 ) -> None:
     p = results_path / f"round_{round_n}" / f"batch_{batch_idx}" / "scores.json"
     p.parent.mkdir(parents=True, exist_ok=True)
-    avg = (
-        sum(r.llm_judge_score for r in results if r.llm_judge_score >= 0) / len(results)
-        if results
-        else 0.0
-    )
     p.write_text(
         json.dumps(
             {
                 "round": round_n,
                 "batch": batch_idx,
-                "avg_score": avg,
+                "avg_score": _avg_judge_score(results),
                 "eval_results": [_serialize_result(r) for r in results],
             },
             indent=2,

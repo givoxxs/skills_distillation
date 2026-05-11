@@ -7,7 +7,6 @@ It receives the concatenated run_logs from all batches in the round.
 from __future__ import annotations
 
 import logging
-import os
 import time
 from pathlib import Path
 
@@ -82,7 +81,7 @@ def rewrite(
         model:         Teacher model ID.
         round_n:       Current round number (for logging).
         dry_run:       If True, return unchanged SKILL.md without API call.
-        anthropic_api_key: Override for ANTHROPIC_KEY env var.
+        anthropic_api_key: OpenRouter API key (required).
 
     Returns:
         New SKILL.md content as a string.
@@ -94,9 +93,9 @@ def rewrite(
         _log.info("teacher: dry_run — skipping API call")
         return current_md
 
-    api_key = anthropic_api_key or os.getenv("ANTHROPIC_KEY")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_KEY not set (teacher requires it)")
+    if not anthropic_api_key:
+        raise RuntimeError("teacher requires an OpenRouter API key")
+    api_key = anthropic_api_key
 
     user_prompt = _build_prompt(current_md, run_logs, round_n)
     return _call_api(
