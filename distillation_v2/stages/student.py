@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import shutil
+import signal
 import subprocess
 import threading
 import time
@@ -196,6 +197,14 @@ def _install_skill_in_sandbox(
     if effective_skill_md != skill_dir / "SKILL.md":
         shutil.copy2(effective_skill_md, skills_dst / "SKILL.md")
 
+    # Expose skill folder on PYTHONPATH so `from core.<x> import ...` from
+    # SKILL.md examples resolves without the student model having to grep/find
+    # the source from `/` (a recurring failure mode in weaker SLLMs).
+    existing_pp = sandbox.env.get("PYTHONPATH", "")
+    sandbox.env["PYTHONPATH"] = (
+        f"{skills_dst}{os.pathsep}{existing_pp}" if existing_pp else str(skills_dst)
+    )
+
     # 3. Write SKILL.md to cwd/CLAUDE.md so ALL models receive skill instructions
     #    via Claude Code CLI's automatic project-context injection.
     shutil.copy2(effective_skill_md, sandbox.cwd / "CLAUDE.md")
@@ -311,6 +320,23 @@ def _build_claude_cmd(prompt: str, model: str, config: RunConfigV2) -> list[str]
     ]
 
 
+def _kill_process_group(proc: subprocess.Popen) -> None:
+    # SIGKILL the whole process group so children spawned by the student
+    # (grep -r /, find /, ...) die with the parent. Falls back to proc.kill()
+    # if the proc was not started in a new session (defensive).
+    if proc.poll() is not None:
+        return
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        return
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+    try:
+        proc.kill()
+    except ProcessLookupError:
+        pass
+
+
 def _spawn_stderr_drainer(proc: subprocess.Popen) -> tuple[threading.Thread, list[str]]:
     """Drain stderr in a background thread to prevent pipe deadlock.
 
@@ -351,7 +377,7 @@ def _spawn_watchdog(
                     "Watchdog: killing hung subprocess after %ds", timeout_seconds
                 )
                 killed.set()
-                proc.kill()
+                _kill_process_group(proc)
 
     threading.Thread(target=_watchdog, daemon=True).start()
     return cancel, killed
@@ -426,6 +452,10 @@ def _stream_claude(
         stderr=subprocess.PIPE,
         text=True,
         bufsize=1,
+        # Isolate the student in its own process group so any shell helpers
+        # it spawns (grep, find, ...) can be SIGKILLed together via killpg
+        # on watchdog timeout — otherwise they survive as orphans and bleed CPU.
+        start_new_session=True,
     )
 
     state = _StreamState()
@@ -440,8 +470,11 @@ def _stream_claude(
         )
     finally:
         if proc.poll() is None:
-            proc.kill()
-            proc.wait(timeout=5)
+            _kill_process_group(proc)
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
 
     return state.stop_reason, state.iterations, state.tokens, state.final_text
 
