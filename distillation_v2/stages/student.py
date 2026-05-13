@@ -205,6 +205,17 @@ def _install_skill_in_sandbox(
         f"{skills_dst}{os.pathsep}{existing_pp}" if existing_pp else str(skills_dst)
     )
 
+    # Mirror skill helper folders (core/, scripts/, ...) into the sandbox cwd
+    # so an `ls` shows them immediately. PYTHONPATH alone isn't enough — weaker
+    # SLLMs still scan `/` with find before trusting the import will work.
+    # Files keep their original mtime, so sandbox.list_outputs() (which filters
+    # by mtime >= since_ts) won't mistake them for agent-produced artifacts.
+    _SKILL_SKIP_NAMES = {".git", "__pycache__", "node_modules", ".npm"}
+    for child in skill_dir.iterdir():
+        if not child.is_dir() or child.name in _SKILL_SKIP_NAMES:
+            continue
+        shutil.copytree(child, sandbox.cwd / child.name, dirs_exist_ok=True)
+
     # 3. Write SKILL.md to cwd/CLAUDE.md so ALL models receive skill instructions
     #    via Claude Code CLI's automatic project-context injection.
     shutil.copy2(effective_skill_md, sandbox.cwd / "CLAUDE.md")
