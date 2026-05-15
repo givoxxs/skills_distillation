@@ -273,8 +273,14 @@ export function SkillDetailClient({
         <div className="panel">
           <div className="panel-header">
             <div>
-              <h3 className="panel-title">
+              <h3 className="panel-title" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <Bi vi="Bảng test case" en={bilingual ? "Test cases" : null} showEn={bilingual} />
+                <span
+                  className="badge badge-accent"
+                  title="distillation_v2 chưa sinh eval_detail.jsonl — dữ liệu test case bên dưới là mô phỏng có cấu trúc thật."
+                >
+                  demo data
+                </span>
               </h3>
               <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
                 Click một dòng để xem prompt · output · rationale.
@@ -401,8 +407,14 @@ export function SkillDetailClient({
         <div className="panel" style={{ gridColumn: "1 / -1" }}>
           <div className="panel-header">
             <div>
-              <h3 className="panel-title">
+              <h3 className="panel-title" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                 <Bi vi="Chi phí & thời gian" en={bilingual ? "Cost & timing" : null} showEn={bilingual} />
+                <span
+                  className="badge badge-accent"
+                  title="distillation_v2 chưa sinh api_calls.jsonl — chi phí bên dưới là ước lượng từ pricing OpenRouter/Anthropic."
+                >
+                  demo data
+                </span>
               </h3>
               <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
                 Phân bổ chi phí theo round, stack theo stage.

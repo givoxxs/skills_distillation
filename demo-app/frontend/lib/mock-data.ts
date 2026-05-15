@@ -233,7 +233,7 @@ const tcSeeds: Record<string, Seed[]> = {
 
 function genEval(skill: string, summary: SkillSummary): Record<number, EvalEntry[]> {
   const seeds = tcSeeds[skill];
-  const r = rng(summary.seed);
+  const r = rng(summary.seed ?? 0);
   const rounds = summary.score_history.map((s) => s.round);
   const out: Record<number, EvalEntry[]> = {};
 
@@ -281,7 +281,7 @@ function genEval(skill: string, summary: SkillSummary): Record<number, EvalEntry
 }
 
 function genApiCalls(skill: string, summary: SkillSummary): ApiCall[] {
-  const r = rng(summary.seed + 100);
+  const r = rng((summary.seed ?? 0) + 100);
   const out: ApiCall[] = [];
   const models = {
     student: "google/gemma-3-26b-it",

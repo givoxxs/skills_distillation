@@ -2,8 +2,8 @@ export type ScorePoint = { round: number; avg_score: number };
 
 export type SkillSummary = {
   skill: string;
-  vi: string;
-  en: string;
+  vi: string;             // display label injected client-side from display-meta
+  en?: string;
   student_model: string;
   teacher_model: string;
   judge_model: string;
@@ -14,8 +14,8 @@ export type SkillSummary = {
   best_score: number;
   score_history: ScorePoint[];
   rubric_cache_keys: Record<string, string>;
-  last_run: string;
-  seed: number;
+  last_run?: string;
+  seed?: number;
 };
 
 export type RuleCheck = { name: string; passed: boolean; reason: string };

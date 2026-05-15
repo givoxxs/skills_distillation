@@ -1,11 +1,21 @@
 import { Bi } from "@/components/bi";
 import { Icon } from "@/components/icon";
 import { TopBar } from "@/components/topbar";
-import { kpis } from "@/lib/mock-data";
+import { fetchSummary } from "@/lib/api";
 
 const BILINGUAL = true;
+const SKILLS = ["docx", "internal-comms", "slack-gif-creator"] as const;
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const summaries = await Promise.all(SKILLS.map(fetchSummary));
+  const totalImprovementPct = +(
+    (summaries.reduce((acc, s) => {
+      const r1 = s.score_history[0]?.avg_score ?? 0;
+      return acc + (s.best_score - r1) / Math.max(r1, 1e-9);
+    }, 0) /
+      Math.max(summaries.length, 1)) *
+    100
+  ).toFixed(1);
   return (
     <>
       <TopBar
@@ -103,7 +113,7 @@ export default function AboutPage() {
                 slack-gif-creator
               </span>
               ), với mức cải thiện peak so với round 1 trung bình{" "}
-              <strong style={{ color: "var(--accent)" }}>+{kpis.total_improvement_pct}%</strong>. Dashboard
+              <strong style={{ color: "var(--accent)" }}>+{totalImprovementPct}%</strong>. Dashboard
               này là công cụ trình bày kết quả và là live demo cho hội đồng bảo vệ.
             </p>
           </div>

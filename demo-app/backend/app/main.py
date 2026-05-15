@@ -1,13 +1,14 @@
 """Skill Distillation Lab — FastAPI backend.
 
-Serves Server-Sent Events for the /run page of the demo dashboard.
-Frontend at http://localhost:3000 fetches POST /api/run then opens an
-EventSource on /api/run/{id}/stream.
+Endpoints split into two groups:
 
-Data for the viewer pages is currently embedded in the Next.js frontend
-(see frontend/lib/mock-data.ts); this backend only exposes /api/run and
-/api/health. See HANDOFF.md for the plan to broaden data_loader endpoints
-once we wire ``distillation_v2/run.py`` for real.
+* ``/api/skills/*`` — read-only data loader over
+  ``distillation_v2/results/stable/<skill>/``. Returns the real
+  ``summary.json`` + ``SKILL_round_*.md`` from disk.
+* ``/api/run`` + ``/api/run/{id}/stream`` — simulated SSE for the live demo
+  on the /run page (no LLM calls).
+
+CORS is open to localhost:3000 only.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.models import HealthResponse
 from app.routes import run as run_route
+from app.routes import skills as skills_route
 
 app = FastAPI(
     title="Skill Distillation Lab — Backend",
@@ -34,6 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(skills_route.router)
 app.include_router(run_route.router)
 
 

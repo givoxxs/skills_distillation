@@ -3,12 +3,35 @@ import { Bi } from "@/components/bi";
 import { Icon } from "@/components/icon";
 import { TopBar } from "@/components/topbar";
 import { Sparkline } from "@/components/charts/sparkline";
-import { kpis, summaries } from "@/lib/mock-data";
+import { fetchSummary, type RealSummary } from "@/lib/api";
+import { displayMetaFor } from "@/lib/display-meta";
 
 const BILINGUAL = true;
+const SKILLS = ["docx", "internal-comms", "slack-gif-creator"] as const;
 
-export default function OverviewPage() {
-  const skills = Object.values(summaries);
+type Kpis = {
+  skills_count: number;
+  total_improvement_pct: number;
+  best_peak: { skill: string; score: number; round: number };
+};
+
+function computeKpis(summaries: RealSummary[]): Kpis {
+  const totalImprovement =
+    summaries.reduce((acc, s) => {
+      const r1 = s.score_history[0]?.avg_score ?? 0;
+      return acc + (s.best_score - r1) / Math.max(r1, 1e-9);
+    }, 0) / Math.max(summaries.length, 1);
+  const best = summaries.reduce((a, b) => (a.best_score > b.best_score ? a : b));
+  return {
+    skills_count: summaries.length,
+    total_improvement_pct: +(totalImprovement * 100).toFixed(1),
+    best_peak: { skill: best.skill, score: best.best_score, round: best.best_round },
+  };
+}
+
+export default async function OverviewPage() {
+  const summaries = await Promise.all(SKILLS.map(fetchSummary));
+  const kpis = computeKpis(summaries);
 
   return (
     <>
@@ -25,16 +48,24 @@ export default function OverviewPage() {
       <div className="page stack-lg">
         <div className="stack-sm" style={{ maxWidth: 720 }}>
           <div className="eyebrow">
-            <Bi vi="Đồ án — Skill distillation" en={BILINGUAL ? "Thesis — Skill distillation" : null} showEn={BILINGUAL} />
+            <Bi
+              vi="Đồ án — Skill distillation"
+              en={BILINGUAL ? "Thesis — Skill distillation" : null}
+              showEn={BILINGUAL}
+            />
           </div>
           <h1 className="h-display">
             Chưng cất{" "}
             <em style={{ fontStyle: "italic", color: "var(--primary)" }}>SKILL.md</em>{" "}
             xuống mô hình nhỏ.
           </h1>
-          <p className="muted" style={{ fontSize: "var(--text-lg)", lineHeight: 1.55, maxWidth: 640 }}>
-            Vòng lặp Teacher–Student–Judge viết lại tài liệu hướng dẫn của Anthropic để Gemma 3 26B thực thi đạt mức gần với Claude.
-            Bảng dưới là kết quả thực nghiệm trên ba skill, mỗi skill 8–10 vòng.
+          <p
+            className="muted"
+            style={{ fontSize: "var(--text-lg)", lineHeight: 1.55, maxWidth: 640 }}
+          >
+            Vòng lặp Teacher–Student–Judge viết lại tài liệu hướng dẫn của Anthropic để Gemma 4-26B
+            thực thi đạt mức gần với Claude. Bảng dưới là kết quả thực nghiệm trên ba skill, mỗi
+            skill 8–10 vòng.
           </p>
         </div>
 
@@ -77,20 +108,27 @@ export default function OverviewPage() {
             </h2>
             <span className="badge badge-outline">
               <span className="mono">
-                batch_size=3 · student=gemma-3-26b · teacher=claude-sonnet-4.5
+                student={summaries[0].student_model.split("/").pop()} · teacher=
+                {summaries[0].teacher_model.split("/").pop()}
               </span>
             </span>
           </div>
           <div className="grid-3">
-            {skills.map((s) => {
-              const improvement =
-                ((s.best_score - s.score_history[0].avg_score) / s.score_history[0].avg_score) *
-                100;
+            {summaries.map((s) => {
+              const meta = displayMetaFor(s.skill);
+              const r1 = s.score_history[0]?.avg_score ?? 0;
+              const improvement = ((s.best_score - r1) / Math.max(r1, 1e-9)) * 100;
               return (
                 <Link key={s.skill} className="skill-card" href={`/skills/${s.skill}`}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                    }}
+                  >
                     <div>
-                      <div className="skill-title">{s.vi}</div>
+                      <div className="skill-title">{meta.vi}</div>
                       <div className="skill-id">{s.skill}</div>
                     </div>
                     <span className="badge badge-success" title="Improvement R1 → Peak">
@@ -98,7 +136,12 @@ export default function OverviewPage() {
                     </span>
                   </div>
                   <div style={{ margin: "6px 0 -2px" }}>
-                    <Sparkline data={s.score_history} peakRound={s.best_round} width={280} height={56} />
+                    <Sparkline
+                      data={s.score_history}
+                      peakRound={s.best_round}
+                      width={280}
+                      height={56}
+                    />
                   </div>
                   <div className="skill-card-stats">
                     <div className="stat">
@@ -107,7 +150,7 @@ export default function OverviewPage() {
                     </div>
                     <div className="stat">
                       <div className="stat-label">R1</div>
-                      <div className="stat-value">{s.score_history[0].avg_score.toFixed(3)}</div>
+                      <div className="stat-value">{r1.toFixed(3)}</div>
                     </div>
                     <div className="stat">
                       <div className="stat-label">Peak</div>
@@ -148,7 +191,11 @@ export default function OverviewPage() {
         <div className="card">
           <div className="row-between" style={{ marginBottom: 16 }}>
             <h3 className="h3">
-              <Bi vi="Phương pháp tóm tắt" en={BILINGUAL ? "Method, at a glance" : null} showEn={BILINGUAL} />
+              <Bi
+                vi="Phương pháp tóm tắt"
+                en={BILINGUAL ? "Method, at a glance" : null}
+                showEn={BILINGUAL}
+              />
             </h3>
             <span className="badge">
               <span className="mono">3-stage loop</span>
@@ -159,14 +206,14 @@ export default function OverviewPage() {
               {
                 n: "01",
                 label: "Student",
-                body: "Gemma 3 26B chạy SKILL.md hiện tại trên 12 test case, sinh output.",
+                body: `${summaries[0].student_model} chạy SKILL.md hiện tại trên các test case, sinh output.`,
                 color: "var(--primary)",
               },
               {
                 n: "02",
                 label: "Judge",
                 body:
-                  "Claude chấm từng output theo rubric. Rule-check chạy trước; điểm rubric quá thấp thì bỏ qua judge.",
+                  "Claude chấm từng output theo rubric. Rule-check chạy trước; điểm rule quá thấp thì bỏ qua judge.",
                 color: "var(--accent)",
               },
               {
@@ -193,7 +240,14 @@ export default function OverviewPage() {
                     {step.label}
                   </span>
                 </div>
-                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--fg-muted)" }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 14,
+                    lineHeight: 1.55,
+                    color: "var(--fg-muted)",
+                  }}
+                >
                   {step.body}
                 </p>
               </div>
