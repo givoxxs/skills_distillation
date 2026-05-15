@@ -48,6 +48,18 @@ dev = [
 [project.urls]
 Repository = "https://github.com/givoxxs/skills_distillation"
 
+[tool.pytest.ini_options]
+# Run both the pipeline suite and the demo-app backend suite from the root.
+# Add new test roots here, never sprinkle them through subprojects ad-hoc.
+testpaths = [
+    "distillation_v2/tests",
+    "demo-app/backend/tests",
+]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-ra --strict-markers"
+
 [tool.setuptools]
 packages = ["distillation", "distillation_v2", "skill_runner", "skill_evaluation"]
 
