@@ -1,6 +1,0 @@
-{
-  "name": "Skill Distillation Playground",
-  "description": "A playground for comparing LLM model performance on agent skills with a terminal-inspired laboratory aesthetic.",
-  "requestFramePermissions": [],
-  "majorCapabilities": []
-}

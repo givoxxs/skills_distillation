@@ -1,9 +1,0 @@
-node_modules/
-.pnpm-store/
-build/
-dist/
-coverage/
-.DS_Store
-*.log
-.env*
-!.env.example
