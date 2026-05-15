@@ -65,6 +65,8 @@ skill_runner/context/*
 /tests
 !demo-app/backend/tests/
 !distillation_v2/tests/
+# Runtime artifacts produced by integration tests — should never be tracked.
+distillation_v2/tests/integration_results/
 # CLAUDE.md
 
 .ruff_cache

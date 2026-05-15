@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","session_id":"sess-2","model":"qwen/qwen3-8b","tools":["bash"],"cwd":"/tmp/sandbox/cwd"}
+{"type":"assistant","message":{"id":"msg-1","content":[{"type":"tool_use","id":"tu-1","name":"bash","input":{"command":"false"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu-1","content":"exit code 1","is_error":true}]}}
+{"type":"result","subtype":"success","duration_ms":500,"usage":{"input_tokens":40,"output_tokens":10},"result":"I encountered an error."}

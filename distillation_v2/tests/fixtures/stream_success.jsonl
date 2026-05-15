@@ -1,0 +1,7 @@
+{"type":"system","subtype":"init","session_id":"sess-123","model":"qwen/qwen3-8b","tools":["bash","read_file","write_file"],"cwd":"/tmp/sandbox/cwd"}
+{"type":"assistant","message":{"id":"msg-1","content":[{"type":"text","text":"I'll create the docx now."}]}}
+{"type":"assistant","message":{"id":"msg-2","content":[{"type":"tool_use","id":"tu-1","name":"bash","input":{"command":"echo hi > out.docx"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu-1","content":"","is_error":false}]}}
+{"type":"assistant","message":{"id":"msg-3","content":[{"type":"tool_use","id":"tu-2","name":"read_file","input":{"path":"out.docx"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu-2","content":[{"type":"text","text":"hi"}],"is_error":false}]}}
+{"type":"result","subtype":"success","duration_ms":12345,"usage":{"input_tokens":100,"output_tokens":50},"result":"Done. Wrote out.docx."}
