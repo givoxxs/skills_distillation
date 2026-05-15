@@ -11,6 +11,7 @@ DISTILL_REPO_ROOT = Path(
 )
 
 STABLE_DIR = DISTILL_REPO_ROOT / "distillation_v2" / "results" / "stable"
+TEST_CASES_DIR = DISTILL_REPO_ROOT / "distillation_v2" / "test_cases"
 
 # Skills we ship in the demo. Filesystem state is the source of truth, but we
 # keep this allowlist to (a) reject random folder names and (b) preserve the

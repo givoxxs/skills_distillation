@@ -62,4 +62,22 @@ export function fetchSkillMd(skill: string, round: number): Promise<SkillMdRespo
   );
 }
 
+export type EvalDetailEntry = {
+  round: number;
+  test_case_id: string;
+  workflow: string;
+  rule_score: number;
+  llm_judge_score: number | null;
+  hybrid_score: number;
+  judge_rationale: string;
+  rule_checks: { name: string; passed: boolean; score: number | null; reason: string }[];
+  prompt: string;
+  output: string;
+};
+
+export function fetchEvalDetail(skill: string, round?: number): Promise<EvalDetailEntry[]> {
+  const qs = round !== undefined ? `?round=${round}` : "";
+  return get<EvalDetailEntry[]>(`/api/skills/${encodeURIComponent(skill)}/eval${qs}`);
+}
+
 export { BACKEND_URL };

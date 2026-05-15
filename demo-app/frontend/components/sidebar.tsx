@@ -6,12 +6,14 @@ import { useState } from "react";
 import { useTheme } from "next-themes";
 import { Bi } from "./bi";
 import { Icon } from "./icon";
+import { useLang } from "./language-provider";
 import { skillList } from "@/lib/mock-data";
 
-export function Sidebar({ bilingual = true }: { bilingual?: boolean }) {
+export function Sidebar() {
   const pathname = usePathname();
   const [skillsOpen, setSkillsOpen] = useState(true);
   const { theme, setTheme } = useTheme();
+  const { lang, toggle } = useLang();
 
   const isActive = (p: string) => pathname === p;
   const isSkillActive = (skill: string) => pathname === "/skills/" + skill;
@@ -23,13 +25,15 @@ export function Sidebar({ bilingual = true }: { bilingual?: boolean }) {
         <div className="brand-mark">S</div>
         <div className="brand-name">
           Skill Distillation Lab
-          <span className="sub">Đồ án tốt nghiệp · 2026</span>
+          <span className="sub">
+            <Bi vi="Đồ án tốt nghiệp · 2026" en="Bachelor's thesis · 2026" />
+          </span>
         </div>
       </div>
 
       <nav className="nav" aria-label="Primary navigation">
         <div className="nav-section">
-          <Bi vi="Điều hướng" en={bilingual ? "Navigation" : null} showEn={bilingual} />
+          <Bi vi="Điều hướng" en="Navigation" />
         </div>
 
         <Link
@@ -38,17 +42,24 @@ export function Sidebar({ bilingual = true }: { bilingual?: boolean }) {
           aria-current={isActive("/") ? "page" : undefined}
         >
           <Icon name="home" />
-          <Bi vi="Tổng quan" en={bilingual ? "Overview" : null} showEn={bilingual} />
+          <Bi vi="Tổng quan" en="Overview" />
         </Link>
 
         <button
           className={"nav-item" + (skillsHighlighted ? " active" : "")}
-          style={{ textAlign: "left", width: "100%", background: "transparent", border: "1px solid transparent" }}
+          style={{
+            textAlign: "left",
+            width: "100%",
+            background: "transparent",
+            border: "1px solid transparent",
+          }}
           onClick={() => setSkillsOpen((o) => !o)}
         >
           <Icon name="layers" />
-          <Bi vi="Các skill" en={bilingual ? "Skills" : null} showEn={bilingual} />
-          <span style={{ marginLeft: "auto", display: "inline-flex", color: "var(--fg-faint)" }}>
+          <Bi vi="Các skill" en="Skills" />
+          <span
+            style={{ marginLeft: "auto", display: "inline-flex", color: "var(--fg-faint)" }}
+          >
             <Icon name={skillsOpen ? "chev-d" : "chev-r"} size={14} />
           </span>
         </button>
@@ -76,7 +87,7 @@ export function Sidebar({ bilingual = true }: { bilingual?: boolean }) {
           aria-current={isActive("/run") ? "page" : undefined}
         >
           <Icon name="play" />
-          <Bi vi="Chạy thử" en={bilingual ? "Live run" : null} showEn={bilingual} />
+          <Bi vi="Chạy thử" en="Live run" />
         </Link>
 
         <Link
@@ -85,22 +96,60 @@ export function Sidebar({ bilingual = true }: { bilingual?: boolean }) {
           aria-current={isActive("/about") ? "page" : undefined}
         >
           <Icon name="info" />
-          <Bi vi="Giới thiệu" en={bilingual ? "About" : null} showEn={bilingual} />
+          <Bi vi="Giới thiệu" en="About" />
         </Link>
       </nav>
 
-      <div className="sidebar-footer">
-        <span style={{ fontSize: 12, color: "var(--fg-subtle)" }}>
-          {theme === "dark" ? "Chế độ tối" : "Chế độ sáng"}
-        </span>
-        <button
-          className="btn btn-ghost btn-icon"
-          aria-label="Toggle theme"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          title="Toggle dark / light"
+      <div className="sidebar-footer" style={{ flexDirection: "column", gap: 8, alignItems: "stretch" }}>
+        {/* Language toggle */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
         >
-          <Icon name={theme === "dark" ? "sun" : "moon"} size={16} />
-        </button>
+          <span style={{ fontSize: 12, color: "var(--fg-subtle)" }}>
+            <Bi vi="Ngôn ngữ" en="Language" />
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={toggle}
+            aria-label="Toggle language"
+            title="Toggle VN / EN"
+            style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}
+          >
+            {lang === "vi" ? "VN · EN" : "EN · VN"}
+          </button>
+        </div>
+        {/* Theme toggle */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 12, color: "var(--fg-subtle)" }}>
+            {theme === "dark" ? (
+              <Bi vi="Chế độ tối" en="Dark mode" />
+            ) : (
+              <Bi vi="Chế độ sáng" en="Light mode" />
+            )}
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon"
+            aria-label="Toggle theme"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            title="Toggle dark / light"
+          >
+            <Icon name={theme === "dark" ? "sun" : "moon"} size={16} />
+          </button>
+        </div>
       </div>
     </aside>
   );

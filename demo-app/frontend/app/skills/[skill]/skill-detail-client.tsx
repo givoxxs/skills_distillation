@@ -181,7 +181,10 @@ export function SkillDetailClient({
                 <Bi vi="Đường học" en={bilingual ? "Learning curve" : null} showEn={bilingual} />
               </h3>
               <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-                Avg hybrid score qua các round, peak được đánh dấu vàng.
+                <Bi
+                  vi="Avg hybrid score qua các round, peak được đánh dấu vàng."
+                  en="Average hybrid score per round, peak highlighted in amber."
+                />
               </div>
             </div>
             <div className="row">
@@ -215,15 +218,18 @@ export function SkillDetailClient({
           </div>
         </div>
 
-        {/* Panel 2 — Diff */}
-        <div className="panel">
+        {/* Panel 2 — Diff (full-width row) */}
+        <div className="panel" style={{ gridColumn: "1 / -1" }}>
           <div className="panel-header">
             <div>
               <h3 className="panel-title">
                 <Bi vi="Diff SKILL.md" en={bilingual ? "SKILL.md diff" : null} showEn={bilingual} />
               </h3>
               <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-                So sánh hai phiên bản của tài liệu hướng dẫn.
+                <Bi
+                  vi="So sánh hai phiên bản của tài liệu hướng dẫn."
+                  en="Compare two versions of the SKILL.md document."
+                />
               </div>
             </div>
             <div className="row">
@@ -273,17 +279,14 @@ export function SkillDetailClient({
         <div className="panel">
           <div className="panel-header">
             <div>
-              <h3 className="panel-title" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <h3 className="panel-title">
                 <Bi vi="Bảng test case" en={bilingual ? "Test cases" : null} showEn={bilingual} />
-                <span
-                  className="badge badge-accent"
-                  title="distillation_v2 chưa sinh eval_detail.jsonl — dữ liệu test case bên dưới là mô phỏng có cấu trúc thật."
-                >
-                  demo data
-                </span>
               </h3>
               <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-                Click một dòng để xem prompt · output · rationale.
+                <Bi
+                  vi="Click một dòng để xem prompt · output_dir · rationale."
+                  en="Click a row to view prompt · output_dir · rationale."
+                />
               </div>
             </div>
             <div className="row">
@@ -417,7 +420,10 @@ export function SkillDetailClient({
                 </span>
               </h3>
               <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
-                Phân bổ chi phí theo round, stack theo stage.
+                <Bi
+                  vi="Phân bổ chi phí theo round, stack theo stage."
+                  en="Cost breakdown per round, stacked by pipeline stage."
+                />
               </div>
             </div>
             <div className="row">
@@ -465,7 +471,9 @@ export function SkillDetailClient({
                   </span>
                   {statusBadge(activeTc.hybrid_score)}
                 </div>
-                <h3 className="panel-title">Chi tiết test case</h3>
+                <h3 className="panel-title">
+                  <Bi vi="Chi tiết test case" en="Test case detail" />
+                </h3>
               </div>
               <button
                 type="button"
@@ -478,7 +486,9 @@ export function SkillDetailClient({
             </div>
             <div className="drawer-body">
               <div className="drawer-section">
-                <div className="drawer-section-title">Điểm số</div>
+                <div className="drawer-section-title">
+                  <Bi vi="Điểm số" en="Scores" />
+                </div>
                 <div className="row" style={{ gap: 24, fontVariantNumeric: "tabular-nums" }}>
                   <div className="stack-sm" style={{ gap: 2 }}>
                     <span className="stat-label">Rule</span>
@@ -505,14 +515,24 @@ export function SkillDetailClient({
               </div>
               <div className="drawer-section">
                 <div className="drawer-section-title">Prompt</div>
-                <div className="code-block">{activeTc.prompt}</div>
+                <div className="code-block">{activeTc.prompt || "—"}</div>
               </div>
               <div className="drawer-section">
-                <div className="drawer-section-title">Output (student)</div>
-                <div className="code-block">{activeTc.output}</div>
+                <div className="drawer-section-title">
+                  {bilingual ? "Output (artifacts) · stored at" : "Output (artifacts) · stored at"}
+                </div>
+                <div className="code-block" style={{ maxHeight: 80 }}>
+                  {activeTc.output || "—"}
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                  Artifacts (output.docx, screenshots…) nằm tại đường dẫn trên trong{" "}
+                  <span className="mono">distillation_v2/</span> — không inline để giữ payload nhẹ.
+                </div>
               </div>
               <div className="drawer-section">
-                <div className="drawer-section-title">Judge rationale</div>
+                <div className="drawer-section-title">
+                  <Bi vi="Judge rationale (lý do của Judge)" en="Judge rationale" />
+                </div>
                 <p
                   style={{
                     margin: 0,
@@ -525,7 +545,9 @@ export function SkillDetailClient({
                 </p>
               </div>
               <div className="drawer-section">
-                <div className="drawer-section-title">Rule checks</div>
+                <div className="drawer-section-title">
+                  <Bi vi="Rule checks (kiểm tra rule)" en="Rule checks" />
+                </div>
                 <ul
                   style={{
                     listStyle: "none",

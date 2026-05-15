@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, Source_Serif_4, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { LanguageProvider } from "@/components/language-provider";
 import { Sidebar } from "@/components/sidebar";
 import "./globals.css";
 
@@ -41,10 +42,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body>
         <ThemeProvider>
-          <div className="app">
-            <Sidebar bilingual={true} />
-            <main className="main">{children}</main>
-          </div>
+          <LanguageProvider>
+            <div className="app">
+              <Sidebar />
+              <main className="main">{children}</main>
+            </div>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

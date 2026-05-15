@@ -88,3 +88,40 @@ def test_skill_md_fallback_for_missing_round(client: TestClient) -> None:
     assert body["fallback"] is True
     assert body["round"] != 999
     assert body["round"] >= 0
+
+
+@requires_stable
+def test_eval_detail_returns_real_entries(client: TestClient) -> None:
+    r = client.get("/api/skills/docx/eval?round=1")
+    assert r.status_code == 200
+    entries = r.json()
+    assert isinstance(entries, list)
+    assert len(entries) > 0
+    e = entries[0]
+    # Schema the frontend depends on
+    for k in (
+        "round",
+        "test_case_id",
+        "workflow",
+        "rule_score",
+        "llm_judge_score",
+        "hybrid_score",
+        "judge_rationale",
+        "rule_checks",
+        "prompt",
+        "output",
+    ):
+        assert k in e, f"missing key {k}"
+    assert e["round"] == 1
+    assert 0.0 <= e["rule_score"] <= 1.0
+    assert 0.0 <= e["hybrid_score"] <= 1.0
+    assert e["workflow"] in {"create", "read", "edit", "convert", "edge"}
+
+
+@requires_stable
+def test_eval_detail_unfiltered_covers_multiple_rounds(client: TestClient) -> None:
+    r = client.get("/api/skills/docx/eval")
+    assert r.status_code == 200
+    entries = r.json()
+    rounds = {e["round"] for e in entries}
+    assert len(rounds) >= 2  # at least round 1 and one more

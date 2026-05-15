@@ -40,7 +40,7 @@ export default async function OverviewPage() {
         actions={
           <Link href="/run" className="btn btn-primary">
             <Icon name="play" size={16} />
-            Chạy mini distillation
+            <Bi vi="Chạy mini distillation" en="Run mini distillation" />
           </Link>
         }
       />
@@ -55,17 +55,31 @@ export default async function OverviewPage() {
             />
           </div>
           <h1 className="h-display">
-            Chưng cất{" "}
-            <em style={{ fontStyle: "italic", color: "var(--primary)" }}>SKILL.md</em>{" "}
-            xuống mô hình nhỏ.
+            <Bi
+              vi={
+                <>
+                  Chưng cất{" "}
+                  <em style={{ fontStyle: "italic", color: "var(--primary)" }}>SKILL.md</em>{" "}
+                  xuống mô hình nhỏ.
+                </>
+              }
+              en={
+                <>
+                  Distilling{" "}
+                  <em style={{ fontStyle: "italic", color: "var(--primary)" }}>SKILL.md</em>{" "}
+                  down to small models.
+                </>
+              }
+            />
           </h1>
           <p
             className="muted"
             style={{ fontSize: "var(--text-lg)", lineHeight: 1.55, maxWidth: 640 }}
           >
-            Vòng lặp Teacher–Student–Judge viết lại tài liệu hướng dẫn của Anthropic để Gemma 4-26B
-            thực thi đạt mức gần với Claude. Bảng dưới là kết quả thực nghiệm trên ba skill, mỗi
-            skill 8–10 vòng.
+            <Bi
+              vi="Vòng lặp Teacher–Student–Judge viết lại tài liệu hướng dẫn của Anthropic để Gemma 4-26B thực thi đạt mức gần với Claude. Bảng dưới là kết quả thực nghiệm trên ba skill, mỗi skill 8–10 vòng."
+              en="The Teacher–Student–Judge loop rewrites Anthropic's skill documentation so Gemma 4-26B performs close to Claude. The table below shows experimental results across three skills, 8–10 rounds each."
+            />
           </p>
         </div>
 

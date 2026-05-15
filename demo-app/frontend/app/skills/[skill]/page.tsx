@@ -4,12 +4,16 @@ import { TopBar } from "@/components/topbar";
 import { SkillDetailClient } from "./skill-detail-client";
 import {
   apiCallsBySkill,
-  evalBySkill,
   workflowsBySkill as MOCK_WORKFLOWS,
 } from "@/lib/mock-data";
-import { fetchAvailableRounds, fetchSkillMd, fetchSummary } from "@/lib/api";
+import {
+  fetchAvailableRounds,
+  fetchEvalDetail,
+  fetchSkillMd,
+  fetchSummary,
+} from "@/lib/api";
 import { displayMetaFor } from "@/lib/display-meta";
-import type { SkillSummary } from "@/lib/types";
+import type { EvalEntry, SkillSummary } from "@/lib/types";
 
 const BILINGUAL = true;
 const SUPPORTED = new Set(["docx", "internal-comms", "slack-gif-creator"]);
@@ -24,10 +28,12 @@ export default async function SkillDetailPage({
 
   let realSummary;
   let availableRounds: { rounds: number[] };
+  let evalEntries: EvalEntry[];
   try {
-    [realSummary, availableRounds] = await Promise.all([
+    [realSummary, availableRounds, evalEntries] = await Promise.all([
       fetchSummary(skill),
       fetchAvailableRounds(skill),
+      fetchEvalDetail(skill),
     ]);
   } catch (e) {
     throw new Error(
@@ -68,9 +74,15 @@ export default async function SkillDetailPage({
       ? Object.keys(realSummary.rubric_cache_keys).sort()
       : MOCK_WORKFLOWS[skill] || [];
 
-  // Test cases + cost — still mock (eval_detail.jsonl / api_calls.jsonl
-  // are not yet emitted by distillation_v2). Surface this in the UI.
-  const evalByRound = evalBySkill[skill] || {};
+  // Group real eval entries by round.
+  const evalByRound: Record<number, EvalEntry[]> = {};
+  for (const entry of evalEntries) {
+    (evalByRound[entry.round] ||= []).push(entry as EvalEntry);
+  }
+  // api_calls.jsonl in the upstream pipeline lacks `round` / `cost_usd` /
+  // `latency_ms` / `timestamp` — keep the deterministic mock for the cost
+  // bar chart so the panel still renders something meaningful; the UI
+  // carries a "demo data" badge there.
   const apiCalls = apiCallsBySkill[skill] || [];
 
   return (
@@ -83,7 +95,7 @@ export default async function SkillDetailPage({
         ]}
         actions={
           <Link href="/run" className="btn btn-sm">
-            Chạy mini cho skill này
+            <span lang="vi">Chạy mini cho skill này</span>
           </Link>
         }
       />

@@ -33,3 +33,8 @@ def get_skill_md(skill: str, round: int) -> dict:
 @router.get("/api/skills/{skill}/available-rounds")
 def get_available_rounds(skill: str) -> dict:
     return {"rounds": data_loader.available_rounds(skill)}
+
+
+@router.get("/api/skills/{skill}/eval")
+def get_eval(skill: str, round: int | None = None) -> list[dict]:
+    return data_loader.get_eval_detail(skill, round)

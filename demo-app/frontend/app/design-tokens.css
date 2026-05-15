@@ -758,7 +758,7 @@ button { font: inherit; cursor: pointer; }
   line-height: 1.7;
   background: var(--surface);
 }
-.diff-pane { overflow: auto; max-height: 560px; }
+.diff-pane { overflow: auto; max-height: 820px; }
 .diff-pane + .diff-pane { border-left: 1px solid var(--line); }
 .diff-row {
   display: grid;
