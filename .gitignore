@@ -61,7 +61,10 @@ distillation/results/*
 # /context
 skill_runner/context/*
 
-tests
+# Stray top-level "tests" dir (root playground), but keep real test suites.
+/tests
+!demo-app/backend/tests/
+!distillation_v2/tests/
 # CLAUDE.md
 
 .ruff_cache
