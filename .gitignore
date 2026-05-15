@@ -93,3 +93,6 @@ ui/backend/outputs
 # MemPalace per-project files (issue #185)
 mempalace.yaml
 entities.json
+
+# Local notes (not for commit)
+docs/notes/
