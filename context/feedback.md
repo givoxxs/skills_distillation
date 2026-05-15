@@ -178,3 +178,28 @@ Gate 2 check `round_avg < prev_avg - threshold` — dùng round ngay trước, k
 Khi round N đạt best score, snapshot restore phải là `SKILL_round_{N-1}.md` (cái TCs đã chạy với), không phải `SKILL_round_N.md` (Teacher output của round N).
 **Why:** `SKILL_round_N.md` là Teacher rewrite chưa được verify bởi batches. `SKILL_round_{N-1}.md` là version đã produce best score thực tế.
 **How to apply:** `best_skill_snapshot = results_path / f"SKILL_round_{round_n - 1}.md"` (đã fix 09/05).
+
+## v2: KHÔNG động vào thư mục skill khi fix pipeline (session 13/05)
+Khi gặp issue student behavior (gọi `find /` thay vì import skill), fix ở pipeline infrastructure (`stages/student.py`), KHÔNG sửa `skill_runner/skills/<skill>/SKILL.md` hay thư mục skill nào.
+**Why:** user yêu cầu rõ "tránh mất bản chất pipeline distillation v2" — Teacher distillation phải làm việc với SKILL.md THUẦN, không phải SKILL.md đã pre-doctored. Sửa skill folder làm sai signal cho Teacher.
+**How to apply:** mọi infrastructure fix (PYTHONPATH, process group kill, mirror folders vào cwd, sandbox tweaks) đều thực hiện trong `stages/student.py` hoặc `runner/`. Verify bằng `git diff --name-only | grep -E "skills/"` phải EMPTY.
+
+## v2: Mirror skill helper folders vào sandbox.cwd để loại find/grep từ student
+Trong `_install_skill_in_sandbox`, copy mọi subfolder không phải SKILL.md (e.g., `core/`, `scripts/`) vào `sandbox.cwd/`.
+**Why:** Weak SLLMs (gemma-4-26b) thấy `from core.X import Y` trong SKILL.md → spawn `find / -name X.py` để verify file tồn tại → mỗi find mất 5-15 phút quét toàn ổ → batches đụng cap 1800s. Mirror folder vào cwd làm `ls` ra ngay → student không cần scan filesystem.
+**How to apply:** `shutil.copytree(child, sandbox.cwd / child.name, dirs_exist_ok=True)` với skip set `{".git", "__pycache__", "node_modules", ".npm"}`. PYTHONPATH alone không đủ — phải mirror physical folder vào cwd.
+
+## v2: subprocess.Popen luôn `start_new_session=True` cho student
+Spawn student trong process group riêng (session leader) để killpg work.
+**Why:** student thường spawn shell helpers (`grep`, `find`, `python`) — khi watchdog kill student mà không kill group, các helper trở thành orphan ngốn CPU 80%+ mỗi cái, kéo các TC khác chậm xuống.
+**How to apply:** `Popen(..., start_new_session=True)` + dùng `os.killpg(os.getpgid(proc.pid), SIGKILL)` thay `proc.kill()`. Fallback: nếu killpg fail (proc đã chết), thử `proc.kill()` rồi swallow `ProcessLookupError`.
+
+## v2: judge_temperature nên = 0 để deterministic resume
+Hiện default `judge_temperature=0.2` — gây score variance khi resume re-eval cached batches.
+**Why:** Session 13/05 thấy slack-gif-creator R3 cùng cached batches nhưng re-eval cho 0.800 → 0.766 → 0.764 qua 3 resume. Compound non-determinism trên Teacher rewrite làm metric không reproducible.
+**How to apply:** set `judge_temperature: 0.0` trong `config.yaml` (cần verify Anthropic API chấp nhận temp=0 với haiku-4-5). Nếu API yêu cầu > 0, set `0.1` thay vì `0.2`.
+
+## v2: validation_tc_count = 3 quá hẹp → gate1 ROLLBACK quá strict
+Default 3 val TCs trong `config.yaml` làm gate1 dễ rollback dù round avg cao.
+**Why:** Session 13/05 slack-gif-creator: R3, R4 đều ROLLBACK (val_score=0.643, 0.817) mặc dù round avg trên full 23 TCs là 0.764, 0.867. 3 TCs sample không đại diện cho full pool.
+**How to apply:** mở `validation_tc_count` từ 3 → 6-8 trong `config.yaml`. Hoặc giảm `gate1_threshold` từ 0.10 → 0.15.

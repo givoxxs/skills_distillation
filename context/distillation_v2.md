@@ -274,10 +274,37 @@ Config override: `judge_temperature`, `teacher_temperature` trong `config.yaml` 
 - Composite lên background color từ GIF palette (tránh transparent → black frames)
 - 3 frames đủ cho judge assess "render đúng không" mà không tốn nhiều image tokens
 
+## Pipeline infrastructure fixes (session 2026-05-13)
+
+Sửa 3 vấn đề trong `stages/student.py` để pipeline robust hơn cho weak SLLMs (gemma, qwen). Không động vào skill folder.
+
+### Fix 1 — PYTHONPATH inject (`commit 64c2999`)
+
+`_install_skill_in_sandbox` set `sandbox.env["PYTHONPATH"] = skills_dst` (= `$HOME/.claude/skills/<skill>/`).
+**Why:** SKILL.md có ví dụ `from core.gif_builder import GIFBuilder` — nhưng `core/` nằm ở sandbox HOME, không trong cwd → `ModuleNotFoundError` → student fallback `find / -name gif_builder.py`.
+**How to apply:** mọi skill có helper modules (validators, easing, frame_composer, ...) hưởng lợi mặc định.
+
+### Fix 2 — Process group kill (`commit 64c2999`)
+
+`subprocess.Popen(start_new_session=True)` + helper `_kill_process_group(proc)` dùng `os.killpg(os.getpgid(proc.pid), SIGKILL)`. Thay 2 chỗ `proc.kill()` cũ (watchdog + finally).
+**Why:** trước fix, khi watchdog kill student, các shell children (`grep -r /`, `find /`) tiếp tục sống làm orphan → ngốn CPU 80%+ mỗi cái, kéo TC khác chạy chậm.
+**How to apply:** pattern `start_new_session=True` + killpg là chuẩn cho mọi long-running subprocess.
+
+### Fix 3 — Mirror skill helper folders vào cwd (`commit 013be30`)
+
+Sau khi copy skill → `~/.claude/skills/<skill>/`, copy thêm các subfolder không phải SKILL.md (e.g., `core/`, `scripts/`) vào `sandbox.cwd/`.
+**Why:** PYTHONPATH KHÔNG ngăn được student gọi `find /` — student vẫn quét filesystem để "verify file tồn tại" trước khi import. Mirror folder vào cwd làm `ls` ra ngay → loại bỏ động cơ scan `/`.
+Files được copy bằng `shutil.copytree` (copy2 default) → preserve mtime → `sandbox.list_outputs()` (filter mtime >= since_ts) không nhận nhầm là output.
+**Verified:** slack-gif-creator R3 với fix: 0 `find /` calls, batches 5-8 phút (vs 25-30 phút trước), score R4 = **0.867** (vs 0.800 trước fix).
+
+---
+
 ## Known issues / Cần làm tiếp
 
-1. **Scripts copy**: `validate.py` chưa được copy vào sandbox — validate check vẫn không chạy được.
-2. **Gemma variance**: score dao động đáng kể giữa các runs (compound non-determinism: Student + Judge + Teacher). Gate 2 giảm regression nhưng không loại bỏ hoàn toàn.
-3. **docx bimodal distribution**: nhiều TCs luôn score 1.0 hoặc 0.0 → rank 6-8 thường vẫn ở 1.0 → Gate 1 baseline=1.0 → validation phải đạt ≥0.9 để pass. Ít discriminating hơn so với skills có distribution mịn.
-4. **So sánh v1 vs v2** cho thesis writeup.
-5. **batch_log_paths** (dead code trong pipeline.py): accumulated nhưng không dùng — harmless.
+1. ~~**Scripts copy**: `validate.py` chưa được copy vào sandbox~~ ✅ FIX 13/05 (Fix 3 ở trên — toàn bộ subfolder được copy vào cwd).
+2. **Gemma variance**: score dao động đáng kể giữa các runs (compound non-determinism). Gate 2 giảm regression nhưng không loại bỏ hoàn toàn.
+3. **docx bimodal distribution**: nhiều TCs luôn score 1.0 hoặc 0.0 → rank 6-8 thường vẫn ở 1.0 → Gate 1 baseline=1.0 → ít discriminating hơn skills có distribution mịn.
+4. **Gate 1 ROLLBACK quá thường xuyên trên slack-gif-creator** (3/5 lần ở session 13/05) — sample 3 TCs quá hẹp. Đề xuất mở `validation_tc_count` từ 3 → 6-8.
+5. **Judge stochasticity ảnh hưởng resume**: cùng cached batch nhưng re-eval cho score hơi khác (R3 slack-gif-creator: 0.800 → 0.766 → 0.764 qua 3 resume). Đề xuất `judge_temperature=0`.
+6. **So sánh v1 vs v2** cho thesis writeup.
+7. **batch_log_paths** (dead code trong pipeline.py): accumulated nhưng không dùng — harmless.
