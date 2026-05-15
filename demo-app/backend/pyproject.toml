@@ -4,11 +4,22 @@ version = "0.1.0"
 description = "Skill Distillation Lab — FastAPI demo backend"
 readme = "README.md"
 requires-python = ">=3.11"
+# Runtime dependencies are installed into the shared conda env "skills" —
+# see ../README.md and .claude/rules/python-env.md. This file only declares
+# what the project depends on so editors / type checkers know the surface.
 dependencies = [
-    "fastapi>=0.136.1",
-    "pydantic>=2.13.4",
-    "uvicorn[standard]>=0.47.0",
+    "fastapi>=0.135.1",
+    "pydantic>=2.12.5",
+    "uvicorn[standard]>=0.42.0",
+    "httpx>=0.28.0",          # used by FastAPI TestClient
 ]
 
-[tool.uv]
-package = false
+[project.optional-dependencies]
+test = ["pytest>=9.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-ra --strict-markers"

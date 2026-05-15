@@ -13,17 +13,30 @@ demo-app/
 ## Yêu cầu hệ thống
 
 - Node ≥ 20, pnpm ≥ 9
-- Python 3.11+, [uv](https://docs.astral.sh/uv/) ≥ 0.5
+- **Conda env `skills`** (Python 3.12) — đã có sẵn `fastapi`, `uvicorn`, `pydantic`, `pytest`, `httpx`. Xem `.claude/rules/python-env.md` để hiểu vì sao project gắn cứng vào env này.
+
+Verify môi trường:
+
+```bash
+/opt/anaconda3/envs/skills/bin/python --version    # Python 3.12.x
+/opt/anaconda3/envs/skills/bin/pip list | grep -iE "fastapi|uvicorn|pytest"
+```
+
+Nếu thiếu dep:
+
+```bash
+conda run -n skills pip install fastapi 'uvicorn[standard]' pydantic httpx pytest
+```
 
 ## Chạy lần đầu
 
 ### Cách nhanh — `make dev` (khuyến nghị)
 
-Một lệnh duy nhất khởi cả backend + frontend song song trong cùng terminal. Ctrl-C kill cả hai:
+Một lệnh duy nhất khởi cả backend + frontend song song trong cùng terminal. Ctrl-C kill cả hai. Makefile dùng các binary của conda env `skills` qua absolute path nên không cần `conda activate` trước:
 
 ```bash
 cd demo-app
-make install     # lần đầu — uv sync + pnpm install
+make install     # chỉ cài frontend (pnpm install); backend deps đã có trong conda env
 make dev         # backend :8000 + frontend :3000
 ```
 
@@ -35,8 +48,7 @@ Mở trình duyệt → `http://localhost:3000`.
 
 ```bash
 cd demo-app/backend
-uv sync                      # đồng bộ deps (FastAPI, Uvicorn, Pydantic)
-uv run uvicorn app.main:app --port 8000 --reload
+/opt/anaconda3/envs/skills/bin/uvicorn app.main:app --port 8000 --reload
 # → API listening at http://127.0.0.1:8000
 # → GET /api/health → {"status":"ok"}
 ```
@@ -108,6 +120,36 @@ Bốn chart (Sparkline / LearningCurve / CostStackedBar / MiniLiveCurve) là Cli
 
 Export PNG dùng `XMLSerializer + canvas.toDataURL` — không cần `html-to-image`.
 
+## Tests
+
+```bash
+# All tests (demo-app/backend + distillation_v2 từ root)
+cd ..
+/opt/anaconda3/envs/skills/bin/pytest
+
+# Hoặc chia ra qua Makefile
+cd demo-app
+make test-backend      # chỉ FastAPI suite (~8s)
+make test-pipeline     # distillation_v2 suite
+make test              # cả hai
+```
+
+Cấu trúc test layout (theo Python multi-subproject convention):
+
+```
+skill_distillation/
+├── pyproject.toml                        # [tool.pytest.ini_options].testpaths
+├── demo-app/backend/
+│   ├── pyproject.toml                    # [tool.pytest.ini_options] cho subproject
+│   └── tests/
+│       ├── conftest.py                   # TestClient fixture
+│       ├── test_health.py
+│       ├── test_skills_routes.py
+│       ├── test_run_routes.py            # SSE schema check
+│       └── test_data_loader.py
+└── distillation_v2/tests/                # pipeline test suite (đã có sẵn)
+```
+
 ## Verify
 
 ```bash
@@ -116,7 +158,7 @@ cd demo-app/frontend && pnpm exec tsc --noEmit
 # → No errors
 
 # Backend boot
-cd demo-app/backend && uv run python -c "from app.main import app; print(app.title)"
+cd demo-app/backend && /opt/anaconda3/envs/skills/bin/python -c "from app.main import app; print(app.title)"
 # → Skill Distillation Lab — Backend
 
 # End-to-end SSE smoke test
