@@ -174,7 +174,9 @@ export function SkillDetailClient({
             {summary.skill}
           </span>
         </div>
-        <h1 className="h1">{summary.vi}</h1>
+        <h1 className="h1">
+          <Bi vi={summary.vi} en={summary.en || summary.vi} />
+        </h1>
         <div className="row" style={{ gap: 24, marginTop: 8, flexWrap: "wrap" }}>
           <Stat label="Rounds run" value={summary.rounds_run} />
           <Stat label="R1" value={summary.score_history[0].avg_score.toFixed(3)} />

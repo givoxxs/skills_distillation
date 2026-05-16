@@ -67,9 +67,9 @@ def test_stream_emits_expected_event_schema(client: TestClient) -> None:
     expected_phases = ["queued", "running", "judging", "teacher", "done"]
     assert statuses == expected_phases, statuses
 
-    # 3 test_case_done events with scores in [0, 1] and a tc_<letter><n> id
+    # One test_case_done event per real test case in round 1 (~26 for docx).
     tc_done = [d for e, d in parsed if e == "test_case_done"]
-    assert len(tc_done) == 3
+    assert len(tc_done) >= 3, "expected at least a few test cases per round"
     for d in tc_done:
         assert d["test_case_id"].startswith("tc_")
         assert 0.0 <= d["hybrid_score"] <= 1.0

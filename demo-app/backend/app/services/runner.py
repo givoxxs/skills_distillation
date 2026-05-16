@@ -24,12 +24,14 @@ from dataclasses import dataclass, field
 from app.services import data_loader
 
 # Wall-clock playback speed multiplier. real_time * SPEEDUP = wall-clock.
-# 0.35 keeps the demo around 20–30 s — enough for the committee to follow,
-# fast enough that they don't get bored.
-SPEEDUP = 0.35
+# 0.40 keeps a ~26-test-case round around 20–25 s of wall-clock — slow
+# enough for the committee to read each log line, fast enough not to drag.
+SPEEDUP = 0.40
 
-# How many test cases to replay per run.
-N_TEST_CASES = 3
+# Mini-batch size for student/judge calls within a round. Each batch is
+# announced with a "batch X/Y" log line so the demo looks like the real
+# pipeline progress instead of one giant flat list.
+BATCH_SIZE = 5
 
 
 @dataclass
@@ -97,8 +99,12 @@ async def stream_events(run: Run) -> AsyncIterator[str]:
             yield evt
         return
 
-    # Stable pick: first N test cases ordered by id so the demo is repeatable.
-    selected = sorted(eval_round1, key=lambda r: r["test_case_id"])[:N_TEST_CASES]
+    # Full round, deterministic order so repeat runs look identical.
+    selected = sorted(eval_round1, key=lambda r: r["test_case_id"])
+    n_tcs = len(selected)
+    # Split into mini-batches.
+    batches = [selected[i : i + BATCH_SIZE] for i in range(0, n_tcs, BATCH_SIZE)]
+    n_batches = len(batches)
     student_model = summary.get("student_model", "google/gemma-4-26b-a4b-it")
     judge_model = summary.get("judge_model", "anthropic/claude-haiku-4-5")
     teacher_model = summary.get("teacher_model", "anthropic/claude-haiku-4-5")
@@ -122,7 +128,7 @@ async def stream_events(run: Run) -> AsyncIterator[str]:
         {
             "line": (
                 f"python distillation_v2/run.py --skill {skill} --rounds 1 "
-                f"--test-cases {N_TEST_CASES} --batch-size {N_TEST_CASES}"
+                f"--test-cases {n_tcs} --batch-size {BATCH_SIZE}"
             ),
             "tag": "system",
         },
@@ -144,42 +150,62 @@ async def stream_events(run: Run) -> AsyncIterator[str]:
     await _sleep(0.5)
 
     # ── RUNNING ──────────────────────────────────────────────────────────
+    # Batched: announce batch X/Y → student call per test case → rule check.
+    # Per-TC sleeps are short so 25+ TCs still fit in ~30s wall-clock.
     yield _event("status", {"phase": "running"})
-    yield _event("log", {"line": "student model invoked", "tag": "status"})
-    for r in selected:
-        tc_id = r["test_case_id"]
-        pt, ct, lat = _student_tokens_for(tc_id)
-        checks = r.get("rule_checks", [])
-        passed = sum(1 for c in checks if c.get("passed"))
-        total_checks = len(checks)
-        await _sleep(0.7)
-        yield _event(
-            "log",
-            {"line": f"{tc_id} · invoking {student_model}", "tag": "student"},
-        )
-        await _sleep(lat)
+    yield _event(
+        "log",
+        {
+            "line": f"student model invoked · {n_tcs} test cases, {n_batches} batches",
+            "tag": "status",
+        },
+    )
+    for bi, batch in enumerate(batches, start=1):
+        await _sleep(0.4)
         yield _event(
             "log",
             {
-                "line": (
-                    f"{tc_id} · {pt} prompt + {ct} completion tokens · {lat:.1f}s"
-                ),
-                "tag": "student",
+                "line": f"batch {bi}/{n_batches} · {len(batch)} test cases",
+                "tag": "system",
             },
         )
-        await _sleep(0.25)
-        yield _event(
-            "log",
-            {
-                "line": f"{tc_id} · rule checks: {passed}/{total_checks} passed",
-                "tag": "rule",
-            },
-        )
+        for r in batch:
+            tc_id = r["test_case_id"]
+            pt, ct, lat = _student_tokens_for(tc_id)
+            checks = r.get("rule_checks", [])
+            passed = sum(1 for c in checks if c.get("passed"))
+            total_checks = len(checks)
+            await _sleep(0.35)
+            yield _event(
+                "log",
+                {"line": f"{tc_id} · invoking {student_model}", "tag": "student"},
+            )
+            await _sleep(0.45)
+            yield _event(
+                "log",
+                {
+                    "line": (
+                        f"{tc_id} · {pt} prompt + {ct} completion tokens · {lat:.1f}s"
+                    ),
+                    "tag": "student",
+                },
+            )
+            await _sleep(0.15)
+            yield _event(
+                "log",
+                {
+                    "line": f"{tc_id} · rule checks: {passed}/{total_checks} passed",
+                    "tag": "rule",
+                },
+            )
 
     # ── JUDGING ──────────────────────────────────────────────────────────
-    await _sleep(0.6)
+    await _sleep(0.5)
     yield _event("status", {"phase": "judging"})
-    yield _event("log", {"line": "judge model invoked", "tag": "status"})
+    yield _event(
+        "log",
+        {"line": f"judge model invoked · scoring {n_tcs} test cases", "tag": "status"},
+    )
     for r in selected:
         tc_id = r["test_case_id"]
         jc = judge_by_tc.get(tc_id)
@@ -189,7 +215,7 @@ async def stream_events(run: Run) -> AsyncIterator[str]:
             token_note = f"{pt} prompt + {ct} completion tokens"
         else:
             token_note = "tokens not recorded"
-        await _sleep(0.9)
+        await _sleep(0.35)
         yield _event(
             "log",
             {
@@ -197,7 +223,7 @@ async def stream_events(run: Run) -> AsyncIterator[str]:
                 "tag": "judge",
             },
         )
-        await _sleep(1.2)
+        await _sleep(0.5)
         hybrid = float(r.get("hybrid_score", 0.0))
         yield _event(
             "test_case_done",
@@ -297,7 +323,7 @@ async def _stream_simulated_fallback(run: Run, reason: str) -> AsyncIterator[str
         {
             "line": (
                 f"python distillation_v2/run.py --skill {skill} --rounds 1 "
-                f"--test-cases {N_TEST_CASES} --batch-size {N_TEST_CASES}"
+                f"--test-cases 3 --batch-size 3"
             ),
             "tag": "system",
         },
