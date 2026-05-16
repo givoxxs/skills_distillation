@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 type Row =
   | { type: "same"; left: string; right: string; li: number; ri: number }
@@ -85,6 +85,49 @@ export function DiffViewer({
     else pairs.push({ l: { type: "rem", n: r.li, text: r.left }, r: { type: "empty" } });
   }
 
+  // ── Synchronised scroll: when the user scrolls one pane, mirror the
+  // scrollTop + scrollLeft on the other (git-style side-by-side review).
+  // Uses a single "driver" guard so we don't ping-pong infinitely between
+  // the two scroll events. Native scroll listeners give us frame-perfect
+  // sync without re-rendering React.
+  const leftRef = useRef<HTMLDivElement | null>(null);
+  const rightRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const lp = leftRef.current;
+    const rp = rightRef.current;
+    if (!lp || !rp) return;
+
+    let driver: "l" | "r" | null = null;
+    const clearDriver = () => {
+      driver = null;
+    };
+
+    const onLeft = () => {
+      if (driver === "r") return;
+      driver = "l";
+      rp.scrollTop = lp.scrollTop;
+      rp.scrollLeft = lp.scrollLeft;
+      // Release on next frame so the matched scroll event fires within the
+      // same driver lock, then resets.
+      requestAnimationFrame(clearDriver);
+    };
+    const onRight = () => {
+      if (driver === "l") return;
+      driver = "r";
+      lp.scrollTop = rp.scrollTop;
+      lp.scrollLeft = rp.scrollLeft;
+      requestAnimationFrame(clearDriver);
+    };
+
+    lp.addEventListener("scroll", onLeft, { passive: true });
+    rp.addEventListener("scroll", onRight, { passive: true });
+    return () => {
+      lp.removeEventListener("scroll", onLeft);
+      rp.removeEventListener("scroll", onRight);
+    };
+  }, [left, right]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       <div className="row-between" style={{ marginBottom: 12 }}>
@@ -99,7 +142,7 @@ export function DiffViewer({
         <div style={{ fontSize: 12, color: "var(--fg-subtle)" }}>{rows.length} lines compared</div>
       </div>
       <div className="diff" role="region" aria-label="Diff between rounds">
-        <div className="diff-pane">
+        <div className="diff-pane" ref={leftRef}>
           <div className="diff-header">
             <span>{leftLabel}</span>
           </div>
@@ -115,7 +158,7 @@ export function DiffViewer({
             </div>
           ))}
         </div>
-        <div className="diff-pane">
+        <div className="diff-pane" ref={rightRef}>
           <div className="diff-header">
             <span>{rightLabel}</span>
           </div>
