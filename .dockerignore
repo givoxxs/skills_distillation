@@ -1,0 +1,79 @@
+# Docker build-context filter. Lives at the BUILD CONTEXT root (= repo
+# root, per render.yaml's `dockerContext: .`).
+#
+# Goal: ship ONLY backend app source + the four files data_loader.py
+# reads per skill — summary.json, eval_detail.jsonl, api_calls.jsonl,
+# SKILL_round_*.md. Plus test_cases/<skill>.json for prompt lookup.
+
+# ── Frontend (never needed by backend) ────────────────────────
+demo-app/frontend/
+demo-app/Makefile
+demo-app/README.md
+
+# ── Backend dev artefacts (Docker installs fresh deps) ────────
+demo-app/backend/.venv/
+demo-app/backend/__pycache__/
+demo-app/backend/**/__pycache__/
+demo-app/backend/.pytest_cache/
+demo-app/backend/tests/
+demo-app/backend/.python-version
+
+# ── Pipeline source code (backend doesn't import it) ──────────
+distillation/
+distillation_v2/__pycache__/
+distillation_v2/**/__pycache__/
+distillation_v2/.pytest_cache/
+distillation_v2/.claude/
+distillation_v2/logs/
+distillation_v2/rubrics/
+distillation_v2/skills/
+distillation_v2/tests/
+distillation_v2/utils/
+distillation_v2/stages/
+distillation_v2/runner/
+distillation_v2/evaluator/
+distillation_v2/*.py
+distillation_v2/*.yaml
+distillation_v2/.python-version
+
+# ── Dated run artefacts (results/01_05_2026/, etc) ────────────
+# These match NN_NN_YYYY-style folders; stable/ does NOT match.
+distillation_v2/results/[0-9]*/
+
+# ── Intermediate artefacts inside stable/ ─────────────────────
+# Strip the heavy student outputs but keep summary/eval/api/SKILL.
+distillation_v2/results/stable/*/round_*/
+distillation_v2/results/stable/*/analysis/
+distillation_v2/results/stable/*/validation/
+distillation_v2/results/stable/*/run.log
+distillation_v2/results/stable/*/SKILL_current.md
+
+# Binary fixtures aren't needed
+distillation_v2/test_cases/fixtures/
+
+# ── Other repo dirs not needed at runtime ─────────────────────
+skill_runner/
+skill_evaluation/
+context/
+docs/
+.git/
+.github/
+.claude/
+.antigravity/
+.cursor/
+.code-review-graph/
+.token-savior-cache.json
+.ruff_cache/
+mempalace.yaml
+entities.json
+uv.lock
+requirements.sh
+requirements.txt
+.env
+.env.local
+.env.example
+pyproject.toml
+README.md
+CLAUDE.md
+LICENSE
+LICENSE.md
