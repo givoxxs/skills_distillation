@@ -25,15 +25,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
-    let initial: Theme = "light";
+    // Bootstrap script in <head> already set data-theme from localStorage
+    // before paint — read that back so state matches reality and we don't
+    // overwrite the user's choice.
+    const attr = document.documentElement.getAttribute("data-theme");
+    if (attr === "light" || attr === "dark") {
+      setThemeState(attr);
+      return;
+    }
+    // No attribute yet: try localStorage directly (rare — only when the
+    // bootstrap script is somehow blocked).
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw === "light" || raw === "dark") initial = raw;
+      if (raw === "light" || raw === "dark") {
+        setThemeState(raw);
+        document.documentElement.setAttribute("data-theme", raw);
+      }
     } catch {
       /* ignore */
     }
-    setThemeState(initial);
-    document.documentElement.setAttribute("data-theme", initial);
   }, []);
 
   const setTheme = useCallback((t: Theme) => {
