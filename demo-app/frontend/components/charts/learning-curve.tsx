@@ -211,20 +211,41 @@ export function LearningCurve({
             </g>
           );
         })}
-        <g transform={`translate(${px(peak.round)}, ${py(peak.avg_score) - 18})`}>
-          <rect x="-30" y="-14" width="60" height="18" rx="4" fill="var(--accent)" />
-          <text
-            x="0"
-            y="-1"
-            textAnchor="middle"
-            fill="white"
-            fontSize="11"
-            fontWeight="600"
-            fontFamily="var(--font-mono)"
-          >
-            peak {peak.avg_score.toFixed(3)}
-          </text>
-        </g>
+        {(() => {
+          // Peak badge — bigger + smart placement so it never gets clipped
+          // by the SVG top edge (happens when the peak round is very near
+          // y = 1.0) and never spills past the left / right padding.
+          const peakX = px(peak.round);
+          const peakY = py(peak.avg_score);
+          const halfW = 42;
+          const halfH = 11;
+          const flipBelow = peakY - 28 - halfH < padT; // not enough room above
+          const dy = flipBelow ? 26 : -26;
+          const clampedX = Math.max(padL + halfW, Math.min(W - padR - halfW, peakX));
+          return (
+            <g transform={`translate(${clampedX}, ${peakY + dy})`}>
+              <rect
+                x={-halfW}
+                y={-halfH}
+                width={halfW * 2}
+                height={halfH * 2}
+                rx="5"
+                fill="var(--accent)"
+              />
+              <text
+                x="0"
+                y="4"
+                textAnchor="middle"
+                fill="white"
+                fontSize="12"
+                fontWeight="600"
+                fontFamily="var(--font-mono)"
+              >
+                peak {peak.avg_score.toFixed(3)}
+              </text>
+            </g>
+          );
+        })()}
         {hover && (
           <line
             x1={px(hover.round)}
