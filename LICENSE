@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Skill Distillation Team
+Copyright (c) 2026 Phan Văn Toàn
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,65 +20,79 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
----
+================================================================================
+DERIVED WORKS — Attribution required
+================================================================================
 
-THIRD-PARTY LICENSES
+The `SKILL.md` files bundled under
+`distillation_v2/results/stable/<skill>/SKILL_round_*.md`
+are *derived works* of the original Anthropic open-source skill files at
+https://github.com/anthropics/skills (MIT License). Anthropic's copyright
+notice and license terms apply to those derivations alongside this project's
+MIT grant — see the upstream `LICENSE` file at the URL above for the
+canonical text.
 
-This project uses the following open-source components:
+The original `SKILL_round_0.md` of each skill is the verbatim Anthropic
+SKILL.md content. `SKILL_round_1.md` … `SKILL_round_N.md` are progressive
+rewrites produced by the Skill Distillation pipeline in this repository
+(Teacher = Claude Haiku 4.5, Student = Gemma 4-26B); they are co-derived from
+the upstream content and from Anthropic Claude Haiku 4.5 model outputs.
 
-1. anthropic_skills/ (Git Submodule)
-   - Source: https://github.com/anthropics/skills
-   - License: See anthropic_skills/LICENSE
+================================================================================
+THIRD-PARTY RUNTIME DEPENDENCIES
+================================================================================
 
-2. Python Dependencies (see pyproject.toml)
-   - anthropic: MIT License
-   - openai: Apache 2.0 License
-   - pyyaml: MIT License
-   - click: BSD 3-Clause License
-   - rich: MIT License
-   - python-dotenv: BSD 3-Clause License
-   - anthropic: Proprietary (Anthropic Terms of Service)
-   - openai: MIT License (for openai-python library)
+The repository runs against the following third-party packages. Each retains
+its own license; copies are typically installed alongside the package in
+`site-packages` (Python) or `node_modules` (Node). Most are permissive
+(MIT / BSD / Apache 2.0):
 
-   For CLI & UI:
-   - click: BSD License
-   - rich: MIT License
-   - pyyaml: MIT License
-   - python-dotenv: BSD License
+Pipeline (Python, conda env `skills`):
+  - anthropic           MIT          Anthropic Python SDK (Teacher + Judge calls)
+  - openai              Apache 2.0   OpenAI Python SDK (Student via OpenRouter)
+  - python-dotenv       BSD-3-Clause
+  - click               BSD-3-Clause CLI framework
+  - rich                MIT          Terminal output formatting
+  - pyyaml              MIT          YAML config parsing
+  - python-docx         MIT          .docx read/write for evaluator
+  - pdf2image           MIT          PDF → PNG for visual judging
+  - pillow              MIT-CMU/HPND Image processing
 
-   For development:
-   - pytest: MIT License
-   - pre-commit: MIT License
-   - ruff: MIT License
+Demo backend (FastAPI service):
+  - fastapi             MIT
+  - uvicorn             BSD-3-Clause
+  - pydantic            MIT
+  - httpx               BSD-3-Clause
 
-**Optional (Future use, not currently included):**
-   - langchain: MIT License
-   - chromadb: Apache 2.0 License
-   - mlflow: Apache 2.0 License
-   - ollama: MIT License
+Demo frontend (Next.js app, pnpm):
+  - next                MIT          Next.js framework
+  - react / react-dom   MIT
+  - tailwindcss         MIT
+  - lucide-react        ISC          Icon set
 
-Each dependency maintains its own license terms. Please refer to the respective
-project repositories for the complete license text and any additional terms.
+Development:
+  - pytest              MIT
+  - pre-commit          MIT
+  - ruff                MIT
+  - markdownlint-cli    MIT
 
----
+================================================================================
+THIRD-PARTY SERVICES (API usage governed by provider Terms of Service)
+================================================================================
 
+Running the pipeline calls the following hosted services. Each is bound by the
+provider's Terms of Service, NOT by this LICENSE. The user is responsible for:
+
+  - Anthropic API   — https://www.anthropic.com/legal/commercial-terms
+  - OpenRouter      — https://openrouter.ai/terms
+
+In particular: API keys, usage costs, content filtering, and rate limits are
+the user's responsibility, not the maintainer's.
+
+================================================================================
 DISCLAIMER
+================================================================================
 
-This software is provided as-is for research and development purposes. While we
-strive to maintain accuracy and functionality, there are no warranties or
-guarantees of any kind, either express or implied.
-
-Users are responsible for:
-- Complying with all API provider terms of service (OpenRouter, Anthropic)
-- Managing API credentials securely
-- Monitoring and controlling API usage costs
-- Ensuring compliance with local regulations when using language models
-
----
-
-CONTRIBUTING
-
-Contributions are welcome! By contributing to this project, you agree that your
-contributions will be licensed under the same MIT License.
-
-See CONTRIBUTING.md (if applicable) for guidelines.
+This software is provided as-is for research and academic purposes (Bachelor's
+thesis project, 2026). No warranty of fitness for any particular purpose,
+including correctness of the distilled `SKILL.md` outputs.
