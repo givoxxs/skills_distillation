@@ -1,4 +1,15 @@
-# Skill Runner
+# Skill Runner · v1 student executor (legacy)
+
+> ⚠️ **Legacy component** — this is the hand-written agent loop used by the v1
+> pipeline ([`../distillation/`](../distillation/)) to run Student SLM calls
+> against OpenRouter. The current pipeline
+> ([`../distillation_v2/`](../distillation_v2/)) instead spawns Claude Code CLI
+> in a sandboxed subprocess and parses its stream-json output, so the agent
+> loop here is no longer on the hot path. The folder is kept for the thesis's
+> iteration history — see the root
+> [`README.md`](../README.md#version-history) for v1 → v2 differences.
+
+---
 
 A Python framework for running Anthropic-style "skills" on small models via OpenRouter. The agent loop gives the model a set of tools (bash, read_file, write_file, etc.) and routes it using a skill-specific system prompt until it calls `end_turn`.
 

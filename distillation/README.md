@@ -1,4 +1,13 @@
-# Skill Distillation Pipeline
+# Skill Distillation Pipeline · v1 (legacy)
+
+> ⚠️ **This is the FIRST iteration** of the pipeline (early 2026). Active development
+> has moved to [`../distillation_v2/`](../distillation_v2/), which replaced the
+> hand-written `skill_runner/` agent loop with the Claude Code CLI, and the
+> hybrid rule + LLM scoring with a 100 % LLM-judge backed by an auto-generated
+> rubric. v1 is preserved as part of the thesis's iteration history — see
+> the root [`README.md`](../README.md#version-history) for the v1 → v2 diff.
+
+---
 
 Tự động tối ưu hóa file `SKILL.md` để Small Large Language Model (SLLM) thực thi kỹ năng tốt hơn — không cần fine-tuning, không cần GPU.
 

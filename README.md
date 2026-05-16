@@ -191,6 +191,24 @@ Báo cáo đồ án (draft) ở `docs/thesis/` — đã gitignored vì còn iter
 
 ---
 
+## Version history
+
+Đề tài qua hai iteration. Cả hai vẫn ở trong repo như một phần của câu chuyện thesis (xem Chapter 3 của báo cáo).
+
+| Aspect | v1 — [`distillation/`](distillation/) + [`skill_runner/`](skill_runner/) | v2 — [`distillation_v2/`](distillation_v2/) *(current)* |
+|---|---|---|
+| **Status** | Legacy — giữ làm chứng cứ iteration | Active development |
+| **Student runner** | `skill_runner/` — agent loop tự viết, tự định nghĩa tool, gọi thẳng OpenRouter | Claude Code CLI trong subprocess sandbox (`runner/sandbox.py`), parse stream-json |
+| **Scoring** | Hybrid 80 % rule-based (`docx_rules.py` hand-written per skill) + 20 % LLM-judge | 100 % LLM-judge với rubric **tự sinh** mỗi skill, cache theo hash(SKILL.md) |
+| **Thêm skill mới** | Phải viết `<skill>_rules.py` + register evaluator | Chỉ cần thêm test_cases JSON; rubric generator lo phần còn lại |
+| **Env isolation** | Không — share môi trường parent shell | `anthropic_env()` context manager + sandbox env dict explicit, không leak `ANTHROPIC_*` ra parent |
+| **Teacher rollback** | Không có gate | Gate 1 (rewrite phải giữ ≥ 3 fixture rank 6/8 pass) + Gate 2 (round-avg drop > 10 % → rollback cứng) |
+| **Demo backend đọc data từ** | — | `results/stable/<skill>/` của v2 |
+
+**Tại sao v2 thay vì sửa v1.** Khi pipeline bắt đầu cần thêm skill mới (slack-gif-creator, internal-comms), pattern "viết tay 1 file rules per skill" trở thành bottleneck — vừa tốn công vừa khó audit. Chuyển sang rubric tự sinh + LLM-judge đặt yêu cầu mới: Student phải chạy trong môi trường sạch để judge fair; lúc đó tận dụng luôn Claude Code CLI thay cho agent loop tự viết. v1 không sai — nó là điểm xuất phát cần thiết để hiểu trade-off khi build v2.
+
+---
+
 ## Đóng góp chính
 
 1. **Pipeline đầu-cuối khả dụng** cho việc chưng cất `SKILL.md` xuống SLM — mã nguồn mở trong repo, có batching · gate · resume.
