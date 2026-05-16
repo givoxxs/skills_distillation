@@ -8,12 +8,13 @@ Mở `https://skills-distillation.vercel.app` ở Chrome / Safari, viewport
 ≥ 1280 px chiều ngang (toàn màn hình laptop là OK). Theme **light** cho
 ảnh ra sạch nhất.
 
-## 4 ảnh cần chụp
+## 5 ảnh cần chụp
 
 | Tên file | URL | Khung hình bao trùm | Kích thước gợi ý |
 |---|---|---|---|
 | `01_overview.png` | `/` | Toàn page: 3 KPI card + section "Ba skill, ba quỹ đạo học" với 3 skill card (sparkline) | 1280 × 1024 |
-| `02_skill_detail.png` | `/skills/docx` | Header stats + Panel 1 learning curve (peak R5 amber) + Panel 2 diff (chọn From R0 / To R5) | 1280 × 1400 |
+| `02_skill_detail_learning_curve.png` | `/skills/docx` | Header stats + Panel 1 learning curve (peak R5 amber) | 1280 × 800 |
+| `02_skill_detail_diff.png` | `/skills/docx` | Panel 2 diff side-by-side với selector From R0 / To R5 | 1280 × 800 |
 | `03_live_run.png` | `/run` đang chạy giữa chừng | Stepper đang ở "running" hoặc "judging", learning curve đã có vài round, log stream visible | 1280 × 1200 |
 | `04_about.png` | `/about` | Toàn page: thông tin đề tài + abstract + tech stack badges | 1280 × 900 |
 

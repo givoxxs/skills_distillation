@@ -11,7 +11,6 @@
 
 🔗 **Live demo:** <https://skills-distillation.vercel.app>
 
-![Overview dashboard](docs/screenshots/01_overview.png)
 
 ---
 
@@ -88,14 +87,27 @@ Cả ba skill đều vượt ngưỡng dừng `0.70` ngay từ vòng 1; pipeline
 
 ## Demo
 
-| Trang | Ảnh |
-|---|---|
-| Overview — 3 KPI + sparkline per skill | ![](docs/screenshots/01_overview.png) |
-| Skill detail — learning curve + diff `SKILL.md` round-by-round | ![](docs/screenshots/02_skill_detail.png) |
-| Live run — SSE replay 8–10 rounds với batch 5 song song | ![](docs/screenshots/03_live_run.png) |
-| About | ![](docs/screenshots/04_about.png) |
+**Overview** — 3 KPI + sparkline per skill
 
-> *Capture instructions:* xem `docs/screenshots/README.md`.
+![Overview](docs/screenshots/01_overview.png)
+
+**Skill detail — learning curve** (peak amber dot, real `summary.json` score history)
+
+![Learning curve](docs/screenshots/02_skill_detail_learning_curve.png)
+
+**Skill detail — `SKILL.md` diff** giữa hai round bất kỳ, scroll đồng bộ 2 pane
+
+![SKILL.md diff](docs/screenshots/02_skill_detail_diff.png)
+
+**Live run** — SSE replay full multi-round (8–10 rounds × batch 5 song song)
+
+![Live run](docs/screenshots/03_live_run.png)
+
+**About** — thông tin đề tài + abstract + tech stack
+
+![About](docs/screenshots/04_about.png)
+
+> Capture instructions ở `docs/screenshots/README.md` (sửa cho khớp với 5 ảnh hiện tại).
 
 ---
 
