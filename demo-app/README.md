@@ -1,19 +1,19 @@
 # Skill Distillation Lab — Demo App
 
-Demo dashboard cho đồ án tốt nghiệp *Skill Distillation* (Phan Văn Toàn, K22 22T_DT2, GVHD TS. Phạm Minh Tuấn, 2026).
+Dashboard demo cho đồ án tốt nghiệp *Skill Distillation* (Phan Văn Toàn, K22 22T_DT2, GVHD TS. Phạm Minh Tuấn, 2026).
 
-Kiến trúc 2 service chạy độc lập:
+Đọc dữ liệu thực từ `distillation_v2/results/stable/` (summary + 9 phiên bản `SKILL.md` + `eval_detail.jsonl` + `api_calls.jsonl`), trình bày qua 4 route cho hội đồng bảo vệ.
 
 ```
 demo-app/
-├── frontend/   # Next.js 16 (App Router) + Tailwind v4 — dashboard pixel-perfect theo design Academic Clean
-└── backend/    # FastAPI — phục vụ /api/run SSE cho trang "Chạy thử"
+├── frontend/   # Next.js 16 App Router + Tailwind v4 + TS
+└── backend/    # FastAPI — read-only data API + SSE replay
 ```
 
 ## Yêu cầu hệ thống
 
 - Node ≥ 20, pnpm ≥ 9
-- **Conda env `skills`** (Python 3.12) — đã có sẵn `fastapi`, `uvicorn`, `pydantic`, `pytest`, `httpx`. Xem `.claude/rules/python-env.md` để hiểu vì sao project gắn cứng vào env này.
+- **Conda env `skills`** (Python 3.12) — đã có sẵn `fastapi`, `uvicorn`, `pydantic`, `pytest`, `httpx`. Xem `../.claude/rules/python-env.md` để hiểu vì sao project gắn cứng vào env này.
 
 Verify môi trường:
 
@@ -22,7 +22,7 @@ Verify môi trường:
 /opt/anaconda3/envs/skills/bin/pip list | grep -iE "fastapi|uvicorn|pytest"
 ```
 
-Nếu thiếu dep:
+Thiếu dep:
 
 ```bash
 conda run -n skills pip install fastapi 'uvicorn[standard]' pydantic httpx pytest
@@ -32,52 +32,43 @@ conda run -n skills pip install fastapi 'uvicorn[standard]' pydantic httpx pytes
 
 ### Cách nhanh — `make dev` (khuyến nghị)
 
-Một lệnh duy nhất khởi cả backend + frontend song song trong cùng terminal. Ctrl-C kill cả hai. Makefile dùng các binary của conda env `skills` qua absolute path nên không cần `conda activate` trước:
-
 ```bash
 cd demo-app
-make install     # chỉ cài frontend (pnpm install); backend deps đã có trong conda env
-make dev         # backend :8000 + frontend :3000
+make install     # chỉ pnpm install cho frontend; backend deps đã có trong conda env
+make dev         # backend :8000 + frontend :3000 trong cùng 1 terminal, Ctrl-C kill cả hai
 ```
 
 Mở trình duyệt → `http://localhost:3000`.
 
+Makefile dùng absolute path tới conda binary (`/opt/anaconda3/envs/skills/bin/uvicorn`) nên không cần `conda activate skills` trước.
+
 ### Cách thủ công — hai terminal
 
-#### Terminal 1 — Backend (port 8000)
-
 ```bash
+# Terminal 1
 cd demo-app/backend
 /opt/anaconda3/envs/skills/bin/uvicorn app.main:app --port 8000 --reload
-# → API listening at http://127.0.0.1:8000
-# → GET /api/health → {"status":"ok"}
-```
 
-#### Terminal 2 — Frontend (port 3000)
-
-```bash
-cd demo-app/frontend
-pnpm install                 # nếu chưa cài
-pnpm dev
-# → http://localhost:3000
+# Terminal 2
+cd demo-app/frontend && pnpm dev
 ```
 
 ## Bốn route
 
 | Route | Mô tả |
 |---|---|
-| `/` | **Tổng quan** — 3 KPI + 3 skill card với sparkline mini |
-| `/skills/[skill]` | **Chi tiết skill** — 4 panel (learning curve, diff SKILL.md, test case explorer, cost) |
-| `/run` | **Chạy thử** — form + SSE stream + mini live curve |
-| `/about` | **Giới thiệu** — thông tin đề tài + abstract + tech stack |
+| `/` | **Overview** — 3 KPI + 3 skill card với sparkline mini, tính từ 3 `summary.json` thật |
+| `/skills/[skill]` | **Skill detail** — 4 panel (learning curve · diff `SKILL.md` · test case explorer · cost) |
+| `/run` | **Live run** — form + SSE stream replay toàn bộ round 1 (~26 test case, batch 5) |
+| `/about` | **About** — thông tin đề tài, abstract, tech stack |
 
-Sidebar điều hướng + toggle dark/light ở footer sidebar. Bilingual VN-lead, EN-sub.
+Sidebar có 2 toggle: **VN ↔ EN** (lang context) + **light ↔ dark** (theme). Mặc định VN + light. Cả 2 persist qua `localStorage`.
 
 ## Cấu hình
 
 ### Frontend → backend URL
 
-Mặc định frontend gọi backend ở `http://localhost:8000`. Đổi qua biến môi trường:
+Mặc định frontend gọi backend ở `http://127.0.0.1:8000`. Đổi qua biến môi trường:
 
 ```bash
 NEXT_PUBLIC_BACKEND_URL=http://my-backend:8000 pnpm dev
@@ -85,149 +76,184 @@ NEXT_PUBLIC_BACKEND_URL=http://my-backend:8000 pnpm dev
 
 ### Backend env
 
-Không bắt buộc. Tạo `backend/.env` nếu muốn wire vào pipeline thật:
+Không bắt buộc. Tạo `backend/.env` chỉ khi muốn wire backend sang gọi LLM thật trong tương lai:
 
 ```bash
 cp .env.example .env
+# OPENROUTER_API_KEY=...
+# ANTHROPIC_API_KEY=...
+# DISTILL_REPO_ROOT=/Users/soc_036/study_dir/skill_distillation
 ```
 
-Hiện tại `/api/run` **simulate** event stream — không gọi LLM thật, không tốn credit. Logic mô phỏng nằm trong `backend/app/services/runner.py`. Để swap sang subprocess thật:
-
-1. Mở `backend/app/services/runner.py`.
-2. Thay `stream_events()` bằng wrapper gọi `asyncio.create_subprocess_exec(sys.executable, "<repo>/distillation_v2/run.py", ...)` và parse stdout (xem `HANDOFF.md`).
-
-Trang `/run` có toggle "Backend SSE" ↔ "Local simulation" — nếu backend không chạy, UI tự fallback simulate phía client.
+`/run` hiện **replay** từ JSONL có sẵn — không gọi LLM, không tốn credit.
 
 ## Architecture decisions
 
-### Mock data trong frontend, không qua backend
+### Frontend đọc dữ liệu thật qua backend, KHÔNG mock
 
-Trang tổng quan + chi tiết skill đọc dữ liệu trực tiếp từ `frontend/lib/mock-data.ts` (TypeScript port của `design/data.js`). Backend hiện không phơi bày `/api/skills/*` — vì pipeline thực tế chưa sinh `eval_detail.jsonl`/`api_calls.jsonl` (chỉ có `summary.json` + `SKILL_round_*.md`). Quyết định này:
+Overview + Skill detail đều fetch từ backend qua Server Components (`fetch(BACKEND_URL/api/...)` với `cache: "no-store"`). Backend đọc trực tiếp từ `distillation_v2/results/stable/<skill>/`:
 
-- Đơn giản hoá dev/test — frontend chạy được không cần backend.
-- Đảm bảo pixel-perfect số liệu theo design (đồng bộ với báo cáo).
-- Backend chỉ làm việc nó cần làm: SSE.
-
-Khi pipeline có đủ JSONL, mở rộng `backend/app/routes/skills.py` theo `HANDOFF.md` rồi switch frontend sang fetch.
+| Trường | Nguồn |
+|---|---|
+| KPI / score_history / sparkline / learning curve | `summary.json` |
+| Diff SKILL.md giữa round X ↔ Y | `SKILL_round_{X,Y}.md` thật trên disk |
+| Test case explorer | `eval_detail.jsonl` (26–27 record/round/skill) |
+| Workflow filter | derive từ `summary.rubric_cache_keys` |
+| Drawer rule_checks / judge rationale / prompt | `eval_detail.checks` + `eval_detail.llm_judge_reasoning` + `test_cases/<skill>.json` lookup |
+| Cost & timing breakdown | **mock** (`lib/mock-data.ts`) — `api_calls.jsonl` thiếu `round`/`cost_usd`/`latency_ms`, panel có badge `demo data` |
+| `/run` SSE replay | `eval_detail.jsonl` + `api_calls.jsonl` ghép vào 1 stream |
 
 ### Chart SVG hand-built thay vì Recharts
 
-Bốn chart (Sparkline / LearningCurve / CostStackedBar / MiniLiveCurve) là Client Component SVG thuần — port verbatim từ `design/charts.jsx`. Lý do:
+4 chart (Sparkline / LearningCurve / CostStackedBar / MiniLiveCurve) là Client Component SVG thuần — port từ design prototype. Pixel-perfect, không cần Recharts dep ~150 KB. Export PNG dùng `XMLSerializer + canvas.toDataURL` — không cần `html-to-image`.
 
-- Pixel-perfect khớp prototype (peak amber dot, area gradient, dashed threshold, monospace ticks).
-- Không kéo theo dep Recharts ~150 KB.
-- Dễ tinh chỉnh inline.
+### Diff viewer tự viết (LCS)
 
-Export PNG dùng `XMLSerializer + canvas.toDataURL` — không cần `html-to-image`.
+`components/diff-viewer.tsx` cài đặt diff side-by-side bằng LCS qua `Uint16Array` DP. Hai pane **scroll đồng bộ** (driver lock + `requestAnimationFrame`) — kéo bên này, bên kia chạy theo như git review.
+
+### EN / VI toggle qua context
+
+`components/language-provider.tsx` cung cấp `useLang()` với `lang: "vi" | "en"` persist qua `localStorage:sdl:lang`. Component `<Bi vi="…" en="…" />` switch nội dung theo lang. **Technical terms** (SKILL.md, hybrid, R1, peak, judge, rule, prompt, round, batch…) giữ tiếng Anh trong cả 2 mode bằng cách viết verbatim trong cả hai prop.
+
+### Theme provider tự viết, không next-themes
+
+Trong React 19 + Next 16, `next-themes` 0.4.6 inject `<script>` bên trong Client Component → hard-error. Project dùng `components/theme-provider.tsx` tự viết, cùng pattern với LanguageProvider. Để tránh flash light → dark cho user chọn dark trước đó: layout inject 1 inline script trong `<head>` (`THEME_BOOTSTRAP`) đọc `localStorage:sdl:theme` đồng bộ trước paint.
+
+### `/run` replay full round, batch 5
+
+Backend `services/runner.py` replay TOÀN BỘ test cases của round 1 (~26 cho docx) chia thành 6 batch x 5 TC (1 batch cuối ~1 TC). Mỗi event SSE bám sát schema thật của pipeline:
+
+```
+event: status         { phase: queued|running|judging|teacher|done }
+event: log            { line, tag: system|student|judge|teacher|rule|status }
+event: test_case_done { test_case_id, hybrid_score }
+event: round_done     { round, avg_score }
+event: complete       { skill, final_score }
+```
+
+Tốc độ phát ~22s wall-clock (SPEEDUP=0.40 áp lên delay thực). Nếu file JSONL biến mất runner tự fallback sang simulated mode với log `(fallback simulation — <reason>)`.
+
+## Backend API contract
+
+```
+GET  /api/health                          → { status: "ok" }
+GET  /api/skills                          → SkillListEntry[]
+GET  /api/skills/{skill}/summary          → Summary (raw summary.json)
+GET  /api/skills/{skill}/skill-md?round=N → { round, content, requested_round, fallback }
+GET  /api/skills/{skill}/eval[?round=N]   → EvalEntry[] (eval_detail.jsonl + test_cases prompt lookup)
+GET  /api/skills/{skill}/available-rounds → { rounds: number[] }
+POST /api/run  body={skill}               → { run_id }
+GET  /api/run/{run_id}/stream             → SSE
+```
+
+Read-only — không bao giờ ghi vào `distillation_v2/`.
 
 ## Tests
 
 ```bash
-# All tests (demo-app/backend + distillation_v2 từ root)
+# Tất cả test (demo-app/backend + distillation_v2 từ root)
 cd ..
 /opt/anaconda3/envs/skills/bin/pytest
 
-# Hoặc chia ra qua Makefile
+# Qua Makefile
 cd demo-app
-make test-backend      # chỉ FastAPI suite (~8s)
+make test-backend      # 25 test cho FastAPI (~8s)
 make test-pipeline     # distillation_v2 suite
 make test              # cả hai
 ```
 
-Cấu trúc test layout (theo Python multi-subproject convention):
-
-```
-skill_distillation/
-├── pyproject.toml                        # [tool.pytest.ini_options].testpaths
-├── demo-app/backend/
-│   ├── pyproject.toml                    # [tool.pytest.ini_options] cho subproject
-│   └── tests/
-│       ├── conftest.py                   # TestClient fixture
-│       ├── test_health.py
-│       ├── test_skills_routes.py
-│       ├── test_run_routes.py            # SSE schema check
-│       └── test_data_loader.py
-└── distillation_v2/tests/                # pipeline test suite (đã có sẵn)
-```
+Backend tests cover: `/api/health`, OpenAPI schema, list_skills, get_summary (happy + 404), skill-md (exact round + fallback), eval (round filter + multi-round), POST /run (3 skills + invalid skill 422), SSE stream (phase ordering + test_case_done schema + final_score correlation), data_loader unit tests (LRU cache identity, canonical order, fallback math).
 
 ## Verify
 
 ```bash
 # Frontend type-check
-cd demo-app/frontend && pnpm exec tsc --noEmit
-# → No errors
+cd demo-app/frontend && pnpm exec tsc --noEmit         # → No errors found
 
 # Backend boot
-cd demo-app/backend && /opt/anaconda3/envs/skills/bin/python -c "from app.main import app; print(app.title)"
+cd demo-app/backend
+/opt/anaconda3/envs/skills/bin/python -c "from app.main import app; print(app.title)"
 # → Skill Distillation Lab — Backend
 
-# End-to-end SSE smoke test
-curl -X POST http://127.0.0.1:8000/api/run -H 'Content-Type: application/json' -d '{"skill":"docx"}'
-# → {"run_id":"..."}
-curl -N http://127.0.0.1:8000/api/run/<run_id>/stream
-# → stream of SSE events: status / log / test_case_done / round_done / complete
+# End-to-end smoke test
+curl -s http://127.0.0.1:8000/api/skills | python -m json.tool
+RUN_ID=$(curl -s -X POST http://127.0.0.1:8000/api/run \
+  -H 'Content-Type: application/json' -d '{"skill":"docx"}' | jq -r .run_id)
+curl -N http://127.0.0.1:8000/api/run/$RUN_ID/stream
+# → SSE stream ~22s, kết thúc bằng event: complete với final_score thật
 ```
 
 ## Cấu trúc thư mục
 
 ```
 demo-app/
-├── README.md                            # tài liệu này
-├── frontend/
+├── README.md                                 # file này
+├── Makefile                                  # make dev / install / test{,-backend,-pipeline} / clean
+├── frontend/                                 # Next.js 16 App Router
 │   ├── app/
-│   │   ├── layout.tsx                   # root layout + Google fonts + theme + sidebar shell
-│   │   ├── globals.css                  # @import "tailwindcss"; @import "./design-tokens.css";
-│   │   ├── design-tokens.css            # tokens Academic Clean (slate + blue + amber)
-│   │   ├── page.tsx                     # /
-│   │   ├── about/page.tsx               # /about
+│   │   ├── layout.tsx                        # fonts (next/font) + ThemeProvider + LanguageProvider + bootstrap script
+│   │   ├── globals.css                       # import tailwindcss + design-tokens
+│   │   ├── design-tokens.css                 # tokens Academic Clean (slate + blue + amber)
+│   │   ├── page.tsx                          # / Overview (async server fetch x3 summary)
+│   │   ├── about/page.tsx                    # /about
 │   │   ├── run/
-│   │   │   ├── page.tsx                 # /run (Server Component)
-│   │   │   └── run-client.tsx           # SSE client + stepper + log stream + mini curve
+│   │   │   ├── page.tsx                      # /run server shell
+│   │   │   └── run-client.tsx                # EventSource client + stepper + log + mini curve
 │   │   └── skills/[skill]/
-│   │       ├── page.tsx                 # /skills/:skill (Server Component, await params)
-│   │       └── skill-detail-client.tsx  # 4 panel + drawer + state
+│   │       ├── page.tsx                      # /skills/:skill (await params + fetch summary/eval/skill-md parallel)
+│   │       └── skill-detail-client.tsx       # 4 panel + drawer + sort + workflow filter
 │   ├── components/
-│   │   ├── theme-provider.tsx           # next-themes
-│   │   ├── sidebar.tsx                  # Client — usePathname() + theme toggle
-│   │   ├── topbar.tsx                   # crumbs + actions slot
-│   │   ├── bi.tsx                       # Bilingual lockup (VN lead, EN sub)
-│   │   ├── icon.tsx                     # Inline SVG icons (Lucide-style)
-│   │   ├── diff-viewer.tsx              # LCS diff side-by-side
-│   │   └── charts/
-│   │       ├── sparkline.tsx
-│   │       ├── learning-curve.tsx
-│   │       ├── cost-stacked-bar.tsx
-│   │       └── mini-live-curve.tsx
-│   └── lib/
-│       ├── types.ts                     # SkillSummary, EvalEntry, ApiCall, Kpis
-│       └── mock-data.ts                 # ported from design/data.js (deterministic PRNG)
-└── backend/
-    ├── pyproject.toml                   # uv-managed (package=false)
+│   │   ├── theme-provider.tsx                # in-house (no next-themes)
+│   │   ├── language-provider.tsx             # useLang() context + localStorage:sdl:lang
+│   │   ├── sidebar.tsx                       # Client — usePathname + theme + lang toggles
+│   │   ├── topbar.tsx                        # breadcrumbs + action slot
+│   │   ├── bi.tsx                            # <Bi vi en /> switcher
+│   │   ├── icon.tsx                          # Inline SVG icons
+│   │   ├── diff-viewer.tsx                   # LCS diff + synchronised scroll
+│   │   └── charts/{sparkline,learning-curve,cost-stacked-bar,mini-live-curve}.tsx
+│   ├── lib/
+│   │   ├── types.ts                          # SkillSummary, EvalEntry, ApiCall, Kpis
+│   │   ├── api.ts                            # fetch helpers — server-side, no-store cache
+│   │   ├── display-meta.ts                   # static VN/EN labels per skill
+│   │   └── mock-data.ts                      # mock (chỉ còn dùng cho Cost panel)
+│   └── package.json
+└── backend/                                  # FastAPI + Pydantic v2 (conda-managed)
+    ├── pyproject.toml                        # [tool.pytest.ini_options]
     ├── .env.example
+    ├── tests/                                # 25 tests, pytest
+    │   ├── conftest.py                       # TestClient fixture
+    │   ├── test_health.py
+    │   ├── test_skills_routes.py             # /api/skills/*
+    │   ├── test_run_routes.py                # /api/run + SSE schema
+    │   └── test_data_loader.py               # unit tests cho data_loader
     └── app/
-        ├── __init__.py
-        ├── main.py                      # FastAPI app + CORS
-        ├── models.py                    # Pydantic v2
+        ├── main.py                           # FastAPI + CORS + include routes
+        ├── config.py                         # DISTILL_REPO_ROOT, STABLE_DIR, KNOWN_SKILLS
+        ├── models.py                         # Pydantic schemas
         ├── routes/
-        │   └── run.py                   # POST /api/run, GET /api/run/{id}/stream
+        │   ├── skills.py                     # /api/skills/* (read-only data)
+        │   └── run.py                        # /api/run + /api/run/{id}/stream
         └── services/
-            └── runner.py                # In-memory registry + SSE generator
+            ├── data_loader.py                # LRU-cached reads of summary/eval/api_calls/SKILL_round_*
+            └── runner.py                     # SSE replay (with simulated fallback)
 ```
 
-## Acceptance checklist (mapped to HANDOFF.md §5)
+## Acceptance checklist
 
-- [x] `pnpm tsc --noEmit` ở `frontend/` — 0 lỗi.
+- [x] `pnpm exec tsc --noEmit` ở `frontend/` — 0 lỗi.
 - [x] `uvicorn app.main:app` boot; `GET /api/health` → `{"status":"ok"}`.
-- [x] `/` render 3 KPI + 3 skill card với sparkline (R1=0.793, peak=0.921 @ R5 cho docx).
-- [x] `/skills/docx` đủ 4 panel; learning curve highlight R5 amber; diff R0 → R5 hiển thị nội dung thật của `SKILL_round_0` vs `SKILL_round_5`.
-- [x] Test case row click mở Drawer với prompt / output / rationale / rule checks.
-- [x] `/run` Start → SSE stream events đúng schema; stepper advance `queued → running → judging → teacher → done`.
-- [x] Theme toggle hoạt động, không flash.
-- [ ] Mobile responsive 375px — `design-tokens.css` đã có `@media (max-width: 900px)`; cần test thực tế khi demo trên slide.
-- [x] PNG export trên learning curve + cost chart (dùng `XMLSerializer + canvas.toDataURL`).
+- [x] `/` render 3 KPI + 3 skill card với sparkline (số khớp `summary.json`: docx peak 0.921 @ R5).
+- [x] `/skills/docx` đủ 4 panel; learning curve highlight R5 amber; diff R0 → R5 hiển thị nội dung thật của `SKILL_round_0.md` vs `SKILL_round_5.md`; 2 pane scroll đồng bộ.
+- [x] Test case row click mở Drawer với prompt thật (từ `test_cases/docx.json`) + rationale (từ `llm_judge_reasoning`) + 16 rule_checks (từ `eval_detail.checks`).
+- [x] `/run` Start → SSE replay 26 test case x 6 batch trong ~22s; stepper advance `queued → running → judging → teacher → done`; `final_score` khớp avg thật.
+- [x] Theme toggle hoạt động, không flash light→dark khi reload (bootstrap script).
+- [x] Language toggle VN ↔ EN hoạt động trên mọi page.
+- [x] 25/25 backend pytest pass.
+- [ ] Mobile responsive 375px — CSS đã có `@media (max-width: 900px)`; cần test thực tế khi demo trên slide.
 
-## Liên hệ thiết kế gốc
+## Lưu ý cho người maintain
 
-- Design system: `Koro Design System` (override sang **Academic Clean** theo brief của user).
-- Spec: xem `HANDOFF.md` trong design archive gốc (không commit vào repo này).
-- Source prototype: HTML/JSX trong `/tmp/design-extract/proj-1/project/` (đã port verbatim).
+- **Không ghi vào `distillation_v2/results/stable/`** — backend là read-only client.
+- Nếu upstream thêm `cost_usd` / `round` / `latency_ms` / `timestamp` vào `api_calls.jsonl`, có thể bỏ mock + wire frontend Cost panel sang fetch thật.
+- Wallclock của `/run` điều chỉnh qua hằng `SPEEDUP` (`backend/app/services/runner.py`). `BATCH_SIZE` cũng định nghĩa ở đó.
+- Pre-paint theme script trong `app/layout.tsx` (`THEME_BOOTSTRAP`) chạy đồng bộ trước React — không touch nó nếu không hiểu kỹ.
