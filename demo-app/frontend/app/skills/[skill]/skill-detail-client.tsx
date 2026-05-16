@@ -90,7 +90,19 @@ export function SkillDetailClient({
     dir: "desc",
   });
   const [activeTc, setActiveTc] = useState<EvalEntry | null>(null);
-  const rows = evalByRound[evalRound] || [];
+  // Dedupe by test_case_id — defensive in case upstream JSONL ever ships
+  // multiple records per (round, test_case_id) (e.g. ensemble runs).
+  const rows = useMemo(() => {
+    const seen = new Map<string, EvalEntry>();
+    for (const r of evalByRound[evalRound] || []) {
+      const prev = seen.get(r.test_case_id);
+      // Keep the highest hybrid_score across duplicates.
+      if (!prev || r.hybrid_score > prev.hybrid_score) {
+        seen.set(r.test_case_id, r);
+      }
+    }
+    return [...seen.values()];
+  }, [evalByRound, evalRound]);
 
   const sortedRows = useMemo(() => {
     const a = [...rows];
@@ -364,7 +376,7 @@ export function SkillDetailClient({
               <tbody>
                 {visibleRows.map((row) => (
                   <tr
-                    key={row.test_case_id}
+                    key={`${row.round}-${row.test_case_id}`}
                     onClick={() => setActiveTc(row)}
                     className={activeTc && activeTc.test_case_id === row.test_case_id ? "active" : ""}
                   >
