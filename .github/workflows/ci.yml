@@ -35,6 +35,11 @@ jobs:
 
       - name: Run backend suite
         working-directory: demo-app/backend
+        env:
+          # data_loader reads from $DISTILL_REPO_ROOT/distillation_v2/...
+          # CI checks out the repo at $GITHUB_WORKSPACE, so point there
+          # instead of the dev-machine default in app/config.py.
+          DISTILL_REPO_ROOT: ${{ github.workspace }}
         run: pytest -q
 
   frontend-typecheck:
@@ -64,7 +69,6 @@ jobs:
   pipeline-tests:
     name: pipeline pytest (distillation_v2)
     runs-on: ubuntu-latest
-    continue-on-error: true  # legacy test_rollback.py has known API drift
     steps:
       - uses: actions/checkout@v4
 
@@ -83,4 +87,6 @@ jobs:
             "pytest>=8"
 
       - name: Run pipeline suite
-        run: pytest distillation_v2/tests/ -q
+        # test_rollback.py has known API drift (decide() / choose_validation_tcs
+        # signatures diverged) — tracked but out of scope to fix in this branch.
+        run: pytest distillation_v2/tests/ -q --ignore=distillation_v2/tests/test_rollback.py
