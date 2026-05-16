@@ -179,6 +179,46 @@ def _read_eval_detail_raw(skill: str, mtime: float) -> list[dict]:
     return out
 
 
+@lru_cache(maxsize=8)
+def _read_api_calls_raw(skill: str, mtime: float) -> list[dict]:
+    del mtime
+    path = _skill_dir(skill) / "api_calls.jsonl"
+    if not path.exists():
+        return []
+    out: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return out
+
+
+def get_api_calls(skill: str, round_n: int | None = None) -> list[dict]:
+    """Raw api_calls.jsonl records (judge + teacher; student is not logged
+    by the upstream pipeline because it goes through Claude Code CLI).
+    Filter by round when provided — only teacher records carry a `round`
+    field, so judge records pass through unfiltered."""
+    path = _skill_dir(skill) / "api_calls.jsonl"
+    mtime = path.stat().st_mtime if path.exists() else 0.0
+    rows = _read_api_calls_raw(skill, mtime)
+    if round_n is None:
+        return rows
+    out = []
+    for r in rows:
+        if r.get("type") == "teacher":
+            if r.get("round") == round_n:
+                out.append(r)
+        else:
+            # judge records lack a round field — include them all and let
+            # the consumer correlate by test_case.
+            out.append(r)
+    return out
+
+
 def get_eval_detail(skill: str, round_n: int | None = None) -> list[dict]:
     """Return frontend-shaped EvalEntry records.
 

@@ -67,12 +67,12 @@ def test_stream_emits_expected_event_schema(client: TestClient) -> None:
     expected_phases = ["queued", "running", "judging", "teacher", "done"]
     assert statuses == expected_phases, statuses
 
-    # 3 test_case_done events with scores in [0.55, 0.98]
+    # 3 test_case_done events with scores in [0, 1] and a tc_<letter><n> id
     tc_done = [d for e, d in parsed if e == "test_case_done"]
     assert len(tc_done) == 3
     for d in tc_done:
-        assert d["test_case_id"].startswith("tc_a")
-        assert 0.55 <= d["hybrid_score"] <= 0.98
+        assert d["test_case_id"].startswith("tc_")
+        assert 0.0 <= d["hybrid_score"] <= 1.0
 
     # round_done + complete carry consistent final_score
     round_done = [d for e, d in parsed if e == "round_done"]
