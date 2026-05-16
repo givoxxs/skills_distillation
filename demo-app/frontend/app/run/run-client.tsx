@@ -54,7 +54,11 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const startTimeRef = useRef<number>(0);
-  const logEndRef = useRef<HTMLDivElement | null>(null);
+  const logRef = useRef<HTMLDivElement | null>(null);
+  // Track whether the user has scrolled up away from the bottom. While
+  // that flag is on we stop auto-following new log lines so we don't
+  // yank their view back down.
+  const stickToBottomRef = useRef(true);
 
   function appendLog(line: LogLine) {
     setLogs((L) => [...L, line]);
@@ -76,10 +80,20 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
     }
   }
 
-  // Auto-scroll log to bottom on new line.
+  // Auto-scroll the LOG container only (never the page) — and only when
+  // the user is already glued to the bottom. If they scrolled up to read
+  // an earlier line, leave them there.
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const el = logRef.current;
+    if (!el || !stickToBottomRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [logs]);
+
+  function onLogScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = dist < 32;
+  }
 
   useEffect(() => {
     return () => {
@@ -493,13 +507,30 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
         </div>
       )}
 
-      {/* Per-round summary chips */}
+      {/* Per-round summary cards */}
       {rounds.length > 0 && (
         <div className="card">
-          <div className="stat-label" style={{ marginBottom: 10 }}>
-            <Bi vi="Tóm tắt từng round" en="Per-round summary" />
+          <div
+            className="row-between"
+            style={{ marginBottom: 14, alignItems: "baseline" }}
+          >
+            <h3 className="h3">
+              <Bi vi="Tóm tắt từng round" en="Per-round summary" />
+            </h3>
+            <span className="muted" style={{ fontSize: 12 }}>
+              <Bi
+                vi="Δ so với R1; peak được tô vàng; Δ SKILL.md tính bằng diff so với round trước."
+                en="Δ versus R1; peak highlighted in amber; Δ SKILL.md is the diff against the previous round."
+              />
+            </span>
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+              gap: 10,
+            }}
+          >
             {rounds.map((r) => {
               const r1 = rounds[0]?.avg_score ?? r.avg_score;
               const delta = ((r.avg_score - r1) / Math.max(r1, 1e-9)) * 100;
@@ -507,47 +538,99 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
               return (
                 <div
                   key={r.round}
-                  className="badge"
                   style={{
-                    padding: "8px 12px",
-                    background: isPeak ? "var(--accent-tint)" : "var(--surface-2)",
-                    borderColor: isPeak ? "var(--accent)" : "var(--line)",
                     display: "flex",
                     flexDirection: "column",
-                    alignItems: "flex-start",
-                    gap: 2,
-                    minWidth: 90,
+                    gap: 8,
+                    padding: "14px 16px",
+                    borderRadius: "var(--radius-md)",
+                    background: isPeak ? "var(--accent-tint)" : "var(--surface-2)",
+                    border: "1px solid",
+                    borderColor: isPeak ? "var(--accent)" : "var(--line)",
                   }}
                 >
-                  <div style={{ fontSize: 11, color: "var(--fg-subtle)" }}>
-                    R{r.round}
-                    {isPeak && " · peak"}
-                  </div>
                   <div
-                    className="mono tnum"
                     style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: isPeak ? "var(--accent)" : "var(--fg)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
                     }}
                   >
-                    {r.avg_score.toFixed(3)}
+                    <span
+                      className="stat-label"
+                      style={{ fontSize: 10, letterSpacing: "0.06em" }}
+                    >
+                      Round {r.round}
+                    </span>
+                    {isPeak && (
+                      <span
+                        className="mono"
+                        style={{
+                          fontSize: 9,
+                          padding: "2px 6px",
+                          borderRadius: "var(--radius-xs)",
+                          background: "var(--accent)",
+                          color: "white",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        peak
+                      </span>
+                    )}
                   </div>
-                  {r.round > 1 && (
-                    <div
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span
                       className="mono tnum"
                       style={{
-                        fontSize: 10,
-                        color: delta >= 0 ? "var(--success)" : "var(--danger)",
+                        fontSize: 22,
+                        fontWeight: 600,
+                        lineHeight: 1,
+                        color: isPeak ? "var(--accent)" : "var(--fg)",
                       }}
                     >
-                      {delta >= 0 ? "+" : ""}
-                      {delta.toFixed(1)}%
-                    </div>
-                  )}
+                      {r.avg_score.toFixed(3)}
+                    </span>
+                    {r.round > 1 && (
+                      <span
+                        className="mono tnum"
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: delta >= 0 ? "var(--success)" : "var(--danger)",
+                        }}
+                      >
+                        {delta >= 0 ? "+" : ""}
+                        {delta.toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
                   {r.lines_added !== undefined && (
-                    <div className="mono" style={{ fontSize: 10, color: "var(--fg-faint)" }}>
-                      Δ SKILL.md +{r.lines_added} / −{r.lines_removed}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: 11,
+                        color: "var(--fg-faint)",
+                        paddingTop: 4,
+                        borderTop: "1px solid var(--line-faint)",
+                      }}
+                    >
+                      <span className="mono">Δ SKILL.md</span>
+                      <span
+                        className="mono"
+                        style={{ color: "var(--diff-add-fg)" }}
+                      >
+                        +{r.lines_added}
+                      </span>
+                      <span
+                        className="mono"
+                        style={{ color: "var(--diff-rem-fg)" }}
+                      >
+                        −{r.lines_removed}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -572,6 +655,8 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
           </div>
           <div className="panel-body" style={{ padding: 0 }}>
             <div
+              ref={logRef}
+              onScroll={onLogScroll}
               className="log"
               style={{
                 maxHeight: 540,
@@ -593,7 +678,6 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
                   <span>{l.text}</span>
                 </div>
               ))}
-              <div ref={logEndRef} />
             </div>
           </div>
         </div>
