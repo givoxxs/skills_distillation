@@ -48,15 +48,20 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: pnpm
-          cache-dependency-path: demo-app/frontend/pnpm-lock.yaml
+          # No pnpm cache — would require pnpm in PATH before setup-node
+          # runs, but pnpm comes from corepack (next step). For a small
+          # frontend with a frozen lockfile, install is ~5 s; not worth
+          # the wiring.
+
+      - name: Activate pnpm via corepack
+        # pnpm/action-setup still pins Node 20 and trips the deprecation
+        # warning. corepack ships inside Node and handles the same job.
+        run: |
+          corepack enable
+          corepack prepare pnpm@10 --activate
 
       - name: Install
         working-directory: demo-app/frontend
