@@ -900,15 +900,88 @@ button { font: inherit; cursor: pointer; }
 }
 
 /* Mobile */
+/* ============================================================
+   Responsive breakpoints
+   - 900px  : tablet / narrow desktop — collapse layout to one
+              column, shrink sidebar to icon rail
+   - 700px  : small tablet / large phone — stack diff viewer,
+              compact panel headers
+   - 600px  : phone — hide stepper phase labels, tighten chrome
+   ============================================================ */
+
 @media (max-width: 900px) {
   :root { --sidebar-w: 64px; }
   .app { grid-template-columns: 64px 1fr; }
-  .sidebar .brand-name, .sidebar .nav-section, .sidebar .nav-sub, .sidebar .nav-item span:not(.icon-slot) {
-    /* keep simple for mobile demo */
+
+  /* Icon rail: keep brand mark + nav icons, hide every text label */
+  .sidebar-brand .brand-name,
+  .sidebar .nav-section,
+  .sidebar .nav-sub,
+  .sidebar .nav-item .bi,
+  .sidebar .nav-item > span:not(.icon),
+  .sidebar-footer > span {
+    display: none;
   }
+  .sidebar-brand { justify-content: center; padding: var(--s-2) 0 var(--s-5); }
+  .sidebar .nav { padding: 0 var(--s-2); }
+  .sidebar .nav-item {
+    justify-content: center;
+    padding: 8px;
+  }
+  .sidebar-footer { justify-content: center; padding: var(--s-3) 0 0; }
+
+  /* Layout */
   .grid-2 { grid-template-columns: 1fr; }
   .grid-3 { grid-template-columns: 1fr; }
   .grid-4 { grid-template-columns: 1fr 1fr; }
   .page { padding: var(--s-6) var(--s-4); }
   .topbar { padding: 0 var(--s-4); }
+
+  /* Panel headers wrap controls under the title */
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-3);
+  }
+
+  /* KPI cards trim height */
+  .kpi-card { min-height: 100px; padding: var(--s-5); }
+  .kpi-value { font-size: var(--text-3xl); }
+}
+
+@media (max-width: 700px) {
+  /* Diff viewer: stack the two panes vertically so each line is readable */
+  .diff { grid-template-columns: 1fr; }
+  .diff-pane + .diff-pane {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+  .diff-pane { max-height: 500px; }
+
+  /* Display headings shrink so they don't wrap awkwardly */
+  .h-display { font-size: var(--text-3xl); }
+  .h1 { font-size: var(--text-2xl); }
+  .h2 { font-size: var(--text-xl); }
+
+  /* Drawer takes nearly full width */
+  .drawer { width: 100vw; }
+}
+
+@media (max-width: 600px) {
+  /* Stepper: icons + numbers only, hide phase text labels.
+     Inside .step, the first span is the .num circle; the next sibling
+     span (the literal phase name like "running") gets hidden. */
+  .step > span:not(.num) { display: none; }
+  .step { padding: var(--s-3) var(--s-2); justify-content: center; }
+
+  /* Page padding tighter */
+  .page { padding: var(--s-5) var(--s-3); }
+
+  /* Topbar crumbs scroll horizontally instead of wrapping */
+  .crumbs {
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .crumbs::-webkit-scrollbar { display: none; }
 }
