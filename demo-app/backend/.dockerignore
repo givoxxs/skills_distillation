@@ -1,0 +1,47 @@
+# Build context is the repo root (set via dockerContext in render.yaml).
+# Skip everything we don't need to keep the image small and the build fast.
+
+# Frontend — never copied in
+demo-app/frontend/
+demo-app/Makefile
+demo-app/README.md
+
+# Backend dev artefacts
+demo-app/backend/.venv/
+demo-app/backend/__pycache__/
+demo-app/backend/**/__pycache__/
+demo-app/backend/.pytest_cache/
+demo-app/backend/tests/
+
+# Upstream pipeline code, logs, rubrics — only stable results + test_cases
+# are baked in.
+distillation_v2/__pycache__/
+distillation_v2/**/__pycache__/
+distillation_v2/.pytest_cache/
+distillation_v2/.claude/
+distillation_v2/logs/
+distillation_v2/rubrics/
+distillation_v2/results/[0-9]*/
+distillation_v2/results/14_05_2026/
+distillation_v2/skills/
+distillation_v2/tests/
+
+# Everything else outside what we COPY explicitly
+distillation/
+skill_runner/
+skill_evaluation/
+context/
+docs/
+.git/
+.github/
+.claude/
+.antigravity/
+.cursor/
+.code-review-graph/
+.token-savior-cache.json
+.ruff_cache/
+mempalace.yaml
+entities.json
+uv.lock
+*.md
+!demo-app/backend/README.md

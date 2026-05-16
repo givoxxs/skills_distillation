@@ -251,6 +251,84 @@ demo-app/
 - [x] 25/25 backend pytest pass.
 - [ ] Mobile responsive 375px — CSS đã có `@media (max-width: 900px)`; cần test thực tế khi demo trên slide.
 
+## Deploy ra internet — free 100%
+
+Mục tiêu: cho hội đồng / người ngoài access link `https://<vercel>.vercel.app` → toàn bộ demo chạy như local. Hai service tách rời, hai platform free:
+
+| Service | Platform | Plan | Ghi chú |
+|---|---|---|---|
+| Frontend (Next.js) | **Vercel** | Hobby (free vĩnh viễn) | Auto-deploy từ GitHub, ~100 GB BW/tháng |
+| Backend (FastAPI) | **Render** | Web Service Free (750h/m) | Sleep sau 15 min idle → cold start ~30–60s khi user đầu tiên click sau đó |
+
+### Bước 1 — Push repo lên GitHub
+
+Nếu chưa có:
+```bash
+gh repo create skills-distillation --public --source . --push
+# hoặc: thêm remote + git push thủ công
+```
+
+### Bước 2 — Deploy backend lên Render
+
+1. Mở `https://dashboard.render.com` → **New +** → **Blueprint**.
+2. Connect GitHub repo, chọn branch `main`.
+3. Render đọc `demo-app/render.yaml`, tạo Web Service `skill-distillation-backend`.
+4. Trong tab Environment, sửa `ALLOWED_ORIGINS` thêm Vercel domain (lát sau khi có):
+   ```
+   ALLOWED_ORIGINS=https://your-app.vercel.app,http://localhost:3000
+   ```
+5. Bấm Deploy. Build mất ~3–5 phút (Docker từ scratch).
+6. Khi sống: copy URL Render, ví dụ `https://skill-distillation-backend.onrender.com`.
+7. Verify: `curl https://<your-render-domain>/api/health` → `{"status":"ok"}`.
+
+> **Docker chi tiết:** `demo-app/backend/Dockerfile` bake sẵn `distillation_v2/results/stable/` + `test_cases/` vào image (~5 MB) qua build context = repo root. `DISTILL_REPO_ROOT` được set sang `/data` trong image nên `data_loader.py` đọc đúng path mà không cần volume mount.
+
+### Bước 3 — Deploy frontend lên Vercel
+
+1. Mở `https://vercel.com/new` → import GitHub repo.
+2. **Root Directory**: `demo-app/frontend`.
+3. **Build Command**: để mặc định (`next build`).
+4. **Environment Variables** → thêm:
+   ```
+   NEXT_PUBLIC_BACKEND_URL=https://skill-distillation-backend.onrender.com
+   ```
+5. Deploy. Build mất ~1–2 phút.
+6. Khi xong: copy Vercel domain, **quay lại Render → cập nhật `ALLOWED_ORIGINS`** với domain Vercel → trigger redeploy backend.
+
+### Bước 4 — Smoke test
+
+Mở `https://<your-vercel-domain>.vercel.app/`. Browser console KHÔNG được có CORS error. Các route:
+- `/` → 3 KPI + 3 skill card với sparkline thật
+- `/skills/docx` → 4 panel, diff R0 → R5 hiển thị nội dung thật
+- `/run` → bấm Start → SSE stream 8 round, kết thúc với peak 0.921 @ R5
+
+### Cold-start mitigation (tuỳ chọn)
+
+Render free tier sleep sau 15 phút idle. Một số cách giảm shock:
+- Trong UI thêm dòng "Backend đang warm up… (lần đầu mất ~30s)" khi fetch `/api/health` mất > 10s.
+- Hoặc ping endpoint `/api/health` từ cron job free (vd. `cron-job.org`) mỗi 10 phút → giữ container awake (chỉ trong giờ bảo vệ).
+- Hoặc upgrade Render lên **Starter $7/m** để bỏ sleep.
+
+### File / endpoint cần biết
+
+| File | Vai trò |
+|---|---|
+| `demo-app/render.yaml` | Blueprint Render — đọc khi tạo service |
+| `demo-app/backend/Dockerfile` | Image cho production |
+| `demo-app/backend/.dockerignore` | Skip dev artefacts khi build |
+| `ALLOWED_ORIGINS` env var | CORS whitelist, dạng comma-separated |
+| `DISTILL_REPO_ROOT` env var | Path tới `distillation_v2/` data. Default `/data` trong Docker |
+| `NEXT_PUBLIC_BACKEND_URL` (Vercel) | URL backend FE sẽ gọi |
+
+### Khi deploy thất bại
+
+| Triệu chứng | Nguyên nhân thường gặp |
+|---|---|
+| Render build "context exceeded" | `.dockerignore` chưa skip dir lớn — check |
+| CORS error trong browser | `ALLOWED_ORIGINS` thiếu Vercel domain — sửa env, redeploy |
+| 502/504 trên `/api/run/{id}/stream` | Render free idle hoặc proxy timeout; thử reload |
+| `/api/skills` trả 502 với "stable dir missing" | Image không có data — check `.dockerignore` whitelist |
+
 ## Lưu ý cho người maintain
 
 - **Không ghi vào `distillation_v2/results/stable/`** — backend là read-only client.

@@ -1,0 +1,30 @@
+# Render Blueprint for the Skill Distillation Lab backend.
+# Push this repo to GitHub, then in Render: New +  →  Blueprint  →
+# point at the repo. Render reads this file and creates the service.
+#
+# Tier: free plan, US Oregon region. Sleeps after 15 min idle — first
+# request after sleep costs ~30–60 s cold start. Acceptable for a demo
+# the committee will reload a few times.
+#
+# Frontend stays on Vercel; this blueprint only covers the backend.
+
+services:
+  - type: web
+    name: skill-distillation-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    # The Dockerfile lives in demo-app/backend/ but the build context
+    # must be the repo root so COPY can reach distillation_v2/.
+    dockerContext: .
+    dockerfilePath: ./demo-app/backend/Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ALLOWED_ORIGINS
+        # Replace with your Vercel domain once the frontend is deployed,
+        # then redeploy. Multiple origins comma-separated.
+        value: "https://your-vercel-domain.vercel.app,http://localhost:3000"
+      - key: PORT
+        # Render injects this automatically. Listed here for clarity.
+        value: "10000"
