@@ -270,9 +270,9 @@ gh repo create skills-distillation --public --source . --push
 
 ### Bước 2 — Deploy backend lên Render
 
-1. Mở `https://dashboard.render.com` → **New +** → **Blueprint**.
-2. Connect GitHub repo, chọn branch `main`.
-3. Render đọc `demo-app/render.yaml`, tạo Web Service `skill-distillation-backend`.
+1. Mở `https://dashboard.render.com/blueprints` (KHÔNG phải New + → Web Service).
+2. Bấm **New Blueprint Instance** → connect GitHub repo, chọn branch `main`.
+3. Render đọc `render.yaml` ở repo root, tạo Web Service `skill-distillation-backend`.
 4. Trong tab Environment, sửa `ALLOWED_ORIGINS` thêm Vercel domain (lát sau khi có):
    ```
    ALLOWED_ORIGINS=https://your-app.vercel.app,http://localhost:3000

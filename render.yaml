@@ -1,6 +1,11 @@
 # Render Blueprint for the Skill Distillation Lab backend.
-# Push this repo to GitHub, then in Render: New +  →  Blueprint  →
-# point at the repo. Render reads this file and creates the service.
+#
+# Lives at repo root because Render only auto-detects render.yaml at
+# the top level of the linked repo.
+#
+# To deploy: https://dashboard.render.com/blueprints → New Blueprint
+# Instance → pick this repo → Apply. Render reads this file and
+# creates the service.
 #
 # Tier: free plan, US Oregon region. Sleeps after 15 min idle — first
 # request after sleep costs ~30–60 s cold start. Acceptable for a demo
