@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Bi } from "@/components/bi";
 import { TopBar } from "@/components/topbar";
 import { SkillDetailClient } from "./skill-detail-client";
 import {
@@ -89,13 +90,13 @@ export default async function SkillDetailPage({
     <>
       <TopBar
         crumbs={[
-          { label: "Tổng quan", href: "/" },
-          { label: BILINGUAL ? "Skills" : "Skills", href: "/" },
+          { label: <Bi vi="Tổng quan" en="Overview" />, href: "/" },
+          { label: "Skills", href: "/" },
           { label: <span className="mono">{summary.skill}</span> },
         ]}
         actions={
           <Link href="/run" className="btn btn-sm">
-            <span lang="vi">Chạy mini cho skill này</span>
+            <Bi vi="Chạy mini cho skill này" en="Run mini for this skill" />
           </Link>
         }
       />

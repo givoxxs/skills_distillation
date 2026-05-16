@@ -530,15 +530,25 @@ export function SkillDetailClient({
                 <div className="code-block">{activeTc.prompt || "—"}</div>
               </div>
               <div className="drawer-section">
-                <div className="drawer-section-title">
-                  {bilingual ? "Output (artifacts) · stored at" : "Output (artifacts) · stored at"}
-                </div>
+                <div className="drawer-section-title">Output (artifacts) · stored at</div>
                 <div className="code-block" style={{ maxHeight: 80 }}>
                   {activeTc.output || "—"}
                 </div>
                 <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                  Artifacts (output.docx, screenshots…) nằm tại đường dẫn trên trong{" "}
-                  <span className="mono">distillation_v2/</span> — không inline để giữ payload nhẹ.
+                  <Bi
+                    vi={
+                      <>
+                        Artifacts (output.docx, screenshots…) nằm tại đường dẫn trên trong{" "}
+                        <span className="mono">distillation_v2/</span> — không inline để giữ payload nhẹ.
+                      </>
+                    }
+                    en={
+                      <>
+                        Artifacts (output.docx, screenshots…) live at the path above inside{" "}
+                        <span className="mono">distillation_v2/</span> — not inlined to keep payload small.
+                      </>
+                    }
+                  />
                 </div>
               </div>
               <div className="drawer-section">

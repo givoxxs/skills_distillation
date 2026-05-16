@@ -36,7 +36,7 @@ export default async function OverviewPage() {
   return (
     <>
       <TopBar
-        crumbs={[{ label: BILINGUAL ? "Tổng quan · Overview" : "Tổng quan" }]}
+        crumbs={[{ label: <Bi vi="Tổng quan" en="Overview" /> }]}
         actions={
           <Link href="/run" className="btn btn-primary">
             <Icon name="play" size={16} />
@@ -142,7 +142,9 @@ export default async function OverviewPage() {
                     }}
                   >
                     <div>
-                      <div className="skill-title">{meta.vi}</div>
+                      <div className="skill-title">
+                        <Bi vi={meta.vi} en={meta.en} />
+                      </div>
                       <div className="skill-id">{s.skill}</div>
                     </div>
                     <span className="badge badge-success" title="Improvement R1 → Peak">
@@ -220,21 +222,22 @@ export default async function OverviewPage() {
               {
                 n: "01",
                 label: "Student",
-                body: `${summaries[0].student_model} chạy SKILL.md hiện tại trên các test case, sinh output.`,
+                vi: `${summaries[0].student_model} chạy SKILL.md hiện tại trên các test case, sinh output.`,
+                en: `${summaries[0].student_model} runs the current SKILL.md against the test cases and produces output.`,
                 color: "var(--primary)",
               },
               {
                 n: "02",
                 label: "Judge",
-                body:
-                  "Claude chấm từng output theo rubric. Rule-check chạy trước; điểm rule quá thấp thì bỏ qua judge.",
+                vi: "Claude chấm từng output theo rubric. Rule-check chạy trước; điểm rule quá thấp thì bỏ qua judge.",
+                en: "Claude scores each output against the rubric. Rule checks run first; if rule_score is too low, the LLM judge is skipped.",
                 color: "var(--accent)",
               },
               {
                 n: "03",
                 label: "Teacher",
-                body:
-                  "Claude đọc rationale của judge, viết lại SKILL.md cho vòng kế tiếp, lưu thành SKILL_round_N.md.",
+                vi: "Claude đọc rationale của judge, viết lại SKILL.md cho vòng kế tiếp, lưu thành SKILL_round_N.md.",
+                en: "Claude reads the judge rationales, rewrites SKILL.md for the next round, and saves it as SKILL_round_N.md.",
                 color: "var(--success)",
               },
             ].map((step) => (
@@ -262,7 +265,7 @@ export default async function OverviewPage() {
                     color: "var(--fg-muted)",
                   }}
                 >
-                  {step.body}
+                  <Bi vi={step.vi} en={step.en} />
                 </p>
               </div>
             ))}

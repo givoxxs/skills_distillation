@@ -1,3 +1,4 @@
+import { Bi } from "@/components/bi";
 import { TopBar } from "@/components/topbar";
 import { RunClient } from "./run-client";
 
@@ -6,8 +7,8 @@ export default function RunPage() {
     <>
       <TopBar
         crumbs={[
-          { label: "Tổng quan", href: "/" },
-          { label: "Live run · Chạy thử" },
+          { label: <Bi vi="Tổng quan" en="Overview" />, href: "/" },
+          { label: <Bi vi="Chạy thử" en="Live run" /> },
         ]}
       />
       <RunClient bilingual={true} />

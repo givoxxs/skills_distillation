@@ -272,13 +272,33 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
             showEn={bilingual}
           />
         </div>
-        <h1 className="h1">Chạy pipeline 1 vòng để xem code thật.</h1>
+        <h1 className="h1">
+          <Bi
+            vi="Chạy pipeline 1 vòng để xem code thật."
+            en="Run one pipeline round to see the code in action."
+          />
+        </h1>
         <p className="muted" style={{ maxWidth: 640, fontSize: 16 }}>
-          Tốc độ ~2–3 phút wall-clock. UI gọi{" "}
-          <span className="mono" style={{ fontSize: 13 }}>
-            POST /api/run
-          </span>{" "}
-          rồi stream tiến trình qua Server-Sent Events.
+          <Bi
+            vi={
+              <>
+                Tốc độ ~2–3 phút wall-clock. UI gọi{" "}
+                <span className="mono" style={{ fontSize: 13 }}>
+                  POST /api/run
+                </span>{" "}
+                rồi stream tiến trình qua Server-Sent Events.
+              </>
+            }
+            en={
+              <>
+                About 2–3 minutes wall-clock. The UI calls{" "}
+                <span className="mono" style={{ fontSize: 13 }}>
+                  POST /api/run
+                </span>{" "}
+                and streams progress over Server-Sent Events.
+              </>
+            }
+          />
         </p>
       </div>
 
@@ -325,7 +345,9 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
                         <div className="mono" style={{ fontSize: 13, color: "var(--fg)" }}>
                           {s}
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--fg-subtle)" }}>{sum.vi}</div>
+                        <div style={{ fontSize: 12, color: "var(--fg-subtle)" }}>
+                          <Bi vi={sum.vi} en={sum.en || sum.vi} />
+                        </div>
                       </div>
                       <span className="badge">
                         <span className="mono tnum">peak {sum.best_score.toFixed(3)}</span>
@@ -352,7 +374,10 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
                 </span>
               </div>
               <p className="muted" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-                Giới hạn để hội đồng thấy code chạy thật trong ~2–3 phút.
+                <Bi
+                  vi="Giới hạn để hội đồng thấy code chạy thật trong ~2–3 phút."
+                  en="Capped so the committee can watch the pipeline run live in 2–3 minutes."
+                />
               </p>
             </div>
 
@@ -379,8 +404,20 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
                 </button>
               </div>
               <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
-                Backend mode gọi FastAPI ở <span className="mono">{BACKEND_URL}</span>; fallback local
-                nếu không kết nối được.
+                <Bi
+                  vi={
+                    <>
+                      Backend mode gọi FastAPI ở <span className="mono">{BACKEND_URL}</span>; fallback
+                      local nếu không kết nối được.
+                    </>
+                  }
+                  en={
+                    <>
+                      Backend mode calls FastAPI at <span className="mono">{BACKEND_URL}</span>; falls
+                      back to local simulation if unreachable.
+                    </>
+                  }
+                />
               </p>
             </div>
 
@@ -487,7 +524,10 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
           >
             {logs.length === 0 && (
               <div style={{ color: "var(--fg-faint)", fontStyle: "italic" }}>
-                Chưa có dòng nào. Bấm “Bắt đầu mini run” để khởi chạy.
+                <Bi
+                  vi="Chưa có dòng nào. Bấm “Bắt đầu mini run” để khởi chạy."
+                  en="No log lines yet. Click “Start mini run” to begin."
+                />
               </div>
             )}
             {logs.map((l, i) => (
@@ -506,7 +546,7 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
               </button>
               <Link className="btn btn-primary" href={`/skills/${picked}`}>
                 <Icon name="external" size={14} />
-                Xem báo cáo đầy đủ →
+                <Bi vi="Xem báo cáo đầy đủ →" en="View full report →" />
               </Link>
             </div>
           )}
@@ -521,7 +561,10 @@ export function RunClient({ bilingual }: { bilingual: boolean }) {
               <Bi vi="Backend contract" en={bilingual ? "Backend contract" : null} showEn={bilingual} />
             </div>
             <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-              FastAPI endpoints này dashboard sẽ gọi. SSE stream theo schema bên dưới.
+              <Bi
+                vi="FastAPI endpoints này dashboard sẽ gọi. SSE stream theo schema bên dưới."
+                en="The FastAPI endpoints the dashboard calls. SSE events follow the schema below."
+              />
             </div>
           </div>
         </div>
