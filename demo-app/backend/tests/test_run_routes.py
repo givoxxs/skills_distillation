@@ -29,7 +29,16 @@ def test_stream_404_for_unknown_run(client: TestClient) -> None:
     assert r.status_code == 404
 
 
-def test_stream_emits_expected_event_schema(client: TestClient) -> None:
+def test_stream_emits_expected_event_schema(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Speed the replay up for the test — the full multi-round stream is
+    # designed to run for ~120 s wall-clock in production, which would
+    # blow up the pytest timeout.
+    from app.services import runner as runner_module
+
+    monkeypatch.setattr(runner_module, "SPEEDUP", 0.02)
+
     create = client.post("/api/run", json={"skill": "docx"})
     run_id = create.json()["run_id"]
 
@@ -62,23 +71,29 @@ def test_stream_emits_expected_event_schema(client: TestClient) -> None:
     assert parsed[0][1]["phase"] == "queued"
     assert events[-1] == "complete"
 
-    # Must hit every phase in order
+    # Must visit every phase at least once, end with 'done'.
     statuses = [d["phase"] for e, d in parsed if e == "status"]
-    expected_phases = ["queued", "running", "judging", "teacher", "done"]
-    assert statuses == expected_phases, statuses
+    assert {"queued", "running", "judging", "teacher", "done"}.issubset(set(statuses))
+    assert statuses[0] == "queued"
+    assert statuses[-1] == "done"
 
-    # One test_case_done event per real test case in round 1 (~26 for docx).
+    # Multi-round replay: one round_started + one round_done per round.
+    round_started = [d for e, d in parsed if e == "round_started"]
+    round_done = [d for e, d in parsed if e == "round_done"]
+    assert len(round_started) == len(round_done) >= 2
+    rounds_sequence = [d["round"] for d in round_done]
+    assert rounds_sequence == sorted(rounds_sequence), "rounds out of order"
+
+    # test_case_done per TC per round.
     tc_done = [d for e, d in parsed if e == "test_case_done"]
-    assert len(tc_done) >= 3, "expected at least a few test cases per round"
+    assert len(tc_done) >= len(round_done) * 3
     for d in tc_done:
         assert d["test_case_id"].startswith("tc_")
         assert 0.0 <= d["hybrid_score"] <= 1.0
+        assert "round" in d
 
-    # round_done + complete carry consistent final_score
-    round_done = [d for e, d in parsed if e == "round_done"]
+    # complete carries skill + final_score
     complete = [d for e, d in parsed if e == "complete"]
-    assert len(round_done) == 1
     assert len(complete) == 1
-    assert round_done[0]["round"] == 1
     assert complete[0]["skill"] == "docx"
-    assert complete[0]["final_score"] == round_done[0]["avg_score"]
+    assert 0.0 <= complete[0]["final_score"] <= 1.0
