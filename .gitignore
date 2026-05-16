@@ -73,7 +73,19 @@ distillation_v2/tests/integration_results/
 .ruff_cache
 
 distillation_v2/rubrics
-distillation_v2/results
+
+# Ignore dated run dirs (results/01_05_2026/, etc) but KEEP the curated
+# stable/ snapshot so demo-app's backend can serve real data on Render.
+# Inside stable/, only the four files data_loader.py reads are tracked;
+# the heavy student artefacts (round_N/, analysis/, validation/) stay out.
+distillation_v2/results/*
+!distillation_v2/results/stable/
+distillation_v2/results/stable/*/round_*/
+distillation_v2/results/stable/*/analysis/
+distillation_v2/results/stable/*/validation/
+distillation_v2/results/stable/*/run.log
+distillation_v2/results/stable/*/SKILL_current.md
+
 distillation_v2/skills/*
 
 skillsbench/

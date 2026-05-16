@@ -1,0 +1,52 @@
+{
+  "skill": "docx",
+  "student_model": "google/gemma-4-26b-a4b-it",
+  "teacher_model": "anthropic/claude-haiku-4-5",
+  "judge_model": "anthropic/claude-haiku-4-5",
+  "batch_size": 5,
+  "rounds_run": 8,
+  "final_score": 0.8771877426312005,
+  "best_round": 5,
+  "best_score": 0.9211353725015142,
+  "score_history": [
+    {
+      "round": 1,
+      "avg_score": 0.7928069015097052
+    },
+    {
+      "round": 2,
+      "avg_score": 0.8406014378145219
+    },
+    {
+      "round": 3,
+      "avg_score": 0.8492145938173975
+    },
+    {
+      "round": 4,
+      "avg_score": 0.902582012724118
+    },
+    {
+      "round": 5,
+      "avg_score": 0.9211353725015142
+    },
+    {
+      "round": 6,
+      "avg_score": 0.8965376707404745
+    },
+    {
+      "round": 7,
+      "avg_score": 0.9207763813651137
+    },
+    {
+      "round": 8,
+      "avg_score": 0.8771877426312005
+    }
+  ],
+  "rubric_cache_keys": {
+    "convert": "convert_ef138f0f7bfb_5bf693f8380b",
+    "create": "create_ef138f0f7bfb_5e9d26e238eb",
+    "edge": "edge_ef138f0f7bfb_8ce200f5357f",
+    "edit": "edit_ef138f0f7bfb_dc4dafe9e288",
+    "read": "read_ef138f0f7bfb_919079fa6503"
+  }
+}

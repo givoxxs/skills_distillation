@@ -1,0 +1,60 @@
+{
+  "skill": "slack-gif-creator",
+  "student_model": "google/gemma-4-26b-a4b-it",
+  "teacher_model": "anthropic/claude-haiku-4-5",
+  "judge_model": "anthropic/claude-haiku-4-5",
+  "batch_size": 5,
+  "rounds_run": 10,
+  "final_score": 0.8651142857142858,
+  "best_round": 9,
+  "best_score": 0.8855,
+  "score_history": [
+    {
+      "round": 1,
+      "avg_score": 0.7164155279503106
+    },
+    {
+      "round": 2,
+      "avg_score": 0.7803689440993788
+    },
+    {
+      "round": 3,
+      "avg_score": 0.7641447204968944
+    },
+    {
+      "round": 4,
+      "avg_score": 0.8666614906832298
+    },
+    {
+      "round": 5,
+      "avg_score": 0.8653273291925466
+    },
+    {
+      "round": 6,
+      "avg_score": 0.818660248447205
+    },
+    {
+      "round": 7,
+      "avg_score": 0.7794024844720496
+    },
+    {
+      "round": 8,
+      "avg_score": 0.8241739130434782
+    },
+    {
+      "round": 9,
+      "avg_score": 0.8855
+    },
+    {
+      "round": 10,
+      "avg_score": 0.8651142857142858
+    }
+  ],
+  "rubric_cache_keys": {
+    "compose": "compose_fb7f4f3dba38_8307925949e3",
+    "create": "create_fb7f4f3dba38_62f32959f630",
+    "edge": "edge_fb7f4f3dba38_bb1e6b5de5dc",
+    "optimize": "optimize_fb7f4f3dba38_013d680aff4c",
+    "validate": "validate_fb7f4f3dba38_fb330bda6e4a"
+  }
+}

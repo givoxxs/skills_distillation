@@ -14,7 +14,11 @@ repos:
       - id: check-toml
       - id: check-merge-conflict
       - id: check-added-large-files
-        args: ['--maxkb=500']
+        args: ['--maxkb=1000']
+        # distillation_v2/results/stable/<skill>/eval_detail.jsonl runs
+        # 700–900 KB (real run logs needed by demo-app/backend); allow
+        # up to 1 MB to keep that data tracked. skillsbench_tasks/
+        # archives can be larger and are intentionally exempt.
         exclude: ^skillsbench_tasks/
       - id: mixed-line-ending
         args: ['--fix=lf']
