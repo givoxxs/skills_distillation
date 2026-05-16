@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { useTheme } from "next-themes";
 import { Bi } from "./bi";
 import { Icon } from "./icon";
 import { useLang } from "./language-provider";
+import { useTheme } from "./theme-provider";
 import { skillList } from "@/lib/mock-data";
 
 export function Sidebar() {
