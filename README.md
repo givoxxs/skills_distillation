@@ -1,8 +1,17 @@
 # Skill Distillation
 
+[![CI](https://github.com/givoxxs/Skills_Distillation/actions/workflows/ci.yml/badge.svg)](https://github.com/givoxxs/Skills_Distillation/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![Live demo](https://img.shields.io/badge/demo-skills--distillation.vercel.app-black?logo=vercel)](https://skills-distillation.vercel.app)
+
 > Chưng cất tài liệu `SKILL.md` của Anthropic xuống mô hình ngôn ngữ nhỏ — không huấn luyện lại trọng số, chỉ viết lại văn bản hướng dẫn qua vòng lặp *Teacher → Student → Judge*.
 
 **Đồ án tốt nghiệp 2026** · Phan Văn Toàn · K22 · `22T_DT2` · GVHD TS. Phạm Minh Tuấn · Khoa Công nghệ Thông tin.
+
+🔗 **Live demo:** <https://skills-distillation.vercel.app>
+
+![Overview dashboard](docs/screenshots/01_overview.png)
 
 ---
 
@@ -74,6 +83,19 @@ Cả ba skill đều vượt ngưỡng dừng `0.70` ngay từ vòng 1; pipeline
 **Stack:** Python 3.12 (conda env `skills`) · Anthropic SDK · OpenRouter · Click + Rich · PyYAML · pytest · pre-commit.
 
 **Demo app:** Next.js 16 App Router + Tailwind v4 + FastAPI + SSE (xem `demo-app/`).
+
+---
+
+## Demo
+
+| Trang | Ảnh |
+|---|---|
+| Overview — 3 KPI + sparkline per skill | ![](docs/screenshots/01_overview.png) |
+| Skill detail — learning curve + diff `SKILL.md` round-by-round | ![](docs/screenshots/02_skill_detail.png) |
+| Live run — SSE replay 8–10 rounds với batch 5 song song | ![](docs/screenshots/03_live_run.png) |
+| About | ![](docs/screenshots/04_about.png) |
+
+> *Capture instructions:* xem `docs/screenshots/README.md`.
 
 ---
 
